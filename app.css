@@ -1,0 +1,66 @@
+section[data-testid="plugin-sidebar-footer-disclosure-pool-usage-pool-usage"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.pool-usage-root {
+  padding-inline: 8px;
+  width: 100%;
+}
+
+.pool-usage-row {
+  display: grid;
+  grid-template-columns: 1rem 3.75rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.5rem;
+  min-height: 1.875rem;
+  padding-block: 2px;
+}
+
+.pool-usage-provider,
+.pool-usage-plan {
+  margin-top: 0.0625rem;
+}
+
+.pool-usage-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pool-usage-list--scrollable {
+  max-height: min(18rem, 48vh);
+  overflow-y: auto;
+}
+
+.pool-usage-meta {
+  margin-top: 2px;
+}
+
+.pool-usage-track {
+  background: var(--muted);
+}
+
+.pool-usage-fill {
+  min-width: 0;
+  transition: width 300ms ease-out;
+}
+
+.pool-usage-fill--neutral {
+  background: var(--muted-foreground);
+}
+
+.pool-usage-fill--warning {
+  background: var(--warning);
+}
+
+.pool-usage-fill--critical {
+  background: var(--destructive);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pool-usage-fill {
+    transition: none;
+  }
+}
