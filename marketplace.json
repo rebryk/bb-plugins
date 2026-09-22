@@ -1,0 +1,56 @@
+{
+  "$schema": "https://getbb.app/schemas/marketplace-v2.schema.json",
+  "schemaVersion": 2,
+  "name": "rebryk-bb-plugins",
+  "displayName": "rebryk/bb-plugins",
+  "description": "Personal bb plugins by Yurii Rebryk.",
+  "categories": [
+    {
+      "id": "token-usage-and-limits",
+      "displayName": "Token Usage & Limits",
+      "description": "Understand or control token, context-window, and provider-quota use."
+    }
+  ],
+  "collections": [
+    {
+      "id": "rebryk-bb-plugins",
+      "displayName": "rebryk/bb-plugins",
+      "pluginIds": [
+        "pool-usage"
+      ]
+    }
+  ],
+  "plugins": [
+    {
+      "id": "pool-usage",
+      "displayName": "Pool Usage",
+      "description": "See every Account Pooler account's limiting quota window and its reset time in one compact sidebar list.",
+      "icon": "ChartColumn",
+      "tags": [
+        "account-pooler",
+        "quota",
+        "limits",
+        "usage",
+        "claude",
+        "codex"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "token-usage-and-limits",
+      "screenshots": [
+        "./screenshots/pool-usage/sidebar.png"
+      ],
+      "overview": "Keep the whole Account Pooler visible without opening a settings page.\n\n## One account, one row\n\nOpen **Account usage** from the sidebar footer to see a single flat list. Every\nrow contains the Claude or Codex mark, the provider's subscription tier, one flat\nusage bar, the percentage, and a tiny window/reset line. There are no cards,\nprovider group headings, separators, hover states, or status-dot clutter; the\ndisclosure itself is transparent and borderless.\n\nThe bar shows the window that actually limits the account right now. When a\nwindow is spent, the row reports the spent window that clears last and its\nreset, so an account with an empty 5-hour window but a spent weekly quota reads\n`Weekly` and not an empty bar. When every window still has room, the row reports\nthe one closest to its limit. The bar remains neutral below 75%, changes to\nwarning yellow at 75%, and turns critical red at 90%; a row the pool cannot\nroute to is red with a red window/reset line regardless of the percentage.\n\n## Live and local\n\nThe list refreshes every 30 seconds while open. Account Pooler continues to own\nauthentication, secret storage, routing, and upstream quota refreshes. Pool\nUsage reads only the redacted account status already exposed by Account\nPooler's typed RPC. For a Codex account whose tier is missing there, it can\nmatch the plan label from BB's official provider usage by account email;\ncredentials and tokens never enter the plugin or frontend.\n\nDisabled, held, and unavailable accounts stay in place with quiet inline\nstates, preserving the pool's stable order without expanding the interface.",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "pool-usage"
+        }
+      }
+    }
+  ]
+}

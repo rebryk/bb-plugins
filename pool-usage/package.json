@@ -5,12 +5,13 @@
   "author": "Yurii Rebryk",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rebryk/bb-plugin-pool-usage.git"
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "pool-usage"
   },
   "bugs": {
-    "url": "https://github.com/rebryk/bb-plugin-pool-usage/issues"
+    "url": "https://github.com/rebryk/bb-plugins/issues"
   },
-  "homepage": "https://github.com/rebryk/bb-plugin-pool-usage#readme",
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/pool-usage#readme",
   "engines": {
     "bb": ">=0.42",
     "bbPluginSdk": ">=0.4.47"

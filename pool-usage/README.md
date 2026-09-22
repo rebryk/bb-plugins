@@ -28,12 +28,16 @@ source exposes the tier.
 
 ## Install
 
-Enable and configure Account Pooler first, then install this directory:
+Enable and configure Account Pooler first, then install the plugin:
 
 ```sh
 bb plugin enable account-pool
-bb plugin install .
+bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
+bb plugin install pool-usage@rebryk-bb-plugins
 ```
+
+Use `bb plugin install .` from this directory instead when working on it
+locally.
 
 Click **Account usage** in the sidebar footer. The disclosure refreshes on open
 and every 30 seconds while it remains visible. Account Pooler owns credentials
