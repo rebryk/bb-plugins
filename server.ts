@@ -48,6 +48,10 @@ const poolStatusSchema = z.object({
   accounts: z.array(poolAccountSchema),
 });
 
+const poolConfigSchema = z.object({
+  switchThreshold: z.number(),
+});
+
 const usageAccountSchema = z.object({
   id: z.string().min(1),
   provider: poolProviderSchema,
@@ -59,6 +63,7 @@ const usageAccountSchema = z.object({
   utilization: z.number().nullable(),
   resetAt: z.number().int().nullable(),
   windowLabel: z.string().min(1).nullable(),
+  blocked: z.boolean(),
   observedAt: z.number().int().nullable(),
   error: z.string().nullable(),
 });
@@ -77,9 +82,13 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-interface CandidateWindow {
+/** Account Pooler's default; the live value comes from its `config.get` RPC. */
+const DEFAULT_SWITCH_THRESHOLD = 0.98;
+
+interface QuotaWindow {
   utilization: number | null;
   resetAt: number | null;
+  status: string | null;
   label: string;
   durationMinutes: number | null;
 }
@@ -94,45 +103,88 @@ function windowLabel(minutes: number | null, slot: "primary" | "secondary") {
   return `${minutes} minutes`;
 }
 
-/** Pick the shortest shared quota window Account Pooler has observed. */
-export function shortestWindow(account: PoolAccount): CandidateWindow | null {
-  const candidates: CandidateWindow[] = [
+function sharedWindows(account: PoolAccount): QuotaWindow[] {
+  return [
     {
       utilization: account.fiveHourUtilization,
       resetAt: account.fiveHourResetAt,
+      status: account.fiveHourStatus,
       label: "5 hours",
       durationMinutes: 300,
     },
     {
       utilization: account.sevenDayUtilization,
       resetAt: account.sevenDayResetAt,
+      status: account.sevenDayStatus,
       label: "Weekly",
       durationMinutes: 10_080,
     },
     ...account.limitWindows.map((window) => ({
       utilization: window.utilization,
       resetAt: window.resetAt,
+      status: window.status,
       label: windowLabel(window.windowMinutes, window.slot),
       durationMinutes: window.windowMinutes,
     })),
   ].filter(
-    (candidate) =>
-      candidate.utilization !== null || candidate.resetAt !== null,
+    (window) =>
+      window.utilization !== null ||
+      window.resetAt !== null ||
+      window.status !== null,
   );
+}
 
-  if (candidates.length === 0) return null;
-  return candidates.reduce((selected, candidate) => {
-    const selectedDuration =
-      selected.durationMinutes ?? Number.POSITIVE_INFINITY;
-    const candidateDuration =
-      candidate.durationMinutes ?? Number.POSITIVE_INFINITY;
-    if (candidateDuration !== selectedDuration) {
-      return candidateDuration < selectedDuration ? candidate : selected;
+/** Mirrors the rule Account Pooler uses to hold an account back. */
+function isBlocking(
+  window: QuotaWindow,
+  threshold: number,
+  now: number,
+): boolean {
+  if (window.resetAt !== null && window.resetAt <= now) return false;
+  return (
+    window.status?.toLowerCase() === "rejected" ||
+    (window.utilization !== null && window.utilization >= threshold)
+  );
+}
+
+/**
+ * Pick the window that decides whether the account can serve a request now:
+ * the spent window that clears last, or else the one closest to its limit.
+ */
+export function bindingWindow(
+  account: PoolAccount,
+  threshold: number,
+  now: number,
+): QuotaWindow | null {
+  const windows = sharedWindows(account);
+  if (windows.length === 0) return null;
+
+  const blocking = windows.filter((window) =>
+    isBlocking(window, threshold, now),
+  );
+  if (blocking.length > 0) {
+    return blocking.reduce((selected, window) => {
+      if (selected.resetAt === null) return selected;
+      if (window.resetAt === null) return window;
+      return window.resetAt > selected.resetAt ? window : selected;
+    });
+  }
+
+  // A window past its reset has rolled over, so its utilization is stale.
+  const current = windows.filter(
+    (window) => window.resetAt === null || window.resetAt > now,
+  );
+  if (current.length === 0) return null;
+
+  return current.reduce((selected, window) => {
+    const selectedUtilization = selected.utilization ?? -1;
+    const utilization = window.utilization ?? -1;
+    if (utilization !== selectedUtilization) {
+      return utilization > selectedUtilization ? window : selected;
     }
-    if (selected.utilization === null && candidate.utilization !== null) {
-      return candidate;
-    }
-    return selected;
+    return (window.durationMinutes ?? 0) > (selected.durationMinutes ?? 0)
+      ? window
+      : selected;
   });
 }
 
@@ -177,9 +229,14 @@ export function accountTier(
 
 export function normalizeAccount(
   account: PoolAccount,
-  tierFallback: string | null = null,
+  options: {
+    threshold: number;
+    now: number;
+    tierFallback?: string | null;
+  },
 ): UsageAccount {
-  const selected = shortestWindow(account);
+  const { threshold, now, tierFallback = null } = options;
+  const selected = bindingWindow(account, threshold, now);
   const metadataTier = accountTier(account);
   return {
     id: account.id,
@@ -198,6 +255,10 @@ export function normalizeAccount(
         ? account.heldUntil
         : (selected?.resetAt ?? null),
     windowLabel: selected?.label ?? null,
+    blocked:
+      account.status === "exhausted" ||
+      account.status === "held" ||
+      (selected !== null && isBlocking(selected, threshold, now)),
     observedAt: account.observedAt,
     error: account.error,
   };
@@ -262,6 +323,23 @@ async function fetchOfficialCodexTiers(
   );
 }
 
+async function fetchSwitchThreshold(bb: BbPluginApi): Promise<number> {
+  try {
+    const config = await bb.sdk.plugins.callRpc({
+      pluginId: "account-pool",
+      method: "config.get",
+      input: null,
+      outputSchema: poolConfigSchema,
+    });
+    const threshold = config.switchThreshold;
+    return typeof threshold === "number" && threshold > 0 && threshold <= 1
+      ? threshold
+      : DEFAULT_SWITCH_THRESHOLD;
+  } catch {
+    return DEFAULT_SWITCH_THRESHOLD;
+  }
+}
+
 export default function plugin(bb: BbPluginApi): void {
   let codexTierCache: { expiresAt: number; tiers: Map<string, string> } | null =
     null;
@@ -293,14 +371,17 @@ export default function plugin(bb: BbPluginApi): void {
             tiers: codexTiers,
           };
         }
+        const threshold = await fetchSwitchThreshold(bb);
         return {
           accounts: status.accounts.map((account) =>
-            normalizeAccount(
-              account,
-              account.email === null
-                ? null
-                : (codexTiers.get(normalizedEmail(account.email)) ?? null),
-            ),
+            normalizeAccount(account, {
+              threshold,
+              now: Date.now(),
+              tierFallback:
+                account.email === null
+                  ? null
+                  : (codexTiers.get(normalizedEmail(account.email)) ?? null),
+            }),
           ),
           fetchedAt,
           error: null,

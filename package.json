@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-pool-usage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -17,7 +17,7 @@
   },
   "bb": {
     "name": "Pool Usage",
-    "description": "See every Account Pooler account's quota and reset time in one compact sidebar list.",
+    "description": "See every Account Pooler account's limiting quota window and its reset time in one compact sidebar list.",
     "branding": {
       "icon": "ChartColumn"
     },

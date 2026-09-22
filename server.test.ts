@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, {
   accountTier,
+  bindingWindow,
   normalizeAccount,
-  shortestWindow,
   type PoolAccount,
 } from "./server";
 
@@ -35,13 +35,65 @@ function account(overrides: Partial<PoolAccount> = {}): PoolAccount {
 }
 
 describe("quota normalization", () => {
-  it("uses the shortest observed shared window", () => {
-    expect(shortestWindow(account())).toEqual({
-      utilization: 0.42,
-      resetAt: 1_800_000,
-      label: "5 hours",
-      durationMinutes: 300,
+  const options = { threshold: 0.95, now: 0 };
+
+  it("uses the window closest to its limit while every window has room", () => {
+    expect(bindingWindow(account(), 0.95, 0)).toMatchObject({
+      utilization: 0.81,
+      resetAt: 604_800_000,
+      label: "Weekly",
     });
+  });
+
+  it("uses the spent window even when a shorter window is empty", () => {
+    const normalized = normalizeAccount(
+      account({
+        fiveHourUtilization: 0,
+        sevenDayUtilization: 0.95,
+        status: "exhausted",
+      }),
+      options,
+    );
+
+    expect(normalized.windowLabel).toBe("Weekly");
+    expect(normalized.utilization).toBe(0.95);
+    expect(normalized.resetAt).toBe(604_800_000);
+    expect(normalized.blocked).toBe(true);
+  });
+
+  it("treats a rejected window as spent whatever its utilization reads", () => {
+    const normalized = normalizeAccount(
+      account({
+        fiveHourUtilization: 0.1,
+        sevenDayUtilization: 0.2,
+        sevenDayStatus: "rejected",
+        status: "exhausted",
+      }),
+      options,
+    );
+
+    expect(normalized.windowLabel).toBe("Weekly");
+    expect(normalized.blocked).toBe(true);
+  });
+
+  it("reports the spent window that clears last", () => {
+    expect(
+      bindingWindow(
+        account({ fiveHourUtilization: 0.99, sevenDayUtilization: 0.99 }),
+        0.95,
+        0,
+      ),
+    ).toMatchObject({ label: "Weekly", resetAt: 604_800_000 });
+  });
+
+  it("ignores a window that has already reset", () => {
+    const normalized = normalizeAccount(
+      account({ fiveHourUtilization: 0.99, fiveHourResetAt: 1_000 }),
+      { threshold: 0.95, now: 2_000 },
+    );
+
+    expect(normalized.windowLabel).toBe("Weekly");
+    expect(normalized.blocked).toBe(false);
   });
 
   it("normalizes Codex limit windows", () => {
@@ -50,8 +102,10 @@ describe("quota normalization", () => {
         provider: "codex",
         fiveHourUtilization: null,
         fiveHourResetAt: null,
+        fiveHourStatus: null,
         sevenDayUtilization: null,
         sevenDayResetAt: null,
+        sevenDayStatus: null,
         limitWindows: [
           {
             slot: "primary",
@@ -69,11 +123,13 @@ describe("quota normalization", () => {
           },
         ],
       }),
+      options,
     );
 
     expect(normalized.utilization).toBe(0.67);
     expect(normalized.windowLabel).toBe("Weekly");
     expect(normalized.resetAt).toBe(900_000);
+    expect(normalized.blocked).toBe(false);
   });
 
   it("formats the provider's actual subscription tier", () => {
@@ -112,21 +168,30 @@ describe("quota normalization", () => {
   });
 
   it("uses the hold expiry as the actionable reset", () => {
-    expect(
-      normalizeAccount(account({ status: "held", heldUntil: 999_000 }))
-        .resetAt,
-    ).toBe(999_000);
+    const normalized = normalizeAccount(
+      account({ status: "held", heldUntil: 999_000 }),
+      options,
+    );
+
+    expect(normalized.resetAt).toBe(999_000);
+    expect(normalized.blocked).toBe(true);
   });
 });
 
 describe("plugin RPC", () => {
   it("reads Account Pooler's status through cross-plugin RPC", async () => {
-    const source = account();
+    const source = account({
+      fiveHourResetAt: Date.now() + 60 * 60_000,
+      sevenDayResetAt: Date.now() + 5 * 24 * 60 * 60_000,
+    });
     const { bb, harness } = createFakePluginHost({
       pluginId: "pool-usage",
       sdk: {
         plugins: {
-          callRpc: async () => ({ accounts: [source] }),
+          callRpc: async (request: { method: string }) =>
+            request.method === "config.get"
+              ? { switchThreshold: 0.95 }
+              : { accounts: [source] },
         },
       },
     });
@@ -139,9 +204,14 @@ describe("plugin RPC", () => {
 
     expect(result.error).toBeNull();
     expect(result.accounts).toMatchObject([
-      { label: "Personal", tier: "Max (20x)", utilization: 0.42 },
+      {
+        label: "Personal",
+        tier: "Max (20x)",
+        utilization: 0.81,
+        windowLabel: "Weekly",
+      },
     ]);
-    expect(harness.inspection.sdk.callsTo("plugins.callRpc")).toHaveLength(1);
+    expect(harness.inspection.sdk.callsTo("plugins.callRpc")).toHaveLength(2);
     await harness.lifecycle.dispose();
   });
 
@@ -155,7 +225,10 @@ describe("plugin RPC", () => {
       pluginId: "pool-usage",
       sdk: {
         plugins: {
-          callRpc: async () => ({ accounts: [source] }),
+          callRpc: async (request: { method: string }) =>
+            request.method === "config.get"
+              ? { switchThreshold: 0.95 }
+              : { accounts: [source] },
         },
         hosts: {
           list: async () =>

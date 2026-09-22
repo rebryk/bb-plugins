@@ -38,6 +38,10 @@ section[data-testid="plugin-sidebar-footer-disclosure-pool-usage-pool-usage"] {
   margin-top: 2px;
 }
 
+.pool-usage-meta.pool-usage-meta--blocked {
+  color: var(--destructive);
+}
+
 .pool-usage-track {
   background: var(--muted);
 }

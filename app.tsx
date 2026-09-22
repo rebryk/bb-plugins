@@ -49,14 +49,21 @@ function statusLine(account: UsageAccount, now: number): string {
 
 function AccountRow({ account, now }: { account: UsageAccount; now: number }) {
   const percent = usagePercent(account.utilization);
-  const tone = percent === null ? "neutral" : usageTone(percent);
   const unavailable = !account.enabled || account.status === "error";
+  const blocked = account.blocked && !unavailable;
+  const tone = blocked
+    ? "critical"
+    : percent === null
+      ? "neutral"
+      : usageTone(percent);
   const reset = statusLine(account, now);
   const providerName = account.provider === "claude" ? "Claude" : "Codex";
 
   return (
     <li
-      aria-label={`${providerName} ${account.label}, ${account.tier}`}
+      aria-label={`${providerName} ${account.label}, ${account.tier}${
+        blocked ? `, ${account.windowLabel ?? "quota"} limit reached` : ""
+      }`}
       className={`pool-usage-row ${unavailable ? "opacity-50" : ""}`}
     >
       <span className="pool-usage-provider flex size-4 items-center justify-center text-muted-foreground">
@@ -79,14 +86,18 @@ function AccountRow({ account, now }: { account: UsageAccount; now: number }) {
           >
             <div
               className={`pool-usage-fill pool-usage-fill--${tone} h-full rounded-full`}
-              style={{ width: `${percent ?? 0}%` }}
+              style={{ width: `${percent ?? (blocked ? 100 : 0)}%` }}
             />
           </div>
           <span className="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">
             {percent === null ? "—" : `${percent}%`}
           </span>
         </div>
-        <div className="pool-usage-meta flex min-w-0 items-center justify-between gap-2 text-[9px] leading-none text-muted-foreground/75">
+        <div
+          className={`pool-usage-meta ${
+            blocked ? "pool-usage-meta--blocked" : ""
+          } flex min-w-0 items-center justify-between gap-2 text-[9px] leading-none text-muted-foreground/75`}
+        >
           <span className="truncate">{account.windowLabel ?? "Usage"}</span>
           <span className="shrink-0">{reset}</span>
         </div>

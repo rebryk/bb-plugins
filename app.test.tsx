@@ -45,6 +45,7 @@ describe("compact usage presentation", () => {
                 utilization: 0.81,
                 resetAt: Date.now() + 60 * 60_000,
                 windowLabel: "Weekly",
+                blocked: false,
                 observedAt: Date.now(),
                 error: null,
               },
@@ -62,6 +63,54 @@ describe("compact usage presentation", () => {
     expect(slot.getByText("81%")).toBeTruthy();
     expect(slot.container.querySelectorAll("li")).toHaveLength(1);
     expect(slot.container.querySelector("[title]")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
+  it("marks a row whose binding window is spent", async () => {
+    const app = await loadPluginApp(() => import("./app"));
+    const item = app.experimentalSidebarFooterItems[0];
+    if (item === undefined || item.kind !== "disclosure") {
+      throw new Error("Expected the Pool Usage disclosure");
+    }
+
+    const slot = renderSlot(
+      item,
+      { dismiss: () => undefined },
+      {
+        rpc: {
+          usage_get: () => ({
+            accounts: [
+              {
+                id: "account-1",
+                provider: "claude" as const,
+                label: "Personal",
+                tier: "Max (20x)",
+                enabled: true,
+                status: "exhausted" as const,
+                inFlight: 0,
+                utilization: 0.95,
+                resetAt: Date.now() + 3 * 24 * 60 * 60_000,
+                windowLabel: "Weekly",
+                blocked: true,
+                observedAt: Date.now(),
+                error: null,
+              },
+            ],
+            fetchedAt: Date.now(),
+            error: null,
+          }),
+        },
+      },
+    );
+
+    await slot.findByText("Weekly");
+    expect(slot.getByText("reset 3d")).toBeTruthy();
+    expect(
+      slot.container.querySelector(".pool-usage-fill--critical"),
+    ).toBeTruthy();
+    expect(
+      slot.container.querySelector(".pool-usage-meta--blocked"),
+    ).toBeTruthy();
     slot.lifecycle.unmount();
   });
 
