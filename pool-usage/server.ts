@@ -335,7 +335,12 @@ async function fetchSwitchThreshold(bb: BbPluginApi): Promise<number> {
     return typeof threshold === "number" && threshold > 0 && threshold <= 1
       ? threshold
       : DEFAULT_SWITCH_THRESHOLD;
-  } catch {
+  } catch (cause) {
+    bb.log.debug(
+      `Could not read Account Pooler's switch threshold, assuming ${DEFAULT_SWITCH_THRESHOLD}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
     return DEFAULT_SWITCH_THRESHOLD;
   }
 }
