@@ -8,6 +8,7 @@ serves them.
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install pool-usage@rebryk-bb-plugins
+bb plugin install bookmarks@rebryk-bb-plugins
 ```
 
 `bb marketplace refresh rebryk-bb-plugins` re-reads the catalog; it never
@@ -21,6 +22,12 @@ installs or updates a plugin on its own. The catalog tracks `main`, so
 A compact sidebar footer list with one row per Account Pooler account: the
 provider mark, the subscription tier, a usage bar, and the quota window that
 actually limits the account together with its reset countdown.
+
+### [Bookmarks](./bookmarks)
+
+A bookmark button on every chat message and a Bookmarks tab in the thread's
+right panel that lists the saved messages across threads; clicking one opens
+its thread scrolled to the message.
 
 ## Layout
 

@@ -9,6 +9,11 @@
       "id": "token-usage-and-limits",
       "displayName": "Token Usage & Limits",
       "description": "Understand or control token, context-window, and provider-quota use."
+    },
+    {
+      "id": "thread-content",
+      "displayName": "Thread Content",
+      "description": "Change what people see or do inside an open thread."
     }
   ],
   "collections": [
@@ -16,7 +21,8 @@
       "id": "rebryk-bb-plugins",
       "displayName": "rebryk/bb-plugins",
       "pluginIds": [
-        "pool-usage"
+        "pool-usage",
+        "bookmarks"
       ]
     }
   ],
@@ -49,6 +55,39 @@
           "url": "https://github.com/rebryk/bb-plugins.git",
           "ref": "main",
           "subdir": "pool-usage"
+        }
+      }
+    },
+    {
+      "id": "bookmarks",
+      "displayName": "Bookmarks",
+      "description": "Bookmark any chat message and jump back to it from a Bookmarks tab in the thread's right panel.",
+      "icon": {
+        "url": "./bookmarks/assets/bookmark.svg"
+      },
+      "tags": [
+        "bookmarks",
+        "saved",
+        "messages",
+        "favorites",
+        "navigation"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "thread-content",
+      "screenshots": [
+        "./screenshots/bookmarks/panel.png",
+        "./screenshots/bookmarks/selection.png"
+      ],
+      "overview": "Save the answers worth coming back to, and get back to them in one click.\n\n## Bookmark from the message\n\nEvery user and assistant message gets a **Bookmark** button in its action bar.\nClick it and the message is saved; the button stays filled on that message, the\nway a liked message looks, and clicking it again removes the bookmark with an\nUndo. Select part of an assistant answer and choose **Bookmark** from the\nselection menu to save just that passage as the bookmark's quote.\n\n## A Bookmarks tab on the right\n\nOpen **Bookmarks** from the thread header, the side panel's new-tab actions, or\nthe quick palette (`Bookmarks: Show saved messages`). The tab lists every\nbookmark, newest first, with its thread and when you saved it. Search matches\nthe saved text and thread titles in any case, and **This thread** narrows the\nlist to the open thread in timeline order.\n\nClick a bookmark to jump straight to its message: bb opens the thread, scrolls\nthe timeline to the message, and flashes it, however far back it is. When the\nmessage lives in another thread, the Bookmarks tab opens beside it so you can\nkeep browsing. Hover a bookmark to copy its full text or remove it.\n\n## Local\n\nBookmarks live in the plugin's own SQLite database on your bb server. Each one\nkeeps a copy of the message text, so a bookmark stays readable after its thread\nis deleted. Nothing is sent to an agent or an external service.",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "bookmarks"
         }
       }
     }
