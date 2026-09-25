@@ -1,0 +1,114 @@
+.dia-sidebar {
+  /* Match BB's footer controls, including its spacing and theme tokens. */
+  --dia-sidebar-button-size: calc(var(--spacing, 0.25rem) * 8);
+  --dia-sidebar-icon-size: calc(var(--spacing, 0.25rem) * 4);
+  --dia-sidebar-accessory-width: 20px;
+  --dia-sidebar-accessory-height: 12px;
+  display: contents;
+
+  /* Leave the native customization editor and surrounding sections alone. */
+  [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: var(--spacing, 0.25rem);
+    padding: 0 calc(var(--spacing, 0.25rem) * 2);
+
+    > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
+      position: relative;
+      flex-shrink: 0;
+      width: var(--dia-sidebar-button-size);
+      height: var(--dia-sidebar-button-size);
+      margin: 0;
+    }
+  }
+
+  :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--dia-sidebar-button-size);
+    height: var(--dia-sidebar-button-size);
+    min-height: 0;
+    padding: 0;
+    transition-property: width, height, padding;
+    transition-duration: var(--default-transition-duration, 150ms);
+    transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:not([aria-busy="true"]) { color: var(--muted-foreground); }
+    &:hover { color: var(--sidebar-foreground); }
+    &:is(:active, [aria-current="page"]) {
+      background-color: var(--sidebar-accent);
+      color: var(--sidebar-accent-foreground);
+    }
+    &:focus-visible { --tw-ring-color: var(--sidebar-ring); }
+    &:is(:disabled, [aria-disabled="true"]) {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    > :first-child {
+      width: var(--dia-sidebar-icon-size);
+      height: var(--dia-sidebar-icon-size);
+      flex-shrink: 0;
+    }
+    &:not([aria-busy="true"]) > :first-child { opacity: 0.8; }
+    &[aria-current="page"]:not([aria-busy="true"]) > :first-child { opacity: 1; }
+
+    /* Keep the native text as the accessible name. */
+    > span:last-child {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
+
+  /* Open the native menu with right-click, long press, or Shift+F10. */
+  [data-sidebar-navigation-item] > [data-sidebar-hover-actions-mobile] { display: none; }
+
+  [data-plugin-nav-sidebar-accessory] {
+    /* BB's CSS compiler lowers translate, so reset the host utilities too. */
+    --tw-translate-x: 0px;
+    --tw-translate-y: 0px;
+    top: auto;
+    right: 2px;
+    bottom: 2px;
+    display: block;
+    width: var(--dia-sidebar-accessory-width);
+    height: var(--dia-sidebar-accessory-height);
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow: hidden;
+    contain: layout paint;
+    transform: none;
+    translate: none;
+    opacity: 1 !important;
+    pointer-events: none;
+
+    /* Measure and scale the existing React root; never move its children. */
+    > [data-bb-plugin-root] {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: flex-end;
+      width: max-content;
+      height: max-content;
+      transform-origin: bottom right;
+      transform: scale(var(--dia-sidebar-accessory-scale, 0));
+    }
+  }
+}
+
+@media (width < 48rem) and (pointer: coarse) {
+  .dia-sidebar {
+    --dia-sidebar-button-size: calc(var(--spacing, 0.25rem) * 9);
+    --dia-sidebar-icon-size: calc(var(--spacing, 0.25rem) * 5);
+  }
+}

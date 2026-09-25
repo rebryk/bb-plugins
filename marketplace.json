@@ -14,6 +14,11 @@
       "id": "thread-content",
       "displayName": "Thread Content",
       "description": "Change what people see or do inside an open thread."
+    },
+    {
+      "id": "navigation",
+      "displayName": "Navigation",
+      "description": "Change how you move between threads and app pages."
     }
   ],
   "collections": [
@@ -22,7 +27,8 @@
       "displayName": "rebryk/bb-plugins",
       "pluginIds": [
         "pool-usage",
-        "bookmarks"
+        "bookmarks",
+        "dia-sidebar"
       ]
     }
   ],
@@ -88,6 +94,38 @@
           "url": "https://github.com/rebryk/bb-plugins.git",
           "ref": "main",
           "subdir": "bookmarks"
+        }
+      }
+    },
+    {
+      "id": "dia-sidebar",
+      "displayName": "Dia Sidebar",
+      "description": "Compact, wrapping sidebar icons with live dots and counts in the lower-right corner.",
+      "icon": {
+        "url": "./dia-sidebar/assets/icon.svg"
+      },
+      "tags": [
+        "sidebar",
+        "navigation",
+        "icons",
+        "compact"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "navigation",
+      "screenshots": [
+        "./screenshots/dia-sidebar/navigation.png",
+        "./screenshots/dia-sidebar/wrapped.png"
+      ],
+      "overview": "Keep your navigation close at hand while leaving more room for threads.\n\n## A grid of icons\n\nDia Sidebar turns the top sidebar navigation into compact square icon buttons\nwith small gaps. The grid wraps automatically as the sidebar gets narrower or\nwider. Buttons match BB's footer controls in size and appearance,\nfollow the active BB theme, keep the current destination highlighted, and\nreveal their names on hover. The grid adds no vertical padding between BB's\nheader and thread list.\n\n## Search in one click\n\nSearch threads appears as a magnifying-glass button alongside the other icons.\nClick it to open BB's thread search. If you previously hid Search threads,\nenable it in Customize sidebar.\n\n## Familiar controls\n\nYour existing navigation order and hidden items still apply. Open More or\nright-click a tile to use BB's menus. Keyboard users can focus a tile and press\nShift+F10 or the Context Menu key. Arrange items in Customize sidebar;\ndragging inside the grid does not reorder them. Search, keyboard shortcuts,\nand opening a destination in a split continue through BB's own controls.\n\n## Live indicators\n\nWhen another plugin supplies a sidebar indicator, Dia Sidebar keeps that\ncomponent running inside a bounded area in the lower-right corner of the icon\ntile. Large indicators shrink proportionally to fit; small ones keep their\nnatural size. Live changes refit automatically without moving nearby buttons.\nBB controls which indicators are available on compact screens.\n\n## Choose your navigation\n\nSelect Dia Sidebar under Settings → Appearance → Navigation. Choose BB again\nto return to the standard list. No external account or service is required.",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "dia-sidebar"
         }
       }
     }
