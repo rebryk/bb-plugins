@@ -2,7 +2,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import { mountNavigationLabels } from "./navigation-labels";
+import { enhanceNavigation } from "./navigation";
+
+// Layout is exercised in Chrome; jsdom has no ResizeObserver.
+vi.stubGlobal("ResizeObserver", class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+});
+
+function enhance() {
+  return enhanceNavigation(document.querySelector<HTMLElement>("[data-dia-sidebar]")!);
+}
 
 const disposers: (() => void)[] = [];
 afterEach(() => {
@@ -71,7 +82,7 @@ describe("icon labels", () => {
     metrics.addEventListener("click", activate);
     metrics.parentElement!.addEventListener("contextmenu", menu);
     const accessory = document.querySelector("[data-plugin-nav-sidebar-accessory]");
-    disposers.push(mountNavigationLabels(document));
+    disposers.push(enhance());
 
     fireEvent.click(metrics, { metaKey: true });
     fireEvent.contextMenu(metrics);
@@ -87,9 +98,11 @@ describe("icon labels", () => {
   });
 
   it("handles late mounts, renamed panels and removal without retaining titles", async () => {
-    const dispose = mountNavigationLabels(document);
-    disposers.push(dispose);
-    const { metrics } = fixture();
+    const { navigation, metrics } = fixture();
+    const row = metrics.parentElement!;
+    row.remove();
+    disposers.push(enhance());
+    navigation.append(row);
     await vi.waitFor(() => expect(metrics.title).toBe("Metrics"));
     metrics.querySelector(".truncate")!.textContent = "Metrics updated";
     await vi.waitFor(() => expect(metrics.title).toBe("Metrics updated"));
@@ -99,7 +112,7 @@ describe("icon labels", () => {
 
   it("leaves the customization editor alone and resumes when it closes", async () => {
     const { navigation, metrics } = fixture();
-    disposers.push(mountNavigationLabels(document));
+    disposers.push(enhance());
     navigation.setAttribute("data-sidebar-navigation-customize-mode", "true");
     await vi.waitFor(() => expect(metrics.hasAttribute("title")).toBe(false));
     navigation.removeAttribute("data-sidebar-navigation-customize-mode");
@@ -109,7 +122,7 @@ describe("icon labels", () => {
   it("restores only its own changes and stops observing after disposal", async () => {
     const { newThread, metrics } = fixture();
     newThread.title = "Host tooltip";
-    const dispose = mountNavigationLabels(document);
+    const dispose = enhance();
     metrics.querySelector(".truncate")!.textContent = "Renamed";
     await vi.waitFor(() => expect(metrics.title).toBe("Renamed"));
     dispose();
@@ -122,9 +135,58 @@ describe("icon labels", () => {
 
   it("does not overwrite a title another owner supplies while mounted", () => {
     const { metrics } = fixture();
-    const dispose = mountNavigationLabels(document);
+    const dispose = enhance();
     metrics.title = "Live status from another plugin";
     dispose();
     expect(metrics.title).toBe("Live status from another plugin");
+  });
+});
+
+describe("native menus and sorting", () => {
+  it("opens each native menu with Shift+F10 or the Context Menu key", () => {
+    const { newThread, metrics } = fixture();
+    const menu = vi.fn();
+    for (const button of [newThread, metrics]) {
+      button.parentElement!.addEventListener("contextmenu", menu);
+    }
+    disposers.push(enhance());
+    fireEvent.keyDown(newThread, { key: "F10", shiftKey: true });
+    fireEvent.keyDown(metrics, { key: "ContextMenu" });
+    fireEvent.keyDown(metrics, { key: "F10" });
+    fireEvent.keyDown(metrics, { key: "Enter" });
+    expect(menu).toHaveBeenCalledTimes(2);
+    expect(menu.mock.calls.map(([event]) => event.target)).toEqual([newThread, metrics]);
+  });
+
+  it("blocks list sorting in the grid but preserves split gestures, clicks and Customize", () => {
+    const { navigation, metrics } = fixture();
+    const sort = vi.fn();
+    const split = vi.fn();
+    const select = vi.fn();
+    metrics.addEventListener("mousedown", sort);
+    metrics.addEventListener("touchstart", sort);
+    metrics.addEventListener("pointerdown", split);
+    metrics.addEventListener("click", select);
+    const dispose = enhance();
+    fireEvent.mouseDown(metrics);
+    fireEvent.touchStart(metrics);
+    fireEvent.pointerDown(metrics);
+    fireEvent.click(metrics);
+    expect(sort).not.toHaveBeenCalled();
+    expect(split).toHaveBeenCalledOnce();
+    expect(select).toHaveBeenCalledOnce();
+
+    navigation.setAttribute("data-sidebar-navigation-customize-mode", "true");
+    fireEvent.mouseDown(metrics);
+    fireEvent.touchStart(metrics);
+    expect(sort).toHaveBeenCalledTimes(2);
+    navigation.removeAttribute("data-sidebar-navigation-customize-mode");
+    dispose();
+    fireEvent.mouseDown(metrics);
+    expect(sort).toHaveBeenCalledTimes(3);
+    const menu = vi.fn();
+    metrics.addEventListener("contextmenu", menu);
+    fireEvent.keyDown(metrics, { key: "ContextMenu" });
+    expect(menu).not.toHaveBeenCalled();
   });
 });

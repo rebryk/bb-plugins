@@ -5,7 +5,7 @@ import ts from "typescript";
 
 // Use real layout and the shipped CSS, including BB's CSS compilation step.
 const css = await readFile(new URL("../dist/app.css", import.meta.url), "utf8");
-const source = await readFile(new URL("../accessory-fit.ts", import.meta.url), "utf8");
+const source = await readFile(new URL("../navigation.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 });
@@ -33,7 +33,7 @@ try {
   await page.addStyleTag({ content: css });
   await page.addScriptTag({
     type: "module",
-    content: `${outputText}\nwindow.disposeFit = mountAccessoryFit(document);`,
+    content: `${outputText}\nwindow.disposeFit = enhanceNavigation(document.querySelector("[data-dia-sidebar]"));`,
   });
   await page.waitForFunction(() => typeof window.disposeFit === "function");
 

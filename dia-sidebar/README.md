@@ -13,9 +13,11 @@ menus, and customization.
 ## Use
 
 Install the plugin and choose **Dia Sidebar** under **Settings → Appearance →
-Navigation**. Right-click a tile for its native menu, or open **More →
-Customize sidebar** to change visibility and order. Touch devices retain the
-native context-menu gesture and customization screen.
+Navigation**. Right-click a tile, long-press it, or focus it and press
+**Shift+F10** / the **Context Menu** key for its native menu.
+Use **More → Customize sidebar** to change visibility and order.
+Reordering happens in that native editor; dragging within the icon grid does
+not rearrange tiles. Dragging a destination out into a split remains available.
 
 When **Search threads** is visible, it appears as a magnifying-glass button
 alongside the other icons and opens BB's thread search. Enable it in
@@ -44,11 +46,13 @@ The browser geometry check requires an installed Google Chrome.
 This plugin targets the navigation DOM in BB 0.43.4 / SDK 0.5.9. It delegates
 to the public `experimental_Original` component because that SDK's navigation
 item descriptors omit saved visibility/order and the actual accessory
-components. Scoped CSS changes the native layout; cleanup-aware content
-scripts add titles and measure accessories with ResizeObserver. They keep the
-original component mounted. The plugin does not import private BB modules or
-maintain a second navigation state. Recheck the selectors when upgrading BB,
-since the native DOM is not a versioned layout API.
+components. One effect scoped to the sidebar adds hover titles, fits accessories
+with ResizeObserver, and connects keyboard menu keys to the native context menu.
+It blocks the host's vertical-list sorting sensors in the grid while leaving
+Customize and pointer-based split gestures intact. Cleanup removes listeners,
+observers, titles, and scale properties. There are no global content scripts,
+private BB imports, or duplicated navigation state. Recheck the selectors when
+upgrading BB, since the native DOM is not a versioned layout API.
 
 BB 0.43 loads frontend plugins after the initial app render, so its standard
 navigation can appear briefly on a page reload before the grid takes over.

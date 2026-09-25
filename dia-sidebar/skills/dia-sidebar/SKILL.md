@@ -15,8 +15,9 @@ padding at zero because BB's adjacent sections already provide spacing. Compact 
 pointer viewports use 36 px buttons and 20 px icons. Keep BB's native rounded-md
 radius and focus ring, and the footer's muted icon tone and hover treatment.
 
-Visibility and order belong to BB. Use More → Customize sidebar, or the
-native context menu on a tile. Search threads, when visible, is a regular
+Visibility and order belong to BB. Reorder only in More → Customize sidebar;
+the grid disables BB's vertical-list sorting sensors. Native tile menus open
+on right-click, long press, Shift+F10, or the Context Menu key. Search threads is a regular
 magnifying-glass icon tile that opens BB's search palette. Do not create
 plugin-specific copies of these preferences. Existing plugin accessories
 fit proportionally into a 20 × 12 px area at the lower right without enlarging
@@ -26,7 +27,7 @@ prevents overflow. BB 0.43 does not mount accessories on compact viewports.
 The plugin delegates to `experimental_Original` and styles its DOM. Its CSS
 is scoped to `data-dia-sidebar`. If an upgrade changes the native navigation
 markup, inspect that version's source and update the selectors in `app.css`
-and the content scripts. `accessory-fit.ts` measures BB's existing plugin-root
-node without cloning or reparenting it. Keep labels available to assistive
-technology, preserve native event handlers, and release titles, scale
-properties, and observers on unload.
+and `navigation.ts`. A single effect scoped to the sidebar measures BB's
+existing plugin-root nodes without cloning or reparenting them. Keep labels
+available to assistive technology and preserve pointerdown for native split
+gestures. Release titles, scale properties, observers, and listeners on unload.

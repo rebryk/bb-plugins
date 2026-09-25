@@ -1,5 +1,2 @@
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
-
-export default function plugin(bb: BbPluginApi) {
-  bb.log.info("Dia Sidebar loaded");
-}
+// BB requires a server entry even for a frontend-only plugin.
+export default function plugin() {}

@@ -18,9 +18,10 @@ enable it in Customize sidebar.
 ## Familiar controls
 
 Your existing navigation order and hidden items still apply. Open More or
-right-click a tile to use BB's menus, and use Customize sidebar to arrange
-the items. Search, keyboard shortcuts, and opening a destination in a split
-continue through BB's own controls.
+right-click a tile to use BB's menus. Keyboard users can focus a tile and press
+Shift+F10 or the Context Menu key. Arrange items in Customize sidebar;
+dragging inside the grid does not reorder them. Search, keyboard shortcuts,
+and opening a destination in a split continue through BB's own controls.
 
 ## Live indicators
 
