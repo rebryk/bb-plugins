@@ -9,6 +9,7 @@ serves them.
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install pool-usage@rebryk-bb-plugins
 bb plugin install bookmarks@rebryk-bb-plugins
+bb plugin install dia-sidebar@rebryk-bb-plugins
 ```
 
 `bb marketplace refresh rebryk-bb-plugins` re-reads the catalog; it never
@@ -28,6 +29,12 @@ actually limits the account together with its reset countdown.
 A bookmark button on every chat message and a Bookmarks tab in the thread's
 right panel that lists the saved messages across threads; clicking one opens
 its thread scrolled to the message.
+
+### [Dia Sidebar](./dia-sidebar)
+
+A compact, wrapping grid of navigation icons, with live plugin indicators
+in the lower-right corner. Keeps BB's existing menus,
+hidden items, and customization.
 
 ## Layout
 

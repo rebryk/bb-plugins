@@ -1,0 +1,156 @@
+/* Only the delegated navigation is restyled. BB owns the menus, the
+   customization editor, and the thread list outside this boundary. */
+.dia-sidebar {
+  /* Match BB's footer icon controls using the host's spacing token. */
+  --dia-sidebar-button-size: calc(var(--spacing, 0.25rem) * 8);
+  --dia-sidebar-icon-size: calc(var(--spacing, 0.25rem) * 4);
+  --dia-sidebar-accessory-width: 20px;
+  --dia-sidebar-accessory-height: 12px;
+  display: contents;
+}
+
+.dia-sidebar [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: start;
+  gap: var(--spacing, 0.25rem);
+  /* BB's header and thread list already provide vertical separation. */
+  padding: 0 calc(var(--spacing, 0.25rem) * 2);
+}
+
+.dia-sidebar [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--dia-sidebar-button-size);
+  height: var(--dia-sidebar-button-size);
+  margin: 0;
+}
+
+.dia-sidebar [data-sidebar-navigation-item] > button,
+.dia-sidebar [data-testid="sidebar-navigation-more-trigger"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dia-sidebar-button-size);
+  height: var(--dia-sidebar-button-size);
+  min-height: 0;
+  padding: 0;
+  /* Keep the original rounded-md, focus ring, border and disabled behavior.
+     Footer controls animate geometry, using BB's default transition tokens. */
+  transition-property: width, height, padding;
+  transition-duration: var(--default-transition-duration, 150ms);
+  transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+/* Use the same quiet icon tone as SIDEBAR_FOOTER_ACTION_CLASS. The original
+   loading treatment remains owned by BB, and status badges retain their colors. */
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):not([aria-busy="true"]) {
+  color: var(--muted-foreground);
+}
+
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):hover {
+  color: var(--sidebar-foreground);
+}
+
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):is(:active, [aria-current="page"]) {
+  background-color: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):focus-visible {
+  --tw-ring-color: var(--sidebar-ring);
+}
+
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):is(:disabled, [aria-disabled="true"]) {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.dia-sidebar [data-sidebar-navigation-item] > button > :first-child,
+.dia-sidebar [data-testid="sidebar-navigation-more-trigger"] > :first-child {
+  width: var(--dia-sidebar-icon-size);
+  height: var(--dia-sidebar-icon-size);
+  flex-shrink: 0;
+}
+
+.dia-sidebar :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]):not([aria-busy="true"]) > :first-child {
+  opacity: 0.8;
+}
+
+.dia-sidebar [data-sidebar-navigation-item] > button[aria-current="page"]:not([aria-busy="true"]) > :first-child {
+  opacity: 1;
+}
+
+/* Retain the native text as the accessible name of each icon button. */
+.dia-sidebar [data-sidebar-navigation-item] > button > span:last-child,
+.dia-sidebar [data-testid="sidebar-navigation-more-trigger"] > span:last-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The native context menu remains on each tile (right click / long press).
+   Its separate hover button would cover the icon in a square tile. */
+.dia-sidebar [data-sidebar-navigation-item] > [data-sidebar-hover-actions-mobile] {
+  display: none;
+}
+
+/* A fixed viewport isolates badge layout and clips every painted descendant,
+   even before its initial measurement or while its contents are changing. */
+.dia-sidebar [data-plugin-nav-sidebar-accessory] {
+  /* Reset the host's translate utilities as well as transform: the plugin
+     CSS compiler lowers the standalone translate property to transform. */
+  --tw-translate-x: 0px;
+  --tw-translate-y: 0px;
+  top: auto;
+  right: 2px;
+  bottom: 2px;
+  display: block;
+  width: var(--dia-sidebar-accessory-width);
+  height: var(--dia-sidebar-accessory-height);
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
+  contain: layout paint;
+  transform: none;
+  translate: none;
+  opacity: 1 !important;
+  pointer-events: none;
+}
+
+/* BB's existing plugin-root node is the measuring surface. Keeping that node
+   and its children in place preserves the original React instance and state. */
+.dia-sidebar [data-plugin-nav-sidebar-accessory] > [data-bb-plugin-root] {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  box-sizing: border-box;
+  width: max-content;
+  height: max-content;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  transform-origin: bottom right;
+  transform: scale(var(--dia-sidebar-accessory-scale, 0));
+}
+
+/* BB enlarges footer controls only on compact viewports with a coarse pointer. */
+@media (width < 48rem) and (pointer: coarse) {
+  .dia-sidebar {
+    --dia-sidebar-button-size: calc(var(--spacing, 0.25rem) * 9);
+    --dia-sidebar-icon-size: calc(var(--spacing, 0.25rem) * 5);
+  }
+}
