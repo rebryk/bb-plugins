@@ -124,6 +124,8 @@ plugins. The others:
   thread's right panel.
 - [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
   grid of icons.
+- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
+  and tablets.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use
   and when it frees up, in the sidebar footer.
 - [Server Switcher](../server-switcher): if you run several servers on bb

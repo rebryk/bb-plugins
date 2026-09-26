@@ -84,6 +84,8 @@ plugins. The others:
   thread's right panel.
 - [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
   until its agent needs you.
+- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
+  and tablets.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use
   and when it frees up, in the sidebar footer.
 - [Server Switcher](../server-switcher): if you run several servers on bb

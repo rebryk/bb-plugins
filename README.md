@@ -12,6 +12,7 @@ bb plugin install super-hotkeys@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install dia-sidebar@sf-plugins
 bb plugin install snooze@sf-plugins
+bb plugin install terminal-paste@sf-plugins
 bb plugin install pool-usage@sf-plugins
 bb plugin install server-switcher@sf-plugins
 ```
@@ -22,9 +23,9 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-Super Hotkeys, Bookmarks, Dia Sidebar, and Snooze suit any BB setup. Pool Usage
-needs Account Pooler, and Server Switcher needs more than one server on bb
-connect.
+Super Hotkeys, Bookmarks, Dia Sidebar, Snooze, and Terminal Paste suit any BB
+setup. Pool Usage needs Account Pooler, and Server Switcher needs more than one
+server on bb connect.
 
 ### [Super Hotkeys](./super-hotkeys)
 
@@ -50,6 +51,12 @@ A moon button in the thread header and a command that hide a thread from the
 sidebar until a time you pick or type, the way Superhuman snoozes email. The
 thread comes back at that time, marked unread, or sooner when its agent finishes
 or needs an answer.
+
+### [Terminal Paste](./terminal-paste)
+
+A Paste button for the terminal on phones and tablets, in the header of the
+terminal's pane in the right panel. Where the page can't read the clipboard,
+as in the BB app on Android, Paste opens a text field instead.
 
 ### [Pool Usage](./pool-usage)
 

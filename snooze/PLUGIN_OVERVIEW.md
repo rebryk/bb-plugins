@@ -42,6 +42,7 @@ Snooze is one of the San Francisco Plugins, a family of BB plugins. The others:
   right panel.
 - **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
   icons.
+- **Terminal Paste**: a Paste button for the terminal on phones and tablets.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 - **Server Switcher**: if you run several servers on bb connect, one click opens

@@ -48,6 +48,7 @@ others:
   right panel.
 - **Snooze**: hide a thread from the sidebar until a time you pick, or until its
   agent needs you.
+- **Terminal Paste**: a Paste button for the terminal on phones and tablets.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 - **Server Switcher**: if you run several servers on bb connect, one click opens

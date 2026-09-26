@@ -94,5 +94,7 @@ plugins. The others:
   grid of icons.
 - [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
   until its agent needs you.
+- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
+  and tablets.
 - [Server Switcher](../server-switcher): if you run several servers on bb
   connect, one click opens the next online one.
