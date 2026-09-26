@@ -1,0 +1,44 @@
+name: Release tags
+
+# Tags each plugin version that has no release tag yet, so BB offers the update
+# as soon as a version bump reaches main. Pushed tags are never moved.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tags
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag new plugin versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tags=$(git ls-remote --tags --refs origin | cut -f2)
+          for manifest in */package.json; do
+            jq -e .bb "$manifest" > /dev/null || continue
+            plugin=${manifest%/package.json}
+            version=$(jq -r .version "$manifest")
+            if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error file=$manifest::$plugin has version \"$version\", expected MAJOR.MINOR.PATCH"
+              exit 1
+            fi
+            tag="$plugin/v$version"
+            if grep -qxF "refs/tags/$tag" <<< "$tags"; then continue; fi
+            latest=$(sed -n "s|^refs/tags/$plugin/v||p" <<< "$tags" | sort -V | tail -n 1)
+            if [[ -n $latest && $(printf '%s\n' "$latest" "$version" | sort -V | tail -n 1) != "$version" ]]; then
+              echo "::error file=$manifest::$plugin $version is older than its latest release, $latest"
+              exit 1
+            fi
+            git tag -a "$tag" -m "Release $plugin v$version"
+            git push origin "refs/tags/$tag"
+            echo "Tagged $tag"
+          done
