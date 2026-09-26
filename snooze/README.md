@@ -30,9 +30,9 @@ Next week                  Mon, Sep 28, 9:00 AM
   left. A toast says until when, with **Undo**.
 - **See what's snoozed**: a snoozed thread's moon is filled, and its tooltip
   says until when. **Show snoozed threads** in the command palette lists every
-  snoozed thread, soonest first. Type to filter, press **Enter** to open a
-  thread without waking it, or unsnooze the selected one with **⌘↵** on a Mac
-  and **Ctrl+Enter** elsewhere.
+  snoozed thread, soonest first. Type to filter and press **Enter** to open a
+  thread without waking it. To unsnooze the selected one, press **⌘↵** on a Mac
+  and **Ctrl+Enter** elsewhere, or click **Unsnooze** at the end of its row.
 - **Wake it or move it**: the picker of a snoozed thread starts with
   **Unsnooze**, and picking another time moves the snooze.
 - **Keys**: neither command has a default key. Bind them in Settings → Keyboard.
@@ -46,8 +46,8 @@ A snoozed thread comes back at its time, marked unread. It comes back at once
 when its agent finishes a turn or fails, or when it or a thread hidden with it
 needs an answer. Archiving or deleting a snoozed thread ends its snooze.
 
-On phones, the picker and the list open in BB's bottom drawer, and the list has
-no unsnooze key: open the thread and pick **Unsnooze** from its moon instead.
+On phones, the picker and the list open in BB's bottom drawer. The list can't
+unsnooze there, so open the thread and pick **Unsnooze** from its moon.
 
 ## How it works
 

@@ -26,10 +26,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandShortcut,
 } from "./components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { useIsCompactViewport } from "./components/ui/hooks/use-compact-viewport";
+import { cn } from "./lib/utils";
 import type { Snooze, rpcContract } from "./server";
 import { CHANGED_CHANNEL } from "./shared";
 import { nextThread, sidebarThreadIds } from "./sidebar";
@@ -121,7 +121,11 @@ function TimeItem(props: {
   onSelect: () => void;
 }) {
   return (
-    <CommandItem value={props.value ?? props.title} onSelect={props.onSelect}>
+    <CommandItem
+      value={props.value ?? props.title}
+      onSelect={props.onSelect}
+      className="min-h-8"
+    >
       <span className="truncate">{props.title}</span>
       <span className="ml-auto shrink-0 text-xs text-muted-foreground">
         {fmtWhen(props.until, props.now)}
@@ -167,10 +171,7 @@ function Picker(props: {
         value={query}
         onValueChange={setQuery}
       />
-      <CommandList
-        // Tall enough for every row, so Next week never scrolls away.
-        className="max-h-[400px]"
-      >
+      <CommandList>
         {typedRow ? (
           // Its own group stays first: cmdk only sorts rows within a group.
           <CommandGroup forceMount>
@@ -190,7 +191,11 @@ function Picker(props: {
           <CommandGroup
             heading={heading(`Snoozed until ${fmtUntil(until, now)}`)}
           >
-            <CommandItem value="Unsnooze" onSelect={onUnsnooze}>
+            <CommandItem
+              value="Unsnooze"
+              onSelect={onUnsnooze}
+              className="min-h-8"
+            >
               Unsnooze
             </CommandItem>
           </CommandGroup>
@@ -232,6 +237,10 @@ function SnoozedList(props: {
   const [now] = useState(Date.now);
   const compact = useIsCompactViewport();
   const selected = useCommandState((state) => state.value);
+  // Like BB's key hints: ⌘ on Apple keyboards, Ctrl elsewhere.
+  const modifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl";
   // cmdk tells rows apart by value, so zero-width spaces keep equal titles apart.
   const rows = snoozes.map((snooze, index) => ({
     ...snooze,
@@ -260,17 +269,30 @@ function SnoozedList(props: {
               key={row.threadId}
               value={row.value}
               onSelect={() => onOpen(row.threadId)}
-              className="group"
+              className="group min-h-11"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate">{row.title}</div>
-                <div className="truncate text-xs text-muted-foreground">
+                <div className="truncate text-foreground">{row.title}</div>
+                <div className="truncate text-xs leading-4 text-subtle-foreground">
                   until {fmtUntil(row.until, now)}
                 </div>
               </div>
-              <CommandShortcut className="hidden tracking-normal md:group-data-[selected=true]:inline">
-                Unsnooze ⌘↵
-              </CommandShortcut>
+              <button
+                type="button"
+                tabIndex={-1}
+                // Keeps focus in the search field and the click off the row.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onUnsnooze(row.threadId);
+                }}
+                className="hidden h-7 shrink-0 items-center gap-1 rounded-sm px-1 text-xs text-subtle-foreground hover:text-foreground md:group-data-[selected=true]:inline-flex"
+              >
+                <span className="mr-1">Unsnooze</span>
+                <kbd className="rounded-sm bg-state-hover/50 px-1.5 py-1 font-sans text-xs leading-none tabular-nums text-subtle-foreground">
+                  {modifier} ↵
+                </kbd>
+              </button>
             </CommandItem>
           ))}
         </CommandGroup>
@@ -279,7 +301,11 @@ function SnoozedList(props: {
   );
 }
 
-/** A dialog that looks like BB's command palette: near the top, with no ✕. */
+/**
+ * A dialog that looks like BB's command palette: near the top, with no ✕, and
+ * with the palette's classes set from the root, so the vendored `command`
+ * component stays as the registry ships it.
+ */
 function PaletteDialog(props: {
   kind: DialogRequest["kind"];
   title: string;
@@ -301,8 +327,18 @@ function PaletteDialog(props: {
         <DialogTitle className="sr-only">{props.title}</DialogTitle>
         <Command
           key={key}
-          // Its own corners would cover the dialog's rounded border.
-          className="rounded-[inherit]"
+          className={cn(
+            // Its own corners would cover the dialog's rounded border.
+            "rounded-[inherit]",
+            "bg-background text-foreground",
+            "[&_[cmdk-input-wrapper]]:py-1 [&_[cmdk-input-wrapper]_[data-icon-root]]:hidden",
+            "[&_[cmdk-input]]:placeholder:font-light [&_[cmdk-input]]:placeholder:text-subtle-foreground [&_[cmdk-input]]:placeholder:opacity-70",
+            "[&_[cmdk-list]]:max-h-[min(24rem,50dvh)] [&_[cmdk-list]]:p-1 [&_[cmdk-group]]:p-0",
+            // [cmdk-group] outranks the heading classes CommandGroup sets on itself.
+            "[&_[cmdk-group]_[cmdk-group-heading]]:py-1 [&_[cmdk-group]_[cmdk-group-heading]]:font-normal [&_[cmdk-group]_[cmdk-group-heading]]:leading-5 [&_[cmdk-group]_[cmdk-group-heading]]:text-subtle-foreground",
+            "[&_[cmdk-item]]:cursor-pointer [&_[cmdk-item]]:gap-3 [&_[cmdk-item]]:rounded-md [&_[cmdk-item][data-selected=true]]:bg-state-hover [&_[cmdk-item][data-selected=true]]:text-foreground",
+            "[&_[cmdk-empty]]:px-3 [&_[cmdk-empty]]:py-4 [&_[cmdk-empty]]:text-muted-foreground",
+          )}
         >
           {props.children}
         </Command>

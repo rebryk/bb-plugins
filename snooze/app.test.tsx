@@ -47,6 +47,7 @@ afterEach(() => {
   for (const nav of document.querySelectorAll("nav")) nav.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.clearAllMocks();
 });
 
@@ -162,11 +163,8 @@ describe("snooze picker", () => {
     await openDialog("snooze-thread", lastText);
     await screen.findByText("Last used");
     expect(screen.getByText("Snooze until")).toBeTruthy();
-    // Like BB's palette: no close button, and BB's own magnifier icon.
+    // Like BB's palette: no close button.
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
-    expect(
-      document.querySelector('[cmdk-input-wrapper] [data-icon="Search"]'),
-    ).not.toBeNull();
     expect(rows()).toEqual([
       "fri 3pmFri, Oct 2, 3:00 PM",
       "Later todayToday, 6:00 PM",
@@ -289,8 +287,8 @@ describe("snoozed threads", () => {
     const input = await screen.findByPlaceholderText("Search snoozed threads…");
     await vi.waitFor(() => {
       expect(rows()).toEqual([
-        "Oneuntil today at 6:00 PMUnsnooze ⌘↵",
-        "Threeuntil Mon, Sep 28 at 9:00 AMUnsnooze ⌘↵",
+        "Oneuntil today at 6:00 PMUnsnoozeCtrl ↵",
+        "Threeuntil Mon, Sep 28 at 9:00 AMUnsnoozeCtrl ↵",
       ]);
     });
     fireEvent.keyDown(input, { key: "ArrowDown" });
@@ -313,6 +311,25 @@ describe("snoozed threads", () => {
       expect(slot.inspection.rpcCalls).toContainEqual({
         method: "unsnooze",
         input: { threadId: "t1" },
+      });
+    });
+    expect(slot.inspection.navigateCalls).toEqual([]);
+    expect(screen.getByPlaceholderText("Search snoozed threads…")).toBeTruthy();
+  });
+
+  it("unsnoozes a row from its hint, which says ⌘ on a Mac", async () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    const { slot } = await openDialog("show-snoozed-threads", list);
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    const hint = screen.getAllByRole("button", { name: "Unsnooze⌘ ↵" })[1]!;
+    // The search field keeps focus.
+    expect(fireEvent.mouseDown(hint)).toBe(false);
+    fireEvent.click(hint);
+
+    await vi.waitFor(() => {
+      expect(slot.inspection.rpcCalls).toContainEqual({
+        method: "unsnooze",
+        input: { threadId: "t3" },
       });
     });
     expect(slot.inspection.navigateCalls).toEqual([]);
