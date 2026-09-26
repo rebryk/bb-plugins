@@ -11,7 +11,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: start;
-    gap: var(--spacing, 0.25rem);
+    /* Tiles touch: only a hovered or current tile shows a background. */
+    gap: 0;
     padding: 0 calc(var(--spacing, 0.25rem) * 2);
 
     > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {

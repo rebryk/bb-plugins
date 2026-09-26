@@ -1,9 +1,11 @@
 # Dia Sidebar
 
 The sidebar's top navigation as a wrapping grid of square icon buttons.
-Buttons follow BB's footer controls: normally 32 px with 16 px icons,
-4 px gaps, and 8 px horizontal padding. The grid adds no vertical padding,
-so it does not stack extra space onto BB's header and thread list.
+Buttons follow BB's footer controls: normally 32 px with 16 px icons.
+They sit edge to edge without gaps, since only the hovered and the current
+button show a background. The grid has 8 px horizontal padding and no
+vertical padding, so it does not stack extra space onto BB's header and
+thread list.
 Compact touch viewports use 36 px buttons and 20 px icons.
 These sizes use BB's spacing token; corner radii, colors and interaction
 states follow the active BB theme. Hover an icon for its name.
