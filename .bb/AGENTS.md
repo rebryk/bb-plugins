@@ -44,8 +44,8 @@
   dia-sidebar, snooze, terminal-paste, pool-usage, server-switcher. The places
   are the root README's install block, Plugins intro, and Plugins list; the
   collection's `pluginIds`; and the `## More San Francisco Plugins` block of
-  every other plugin's README and overview. Copy each changed overview into
-  `marketplace.json` as well.
+  every other plugin's README and overview that has one. Copy each changed
+  overview into `marketplace.json` as well.
 - `<id>@sf-plugins` resolves only after the merge, since the catalog follows
   `main`. To try a pushed branch before that, run
   `bb plugin install 'git:https://github.com/rebryk/bb-plugins.git@<branch>' --subdirectory <id> --yes`.
@@ -80,3 +80,8 @@ Every `<id>/README.md` has these sections, in this order:
 no title: an intro line, a `##` section per feature or topic, and the family
 block, with bold names instead of links and a last line that links to the
 repository.
+
+Plugins in BB Community, currently Bookmarks and Pool Usage, stand alone: their
+README and overview describe only the plugin and have no family block. BB
+Community keeps its own copy of each overview, so a change to one needs a pull
+request to [get-bb/marketplace](https://github.com/get-bb/marketplace) as well.
