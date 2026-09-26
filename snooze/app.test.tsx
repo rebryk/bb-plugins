@@ -385,6 +385,39 @@ describe("snoozed threads", () => {
     ).toEqual([]);
   });
 
+  it("lists the soonest first again after a search", async () => {
+    await openDialog("show-snoozed-threads", {
+      snoozes: [
+        {
+          threadId: "t1",
+          title: "Fix the login bug",
+          until: new Date(2026, 8, 26, 18).getTime(),
+        },
+        {
+          threadId: "t3",
+          title: "Login page",
+          until: new Date(2026, 8, 28, 9).getTime(),
+        },
+      ],
+      last: null,
+    });
+    const input = await screen.findByPlaceholderText("Search snoozed threads…");
+    const all = [
+      "Fix the login buguntil today at 6:00 PMUnsnoozeCtrl ↵",
+      "Login pageuntil Mon, Sep 28 at 9:00 AMUnsnoozeCtrl ↵",
+    ];
+    await vi.waitFor(() => expect(rows()).toEqual(all));
+
+    // cmdk sorts by how well a row matches and moves Login page up.
+    fireEvent.change(input, { target: { value: "login" } });
+    expect(rows()).toEqual([all[1], all[0]]);
+    fireEvent.change(input, { target: { value: "" } });
+    await vi.waitFor(() => {
+      expect(rows()).toEqual(all);
+      expect(selectedRow()).toBe(all[0]);
+    });
+  });
+
   it("unsnoozes the selected row with ⌘↵ and stays open", async () => {
     const { slot } = await openDialog("show-snoozed-threads", list);
     const input = await screen.findByPlaceholderText("Search snoozed threads…");
