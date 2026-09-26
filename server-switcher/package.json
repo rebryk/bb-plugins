@@ -39,6 +39,9 @@
     "directory": "server-switcher"
   },
   "homepage": "https://github.com/rebryk/bb-plugins/tree/main/server-switcher#readme",
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
   "scripts": {
     "build": "bb plugin build",
     "typecheck": "tsc --noEmit",

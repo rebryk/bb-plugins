@@ -2,7 +2,9 @@
 
 Switch servers from BB's sidebar footer with a **Change Server** button.
 
-## Browser / Safari / PWA
+## Use
+
+### Browser / Safari / PWA
 
 When BB is open at `https://<handle>.getbb.app`, a click opens the next online
 server on your bb connect account at its home page, in the same tab. Servers
@@ -11,10 +13,9 @@ around. A toast explains when no other server is online, the session has
 expired, or the page isn't a bb connect address (a direct URL or a self-hosted
 connect domain).
 
-Switching doesn't stop threads running on the previous server. Install the
-plugin on every server where you want the button to appear.
+Switching doesn't stop threads running on the previous server.
 
-## Native iPhone / Android app
+### Native iPhone / Android app
 
 A tap opens **This device**, where **Servers** lists the app's saved servers.
 The mobile bridge (`window.bb.native`) can open This device but has no message
@@ -22,13 +23,13 @@ that switches the active server, and a link to another server would leave the
 app for the browser. Older builds without the bridge name the settings path in
 a toast.
 
-## Native desktop app
+### Native desktop app
 
 The button isn't shown. BB Desktop changes servers only from its native
 **Window → Server** menu, and its renderer bridge (`window.bbDesktop`) can't
 list or select servers.
 
-## Data and lifecycle
+## How it works
 
 A click reads `/api/connect/servers` with the page's existing same-origin
 session. Destinations are built from server handles only, never from URLs in
@@ -38,24 +39,25 @@ services.
 
 ## Install
 
+Install the plugin on every server where you want the button to appear:
+
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install server-switcher@sf-plugins
 ```
 
+Use `bb plugin install .` from this directory instead when working on it
+locally.
+
 ## Development
 
 ```sh
-cd server-switcher
-npm ci --include=dev
+npm ci
 npm test
 npm run typecheck
 npm run build
-bb plugin install . --yes
+bb plugin reload server-switcher
 ```
-
-Requires BB 0.43+ and Plugin SDK 0.5.9+. A local installation needs to keep this
-directory on disk.
 
 ## More San Francisco Plugins
 

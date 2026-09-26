@@ -1,22 +1,15 @@
 # Dia Sidebar
 
-The sidebar's top navigation as a wrapping grid of square icon buttons.
-Buttons follow BB's footer controls: normally 32 px with 16 px icons.
-They sit edge to edge without gaps, since only the hovered and the current
-button show a background. The grid has 8 px horizontal padding and no
-vertical padding, so it does not stack extra space onto BB's header and
-thread list.
-Compact touch viewports use 36 px buttons and 20 px icons.
-These sizes use BB's spacing token; corner radii, colors and interaction
-states follow the active BB theme. Hover an icon for its name.
-BB continues to own destinations, shortcuts, split opening, hidden items,
-menus, and customization.
+The sidebar's top navigation as a wrapping grid of square icon buttons. Hover
+an icon for its name. BB continues to own destinations, shortcuts, split
+opening, hidden items, menus, and customization.
 
 ## Use
 
-Install the plugin and choose **Dia Sidebar** under **Settings → Appearance →
-Navigation**. Right-click a tile, long-press it, or focus it and press
-**Shift+F10** / the **Context Menu** key for its native menu.
+Install the plugin and choose **Dia Sidebar** under
+**Settings → Appearance → Navigation**. Choose **bb (built-in)** there to
+return to the standard list. Right-click a tile, long-press it, or focus it
+and press **Shift+F10** / the **Context Menu** key for its native menu.
 Use **More → Customize sidebar** to change visibility and order.
 Reordering happens in that native editor; dragging within the icon grid does
 not rearrange tiles. Dragging a destination out into a split remains available.
@@ -32,25 +25,14 @@ ones shrink. The area's paint boundary prevents overflow during updates.
 The host decides whether an accessory is available; BB 0.43 omits them on
 compact viewports. Long text accessories can become very small in this layout.
 
-## Install
+## How it works
 
-```sh
-bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
-bb plugin install dia-sidebar@sf-plugins
-```
-
-## Develop
-
-```sh
-npm install
-npm test
-npm run typecheck
-npm run build
-npm run test:browser
-bb plugin install . --yes
-```
-
-The browser geometry check requires an installed Google Chrome.
+Buttons follow BB's footer controls: normally 32 px with 16 px icons. They sit
+edge to edge without gaps, since only the hovered and the current button show a
+background. The grid has 8 px horizontal padding and no vertical padding, so it
+does not stack extra space onto BB's header and thread list. Compact touch
+viewports use 36 px buttons and 20 px icons. These sizes use BB's spacing
+token; corner radii, colors and interaction states follow the active BB theme.
 
 This plugin targets the navigation DOM in BB 0.43.4 / SDK 0.5.9. It delegates
 to the public `experimental_Original` component because that SDK's navigation
@@ -60,11 +42,35 @@ with ResizeObserver, and connects keyboard menu keys to the native context menu.
 It blocks the host's vertical-list sorting sensors in the grid while leaving
 Customize and pointer-based split gestures intact. Cleanup removes listeners,
 observers, titles, and scale properties. There are no global content scripts,
-private BB imports, or duplicated navigation state. Recheck the selectors when
-upgrading BB, since the native DOM is not a versioned layout API.
+private BB imports, or duplicated navigation state. Recheck the selectors in
+`app.css` and `navigation.ts` when upgrading BB, since the native DOM is not a
+versioned layout API.
 
 BB 0.43 loads frontend plugins after the initial app render, so its standard
 navigation can appear briefly on a page reload before the grid takes over.
+
+## Install
+
+```sh
+bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
+bb plugin install dia-sidebar@sf-plugins
+```
+
+Use `bb plugin install .` from this directory instead when working on it
+locally.
+
+## Development
+
+```sh
+npm ci
+npm test
+npm run typecheck
+npm run build
+npm run test:browser
+bb plugin reload dia-sidebar
+```
+
+The browser geometry check requires an installed Google Chrome.
 
 ## More San Francisco Plugins
 

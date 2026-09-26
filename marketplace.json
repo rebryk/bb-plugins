@@ -134,7 +134,7 @@
     {
       "id": "server-switcher",
       "displayName": "Server Switcher",
-      "description": "Switch servers in one click: Change Server in the sidebar footer opens your next online bb connect server. Clicks go through your servers in alphabetical order, skip offline ones, and wrap around. In the BB mobile app, a tap opens device settings to change servers there, and BB Desktop shows no button. Needs a bb connect account and the plugin installed on each server.",
+      "description": "Switch servers in one click: Change Server in the sidebar footer opens your next online bb connect server.",
       "icon": "Repeat",
       "tags": [
         "servers",
