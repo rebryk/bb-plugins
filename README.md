@@ -11,6 +11,7 @@ bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install super-hotkeys@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install dia-sidebar@sf-plugins
+bb plugin install terminal-paste@sf-plugins
 bb plugin install pool-usage@sf-plugins
 bb plugin install server-switcher@sf-plugins
 ```
@@ -21,8 +22,9 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-Super Hotkeys, Bookmarks, and Dia Sidebar suit any BB setup. Pool Usage needs
-Account Pooler, and Server Switcher needs more than one server on bb connect.
+Super Hotkeys, Bookmarks, Dia Sidebar, and Terminal Paste suit any BB setup.
+Pool Usage needs Account Pooler, and Server Switcher needs more than one server
+on bb connect.
 
 ### [Super Hotkeys](./super-hotkeys)
 
@@ -41,6 +43,12 @@ its thread scrolled to the message.
 A compact, wrapping grid of navigation icons, with live plugin indicators
 in the lower-right corner. Keeps BB's existing menus,
 hidden items, and customization.
+
+### [Terminal Paste](./terminal-paste)
+
+A Paste button for the terminal on phones and tablets, in the header of the
+terminal's pane in the right panel. Where the page can't read the clipboard,
+as in the BB app on Android, Paste opens a text field instead.
 
 ### [Pool Usage](./pool-usage)
 

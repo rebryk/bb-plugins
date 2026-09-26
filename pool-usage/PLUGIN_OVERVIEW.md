@@ -34,6 +34,7 @@ others:
   right panel.
 - **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
   icons.
+- **Terminal Paste**: a Paste button for the terminal on phones and tablets.
 - **Server Switcher**: if you run several servers on bb connect, one click opens
   the next online one.
 
