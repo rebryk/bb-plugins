@@ -60,22 +60,3 @@ npm run typecheck
 npm run build
 bb plugin reload bookmarks
 ```
-
-## More San Francisco Plugins
-
-Bookmarks is one of the
-[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
-plugins. The others:
-
-- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
-  shortcut hints, slash search, and number keys that set up a new thread.
-- [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
-  grid of icons.
-- [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
-  until its agent needs you.
-- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
-  and tablets.
-- [Pool Usage](../pool-usage): how much of each provider's capacity is in use
-  and when it frees up, in the sidebar footer.
-- [Server Switcher](../server-switcher): if you run several servers on bb
-  connect, one click opens the next online one.

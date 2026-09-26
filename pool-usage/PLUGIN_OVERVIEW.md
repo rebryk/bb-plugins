@@ -22,23 +22,3 @@ showing when the total drops next and what it drops to.
 The numbers refresh every 30 seconds. Pool Usage reads only Account Pooler's
 redacted account status and BB's provider usage readings; credentials and
 tokens never enter the plugin or frontend.
-
-## More San Francisco Plugins
-
-Pool Usage is one of the San Francisco Plugins, a family of BB plugins. The
-others:
-
-- **Super Hotkeys**: Superhuman-like keyboard navigation, with shortcut hints,
-  slash search, and number keys that set up a new thread.
-- **Bookmarks**: save any chat message and jump back to it from the thread's
-  right panel.
-- **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
-  icons.
-- **Snooze**: hide a thread from the sidebar until a time you pick, or until its
-  agent needs you.
-- **Terminal Paste**: a Paste button for the terminal on phones and tablets.
-- **Server Switcher**: if you run several servers on bb connect, one click opens
-  the next online one.
-
-See all of them, with install steps, at
-[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).

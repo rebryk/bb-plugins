@@ -79,22 +79,3 @@ npm run typecheck
 npm run build
 bb plugin reload pool-usage
 ```
-
-## More San Francisco Plugins
-
-Pool Usage is one of the
-[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
-plugins. The others:
-
-- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
-  shortcut hints, slash search, and number keys that set up a new thread.
-- [Bookmarks](../bookmarks): save any chat message and jump back to it from the
-  thread's right panel.
-- [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
-  grid of icons.
-- [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
-  until its agent needs you.
-- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
-  and tablets.
-- [Server Switcher](../server-switcher): if you run several servers on bb
-  connect, one click opens the next online one.
