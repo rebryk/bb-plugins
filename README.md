@@ -10,6 +10,7 @@ bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install pool-usage@rebryk-bb-plugins
 bb plugin install bookmarks@rebryk-bb-plugins
 bb plugin install dia-sidebar@rebryk-bb-plugins
+bb plugin install server-switcher@rebryk-bb-plugins
 ```
 
 `bb marketplace refresh rebryk-bb-plugins` re-reads the catalog; it never
@@ -36,6 +37,13 @@ A compact, wrapping grid of navigation icons, with live plugin indicators
 in the lower-right corner. Keeps BB's existing menus,
 hidden items, and customization.
 
+### [Server Switcher](./server-switcher)
+
+A Change Server button in the sidebar footer that opens the next online bb
+connect server in the browser. In the native mobile app it opens This device
+for server selection. The desktop app doesn't show it, since only
+Window → Server can switch servers there.
+
 ## Layout
 
 - `marketplace.json` is the v2 marketplace document bb reads.
@@ -55,3 +63,7 @@ git tag pool-usage/v0.2.0 && git push origin pool-usage/v0.2.0
 The [BB Community marketplace](https://github.com/get-bb/marketplace) entries
 resolve those tags through `subdir` and `tagPrefix`, so a community install
 follows released tags while this repository's own catalog follows `main`.
+Bump `version` in the plugin's `package.json` before tagging, and never move a
+pushed tag. A new tag inside the entry's `range` (`^0.1.0` covers 0.1.x) shows
+up as an update for community installs; a version outside it needs a
+marketplace pull request that widens the range.

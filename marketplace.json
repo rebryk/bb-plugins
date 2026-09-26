@@ -18,7 +18,7 @@
     {
       "id": "navigation",
       "displayName": "Navigation",
-      "description": "Change how you move between threads and app pages."
+      "description": "Change how you move between threads, app pages, and servers."
     }
   ],
   "collections": [
@@ -28,7 +28,8 @@
       "pluginIds": [
         "pool-usage",
         "bookmarks",
-        "dia-sidebar"
+        "dia-sidebar",
+        "server-switcher"
       ]
     }
   ],
@@ -126,6 +127,36 @@
           "url": "https://github.com/rebryk/bb-plugins.git",
           "ref": "main",
           "subdir": "dia-sidebar"
+        }
+      }
+    },
+    {
+      "id": "server-switcher",
+      "displayName": "Server Switcher",
+      "description": "Switch servers in one click: Change Server in the sidebar footer opens your next online bb connect server. Clicks go through your servers in alphabetical order, skip offline ones, and wrap around. In the BB mobile app, a tap opens device settings to change servers there, and BB Desktop shows no button. Needs a bb connect account and the plugin installed on each server.",
+      "icon": "Repeat",
+      "tags": [
+        "servers",
+        "switch-server",
+        "change-server",
+        "multi-server",
+        "bb-connect",
+        "sidebar",
+        "mobile"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "navigation",
+      "screenshots": [],
+      "overview": "Hop between the BB servers on your bb connect account without typing an address.\n\n## One button\n\n**Change Server** sits in the sidebar footer. Each click opens the next online\nserver at its home page in the same tab. Servers follow alphabetical handle\norder, offline ones are skipped, and the last one wraps around to the first.\nThere is no menu and nothing to configure. When no other server is online, a\nmessage says so.\n\n## In the apps\n\nThe BB mobile app doesn't let plugins change its server, so a tap opens\n**This device**, where **Servers** lists the app's saved servers. BB Desktop\nchanges servers only from **Window → Server**, so it shows no button.\n\n## Requirements\n\nOpen BB through bb connect, at `https://<handle>.getbb.app`. The plugin reads\nyour server list with that page's existing session and stores nothing. Install\nit on every server you switch between, so the button is there after each\nswitch.\n",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "server-switcher"
         }
       }
     }
