@@ -47,23 +47,41 @@ Window → Server can switch servers there.
 ## Layout
 
 - `marketplace.json` is the v2 marketplace document bb reads.
-- `<plugin-id>/` holds one plugin, with its own `package.json` and tests.
+- `<plugin-id>/` holds one plugin, with its own `package.json`, tests, and
+  `CHANGELOG.md`.
 - `screenshots/<plugin-id>/` holds the catalog screenshots.
 
 ## Releases
 
-Each plugin is versioned in its own `package.json` and tagged with a plugin
-prefix, so tags never collide between plugins:
+Each plugin has its own version, in `<plugin-id>/package.json`, its own
+history, in `<plugin-id>/CHANGELOG.md`, and its own release tags,
+`<plugin-id>/v<version>`, so tags never collide between plugins.
 
-```sh
-cd pool-usage && npm test && npm run typecheck && npm run build
-git tag pool-usage/v0.2.0 && git push origin pool-usage/v0.2.0
-```
+1. In every pull request that changes what a plugin ships (its code, styles,
+   manifest, or runtime dependencies), raise that plugin's patch version by
+   one: 0.1.0, then 0.1.1, then 0.1.2. Run
+   `npm version patch --no-git-tag-version` in the plugin's directory, which
+   updates `package.json` and `package-lock.json` together. A pull request is
+   one step however many commits it has, and a pull request that changes two
+   plugins raises both. Tests, docs, and dev tooling alone don't need a new
+   version; they ship with the next one.
+2. In the same pull request, add the new version at the top of the plugin's
+   `CHANGELOG.md`, with the date and what changed for the people who use the
+   plugin.
+3. When the pull request merges, the
+   [Release tags](./.github/workflows/release-tags.yml) workflow tags the new
+   commit on `main` as `<plugin-id>/v<version>`. The
+   [BB Community marketplace](https://github.com/get-bb/marketplace) entries
+   resolve those tags through `subdir` and `tagPrefix`, so their installs see
+   the update in Settings → Updates. This repository's own catalog follows
+   `main` instead.
 
-The [BB Community marketplace](https://github.com/get-bb/marketplace) entries
-resolve those tags through `subdir` and `tagPrefix`, so a community install
-follows released tags while this repository's own catalog follows `main`.
-Bump `version` in the plugin's `package.json` before tagging, and never move a
-pushed tag. A new tag inside the entry's `range` (`^0.1.0` covers 0.1.x) shows
-up as an update for community installs; a version outside it needs a
-marketplace pull request that widens the range.
+Keep the minor and major numbers as they are. A BB Community entry accepts
+only versions inside its range (`^0.1.0` covers 0.1.x), so a 0.2.0 reaches no
+community install until a pull request to get-bb/marketplace widens the
+range. That repository also keeps its own copy of each listing's description,
+overview, and screenshots, so changing those takes a pull request there too.
+
+Never move or delete a pushed tag. BB records the commit behind each tag and
+reports a moved tag as a failed security check. Fix a bad release with the
+next version.
