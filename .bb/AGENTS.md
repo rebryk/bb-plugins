@@ -14,13 +14,13 @@
 
 ## Adding a plugin
 
-- Name the plugin in title case and derive the rest from the name: Super
-  Hotkeys has the id and directory `super-hotkeys`, the package
-  `bb-plugin-super-hotkeys`, and `bb.name` Super Hotkeys. Choose the id with
-  care. BB keys installs, settings, data, and keyboard overrides
-  (`plugin:<id>/<command>`) by it, so after the first release a new id means
-  every user removes the plugin and installs it again, with empty settings and
-  data. Display names and descriptions can change at any time.
+- Name the plugin in title case and derive the rest from the name: Pool Usage
+  has the id and directory `pool-usage`, the package `bb-plugin-pool-usage`, and
+  `bb.name` Pool Usage. Choose the id with care. BB keys installs, settings,
+  data, and keyboard overrides (`plugin:<id>/<command>`) by it, so after the
+  first release a new id means every user removes the plugin and installs it
+  again, with empty settings and data. Display names and descriptions can change
+  at any time.
 - Never change the marketplace `name`, `sf-plugins`. BB rejects a catalog whose
   name changed, so everyone who added the marketplace would have to remove it
   and add it again.
@@ -40,8 +40,7 @@
   script that writes `json.dumps(data, indent=2, ensure_ascii=False) + "\n"`,
   which keeps its format, and validate it against its `$schema`.
 - Add the plugin to the family everywhere, in the same order: general plugins
-  first, setup-specific ones last, currently super-hotkeys, bookmarks,
-  dia-sidebar, snooze, terminal-paste, pool-usage, server-switcher. The places
+  first, setup-specific ones last, currently bookmarks, pool-usage. The places
   are the root README's install block, Plugins intro, and Plugins list; the
   collection's `pluginIds`; and the `## More San Francisco Plugins` block of
   every other plugin's README and overview that has one. Copy each changed

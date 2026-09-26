@@ -8,13 +8,8 @@ them.
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
-bb plugin install super-hotkeys@sf-plugins
 bb plugin install bookmarks@sf-plugins
-bb plugin install dia-sidebar@sf-plugins
-bb plugin install snooze@sf-plugins
-bb plugin install terminal-paste@sf-plugins
 bb plugin install pool-usage@sf-plugins
-bb plugin install server-switcher@sf-plugins
 ```
 
 `bb marketplace refresh sf-plugins` re-reads the catalog; it never installs or
@@ -23,15 +18,8 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-Super Hotkeys, Bookmarks, Dia Sidebar, Snooze, and Terminal Paste suit any BB
-setup. Pool Usage needs Account Pooler, and Server Switcher needs more than one
-server on bb connect.
-
-### [Super Hotkeys](./super-hotkeys)
-
-Superhuman-like keyboard navigation: hints with the remaining keys of visible
-shortcuts, slash to search threads, a command that opens the Plugins page, and
-number keys that set up a new thread's project, model, machine, and branch.
+Both suit any BB setup. With Account Pooler, Pool Usage counts every pooled
+account.
 
 ### [Bookmarks](./bookmarks)
 
@@ -39,37 +27,11 @@ A bookmark button on every chat message and a Bookmarks tab in the thread's
 right panel that lists the saved messages across threads; clicking one opens
 its thread scrolled to the message.
 
-### [Dia Sidebar](./dia-sidebar)
-
-A compact, wrapping grid of navigation icons, with live plugin indicators
-in the lower-right corner. Keeps BB's existing menus,
-hidden items, and customization.
-
-### [Snooze](./snooze)
-
-A moon button in the thread header and a command that hide a thread from the
-sidebar until a time you pick or type, the way Superhuman snoozes email. The
-thread comes back at that time, marked unread, or sooner when its agent finishes
-or needs an answer.
-
-### [Terminal Paste](./terminal-paste)
-
-A Paste button for the terminal on phones and tablets, in the header of the
-terminal's pane in the right panel. Where the page can't read the clipboard,
-as in the BB app on Android, Paste opens a text field instead.
-
 ### [Pool Usage](./pool-usage)
 
 One number per provider at the right end of the sidebar footer: how much of
 each provider's capacity is in use, across Account Pooler accounts, weighted by
 plan. Click it for the next resets.
-
-### [Server Switcher](./server-switcher)
-
-A Change Server button in the sidebar footer that opens the next online bb
-connect server in the browser. In the native mobile app it opens This device
-for server selection. The desktop app doesn't show it, since only
-Window → Server can switch servers there.
 
 ## Layout
 
