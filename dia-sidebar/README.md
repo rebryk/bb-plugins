@@ -30,6 +30,13 @@ ones shrink. The area's paint boundary prevents overflow during updates.
 The host decides whether an accessory is available; BB 0.43 omits them on
 compact viewports. Long text accessories can become very small in this layout.
 
+## Install
+
+```sh
+bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
+bb plugin install dia-sidebar@sf-plugins
+```
+
 ## Develop
 
 ```sh
@@ -56,3 +63,18 @@ upgrading BB, since the native DOM is not a versioned layout API.
 
 BB 0.43 loads frontend plugins after the initial app render, so its standard
 navigation can appear briefly on a page reload before the grid takes over.
+
+## More San Francisco Plugins
+
+Dia Sidebar is one of the
+[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
+plugins. The others:
+
+- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
+  shortcut hints, slash search, and number keys that set up a new thread.
+- [Bookmarks](../bookmarks): save any chat message and jump back to it from the
+  thread's right panel.
+- [Pool Usage](../pool-usage): if you use Account Pooler, each account's
+  limiting quota and its reset time in one sidebar list.
+- [Server Switcher](../server-switcher): if you run several servers on bb
+  connect, one click opens the next online one.

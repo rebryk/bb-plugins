@@ -1,0 +1,39 @@
+{
+  "name": "bb-plugin-super-hotkeys",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.43",
+    "bbPluginSdk": ">=0.5.9"
+  },
+  "bb": {
+    "name": "Super Hotkeys",
+    "description": "Superhuman-like keyboard navigation for BB: instant shortcut hints, slash search, and number keys that set up a new thread.",
+    "branding": {
+      "icon": "Zap"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": []
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.9",
+    "@types/react": "^19.0.0",
+    "react": "^19.3.0",
+    "typescript": "^5.7.0"
+  },
+  "author": "Yurii Rebryk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "super-hotkeys"
+  },
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/super-hotkeys#readme",
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit"
+  }
+}

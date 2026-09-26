@@ -45,7 +45,7 @@ Plan the storage migration                     3d
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
-bb plugin install bookmarks@rebryk-bb-plugins
+bb plugin install bookmarks@sf-plugins
 ```
 
 Use `bb plugin install .` from this directory instead when working on it
@@ -60,3 +60,18 @@ npm run typecheck
 npm run build
 bb plugin reload bookmarks
 ```
+
+## More San Francisco Plugins
+
+Bookmarks is one of the
+[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
+plugins. The others:
+
+- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
+  shortcut hints, slash search, and number keys that set up a new thread.
+- [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
+  grid of icons.
+- [Pool Usage](../pool-usage): if you use Account Pooler, each account's
+  limiting quota and its reset time in one sidebar list.
+- [Server Switcher](../server-switcher): if you run several servers on bb
+  connect, one click opens the next online one.

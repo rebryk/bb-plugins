@@ -35,3 +35,20 @@ BB controls which indicators are available on compact screens.
 
 Select Dia Sidebar under Settings → Appearance → Navigation. Choose BB again
 to return to the standard list. No external account or service is required.
+
+## More San Francisco Plugins
+
+Dia Sidebar is one of the San Francisco Plugins, a family of BB plugins. The
+others:
+
+- **Super Hotkeys**: Superhuman-like keyboard navigation, with shortcut hints,
+  slash search, and number keys that set up a new thread.
+- **Bookmarks**: save any chat message and jump back to it from the thread's
+  right panel.
+- **Pool Usage**: if you use Account Pooler, each account's limiting quota and
+  its reset time in one sidebar list.
+- **Server Switcher**: if you run several servers on bb connect, one click opens
+  the next online one.
+
+See all of them, with install steps, at
+[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).

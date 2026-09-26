@@ -33,7 +33,7 @@ Enable and configure Account Pooler first, then install the plugin:
 ```sh
 bb plugin enable account-pool
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
-bb plugin install pool-usage@rebryk-bb-plugins
+bb plugin install pool-usage@sf-plugins
 ```
 
 Use `bb plugin install .` from this directory instead when working on it
@@ -60,3 +60,18 @@ npm run typecheck
 npm run build
 bb plugin reload pool-usage
 ```
+
+## More San Francisco Plugins
+
+Pool Usage is one of the
+[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
+plugins. The others:
+
+- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
+  shortcut hints, slash search, and number keys that set up a new thread.
+- [Bookmarks](../bookmarks): save any chat message and jump back to it from the
+  thread's right panel.
+- [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
+  grid of icons.
+- [Server Switcher](../server-switcher): if you run several servers on bb
+  connect, one click opens the next online one.
