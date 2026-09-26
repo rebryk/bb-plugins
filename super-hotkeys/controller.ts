@@ -1,8 +1,10 @@
 import type { useSdk } from "@get-bb/plugin-sdk/app";
 
-type Bindings = Awaited<
+type Config = Awaited<
   ReturnType<ReturnType<typeof useSdk>["system"]["config"]>
->["keybindings"];
+>;
+type Bindings = Config["keybindings"];
+type Shortcut = Bindings[number]["shortcut"];
 type Modifier = "ctrlKey" | "altKey" | "shiftKey" | "metaKey";
 type Chord = Record<Modifier, boolean> & { key: string };
 
@@ -21,6 +23,17 @@ const EDITABLE =
 const ITEM =
   '[role="option"], [role="menuitem"], [role="menuitemradio"], button';
 const ROW = "[data-sidebar-thread-shortcut-target]";
+const PLUGINS = '[data-sidebar-navigation-item="__bb__/extensions"] > button';
+const OPEN_PLUGINS = "plugin:super-hotkeys/open-plugins";
+/** The default key of the Open plugins command. */
+export const PLUGINS_SHORTCUT: Shortcut = {
+  key: "p",
+  mod: true,
+  meta: false,
+  control: false,
+  alt: false,
+  shift: false,
+};
 // The new-thread project, model, machine and branch controls, in number order.
 const CONTROLS = [
   "[data-promptbox-project-control]",
@@ -35,19 +48,20 @@ const [KEY, MODE, ANCHOR] = ["key", "mode", "anchor"].map(
 
 let settings: Record<string, unknown> = {};
 let bindings: Bindings = [];
+let pluginsBinding: Chord | undefined;
 let running = false;
 let mods: Record<Modifier, boolean> = NONE;
 let tagged: HTMLElement[] = [];
 let frame = 0;
 let dismissed: Element | null = null;
 
-/** Receives the plugin settings and BB's resolved keybindings. */
-export function update(next: {
-  settings?: typeof settings;
-  bindings?: Bindings;
-}) {
+/** Receives the plugin settings and BB's keyboard configuration. */
+export function update(next: { settings?: typeof settings; config?: Config }) {
   settings = next.settings ?? settings;
-  bindings = next.bindings ?? bindings;
+  if (next.config) {
+    bindings = next.config.keybindings;
+    pluginsBinding = ownBinding(next.config);
+  }
   paint();
 }
 
@@ -110,30 +124,56 @@ function numbered(setup = composer()): HTMLElement[] {
   return empty && !panel && !dismissed && !elsewhere ? setup.controls : [];
 }
 
-/** BB's current shortcut for a command on this platform and surface. */
-function binding(command: string): Chord | undefined {
+/** Whether a binding is for this platform and surface. */
+function applies(item: Bindings[number]) {
   const context: Record<string, boolean> = {
     macPlatform: mac,
     webSurface: !desktop,
     desktopSurface: desktop,
   };
+  return (
+    (desktop || !item.desktopOnly) &&
+    item.when.all.every((key) => context[key] ?? true) &&
+    !item.when.none.some((key) => context[key])
+  );
+}
+
+/** The keys a BB shortcut takes on this platform. */
+const chord = ({ key, mod, control, alt, shift, meta }: Shortcut): Chord => ({
+  key,
+  ctrlKey: control || (mod && !mac),
+  altKey: alt,
+  shiftKey: shift,
+  metaKey: meta || (mod && mac),
+});
+
+/** BB's current shortcut for a command on this platform and surface. */
+function binding(command: string): Chord | undefined {
   const shortcut = bindings.find(
-    (item) =>
-      item.command === command &&
-      item.shortcut &&
-      (desktop || !item.desktopOnly) &&
-      item.when.all.every((key) => context[key] ?? true) &&
-      !item.when.none.some((key) => context[key]),
+    (item) => item.command === command && item.shortcut && applies(item),
   )?.shortcut;
-  if (!shortcut) return;
-  const { key, mod, control, alt, shift, meta } = shortcut;
-  return {
-    key,
-    ctrlKey: control || (mod && !mac),
-    altKey: alt,
-    shiftKey: shift,
-    metaKey: meta || (mod && mac),
-  };
+  return shortcut && chord(shortcut);
+}
+
+/**
+ * The binding of Open plugins. BB resolves plugin command keys in the page, not
+ * in `keybindings`, so this repeats its rule: the user's key wins, and a default
+ * that another command already uses stays unbound. Other plugins' commands are
+ * out of sight here.
+ */
+function ownBinding({ keybindings, keybindingOverrides }: Config) {
+  const override = keybindingOverrides.find(
+    (item) => item.command === OPEN_PLUGINS,
+  );
+  if (override) return override.shortcut ? chord(override.shortcut) : undefined;
+  const wanted = chord(PLUGINS_SHORTCUT);
+  const same = (other: Chord) =>
+    other.key.toLowerCase() === wanted.key.toLowerCase() &&
+    MODIFIERS.every((key) => other[key] === wanted[key]);
+  const taken = keybindings.some(
+    (item) => applies(item) && same(chord(item.shortcut)),
+  );
+  return taken ? undefined : wanted;
 }
 
 /** Reads `aria-keyshortcuts`, such as "Shift+Meta+M". */
@@ -180,6 +220,9 @@ function hints(pills: Map<HTMLElement, string>) {
     "[aria-keyshortcuts]",
   ))
     add(element, parse(element.getAttribute("aria-keyshortcuts")!));
+  // BB's Plugins item has no key of its own; Open plugins goes to the same page.
+  for (const element of document.querySelectorAll<HTMLElement>(PLUGINS))
+    add(element, [pluginsBinding]);
   // BB labels the rows itself while its own hints show, and split panes take the numbers.
   const rows = [...document.querySelectorAll<HTMLElement>(ROW)].filter(
     (row) => !row.closest('[data-sidebar-overflow="true"]'),

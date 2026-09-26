@@ -26,7 +26,8 @@ The plugin leaves your command-palette binding and Cmd+F alone.
 Command+P on a Mac and Ctrl+P elsewhere open the Plugins page. BB's Quick open
 file has the same default key, and BB gives a plugin command no key that
 another command uses, so clear or change Quick open file's key in Settings →
-Keyboard first. The command is also in the command palette.
+Keyboard first. The command is also in the command palette, and hints show its
+key on the sidebar's Plugins item.
 
 ## Settings
 

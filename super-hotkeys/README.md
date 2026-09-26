@@ -17,7 +17,7 @@ action has a key.
   page. BB's **Quick open file** has the same default key, and BB gives a
   plugin command no key that another command uses, so clear or change Quick
   open file's key in Settings → Keyboard first. The command is also in the
-  command palette.
+  command palette, and hints show its key on the sidebar's **Plugins** item.
 - **New thread setup**: while the prompt is empty, **1** opens the project,
   **2** the model, **3** the machine and **4** the branch. Numbers then choose
   one of the first ten options in BB's menu (**1–9**, **0**); BB's own keys,
@@ -43,6 +43,11 @@ settings. On phones and tablets, where touch is the main input, they stay off.
   **/** itself.
 - **Open plugins** is a BB command, so BB matches its key. It opens `/plugins`
   through the browser history, since the SDK has no way to go there.
+- BB's Plugins item has no shortcut, and the keybindings BB gives plugins
+  leave out plugin commands, so the plugin works out the Plugins hint by BB's
+  rule: the key you set in Settings → Keyboard, or else the default unless one
+  of BB's commands has it. If another plugin's command also defaults to that
+  key, BB leaves both unbound, but the hint still shows it.
 - A phone or tablet is any device matching the `(pointer: coarse)` media query.
 - Controls are found by BB 0.43's labels, roles and `data-*` attributes, so a
   future BB UI change may need an update here.

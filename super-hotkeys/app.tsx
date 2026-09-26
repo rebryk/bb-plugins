@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { definePluginApp, useSdk, useSettings } from "@get-bb/plugin-sdk/app";
-import { start, update } from "./controller";
+import { PLUGINS_SHORTCUT, start, update } from "./controller";
 import "./app.css";
 
 // Settings and keybindings reach the page script through this React bridge.
@@ -11,7 +11,7 @@ function Bridge() {
   useEffect(() => {
     const refresh = () =>
       sdk.system.config().then(
-        (config) => update({ bindings: config.keybindings }),
+        (config) => update({ config }),
         () => {}, // Keep the last bindings while the connection recovers.
       );
     void refresh();
@@ -31,7 +31,7 @@ export default definePluginApp((app) => {
   app.commands.register({
     id: "open-plugins",
     title: "Open plugins",
-    defaultShortcut: { key: "p", mod: true },
+    defaultShortcut: PLUGINS_SHORTCUT,
     run: () => {
       if (location.pathname === "/plugins") return;
       history.pushState(history.state, "", "/plugins");
