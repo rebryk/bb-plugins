@@ -69,10 +69,12 @@ no unsnooze key: open the thread and pick **Unsnooze** from its moon instead.
   `data-sidebar-*` attributes the way BB's Next thread reads them, so a BB UI
   change may need an update here. Without them, snoozing opens the new-thread
   screen.
-- The picker and the list are BB's command dialog, the registry `command`
-  component, which becomes BB's bottom drawer on phones. Commands have no React
-  tree and the header button exists only on thread pages, so an
-  `experimental_appOverlay` renders both dialogs; the moon is an
+- The picker and the list are the registry `command` component in BB's
+  `dialog`, with the classes BB's command palette gives it, so they open where
+  the palette opens and look like it; a BB update that restyles the palette
+  doesn't restyle them. On phones, the dialog becomes BB's bottom drawer.
+  Commands have no React tree and the header button exists only on thread
+  pages, so an `experimental_appOverlay` renders both dialogs; the moon is an
   `experimental_threadHeaderAction`. Both slots are experimental and may change
   in a BB update.
 

@@ -162,6 +162,11 @@ describe("snooze picker", () => {
     await openDialog("snooze-thread", lastText);
     await screen.findByText("Last used");
     expect(screen.getByText("Snooze until")).toBeTruthy();
+    // Like BB's palette: no close button, and BB's own magnifier icon.
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    expect(
+      document.querySelector('[cmdk-input-wrapper] [data-icon="Search"]'),
+    ).not.toBeNull();
     expect(rows()).toEqual([
       "fri 3pmFri, Oct 2, 3:00 PM",
       "Later todayToday, 6:00 PM",
@@ -312,6 +317,25 @@ describe("snoozed threads", () => {
     });
     expect(slot.inspection.navigateCalls).toEqual([]);
     expect(screen.getByPlaceholderText("Search snoozed threads…")).toBeTruthy();
+  });
+
+  it("starts afresh each time on phones, where BB's drawer stays mounted", async () => {
+    phone();
+    const { app } = await openDialog("show-snoozed-threads", list);
+    const input = await screen.findByPlaceholderText("Search snoozed threads…");
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    fireEvent.change(input, { target: { value: "three" } });
+    expect(rows()).toHaveLength(1);
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    act(() => runCommand(app, "show-snoozed-threads"));
+    await vi.waitFor(() => {
+      expect(
+        screen.getByPlaceholderText<HTMLInputElement>("Search snoozed threads…")
+          .value,
+      ).toBe("");
+    });
+    expect(rows()).toHaveLength(2);
   });
 
   it("says when nothing is snoozed", async () => {

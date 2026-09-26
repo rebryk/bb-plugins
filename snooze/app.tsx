@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Moon02Icon from "@hugeicons/core-free-icons/Moon02Icon";
@@ -19,7 +20,7 @@ import {
 import { defaultFilter, useCommandState } from "cmdk";
 import { toast } from "sonner";
 import {
-  CommandDialog,
+  Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -27,7 +28,7 @@ import {
   CommandList,
   CommandShortcut,
 } from "./components/ui/command";
-import { DialogTitle } from "./components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { useIsCompactViewport } from "./components/ui/hooks/use-compact-viewport";
 import type { Snooze, rpcContract } from "./server";
 import { CHANGED_CHANNEL } from "./shared";
@@ -41,15 +42,15 @@ import {
   type Choice,
 } from "./time";
 
-type Dialog = { kind: "snooze"; threadId: string } | { kind: "snoozed" };
+type DialogRequest = { kind: "snooze"; threadId: string } | { kind: "snoozed" };
 
 // Commands have no React tree and the header button exists only on thread
 // pages, so both open the dialogs through this store, and an app overlay
 // renders them. The last dialog stays set while it animates closed. Each
 // opening gets a new key, since BB's drawer on phones keeps its content
 // mounted.
-let dialogState: { dialog: Dialog | null; open: boolean; key: number } = {
-  dialog: null,
+let dialogState = {
+  dialog: null as DialogRequest | null,
   open: false,
   key: 0,
 };
@@ -60,7 +61,7 @@ function setDialogState(next: typeof dialogState) {
   for (const listener of dialogListeners) listener();
 }
 
-const openDialog = (dialog: Dialog) =>
+const openDialog = (dialog: DialogRequest) =>
   setDialogState({ dialog, open: true, key: dialogState.key + 1 });
 const closeDialog = () => setDialogState({ ...dialogState, open: false });
 
@@ -161,10 +162,7 @@ function Picker(props: {
 
   return (
     <>
-      <DialogTitle className="sr-only">Snooze thread</DialogTitle>
       <CommandInput
-        // Keeps typed text clear of the dialog's close button.
-        className="md:pr-6"
         placeholder="Try: 8 am, 3 days, aug 7"
         value={query}
         onValueChange={setQuery}
@@ -242,9 +240,7 @@ function SnoozedList(props: {
 
   return (
     <>
-      <DialogTitle className="sr-only">Snoozed threads</DialogTitle>
       <CommandInput
-        className="md:pr-6"
         placeholder="Search snoozed threads…"
         onKeyDown={(event) => {
           if (compact || event.key !== "Enter") return;
@@ -283,14 +279,43 @@ function SnoozedList(props: {
   );
 }
 
-function SnoozeDialogs() {
+/** A dialog that looks like BB's command palette: near the top, with no ✕. */
+function PaletteDialog(props: {
+  kind: DialogRequest["kind"];
+  title: string;
+  children: ReactNode;
+}) {
   const { dialog, open, key } = useDialogState();
+  return (
+    <Dialog
+      open={open && dialog?.kind === props.kind}
+      onOpenChange={(next) => {
+        if (!next) closeDialog();
+      }}
+    >
+      <DialogContent
+        hideCloseButton
+        aria-describedby={undefined}
+        className="top-[12%] max-w-[640px] translate-y-0 gap-0 p-0 shadow-lg sm:rounded-xl"
+      >
+        <DialogTitle className="sr-only">{props.title}</DialogTitle>
+        <Command
+          key={key}
+          // Its own corners would cover the dialog's rounded border.
+          className="rounded-[inherit]"
+        >
+          {props.children}
+        </Command>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SnoozeDialogs() {
+  const { dialog } = useDialogState();
   const { rpc, snoozes, last } = useSnoozes();
   const context = useBbContext();
   const navigate = useBbNavigate();
-  const onOpenChange = (next: boolean) => {
-    if (!next) closeDialog();
-  };
 
   async function snooze(threadId: string, until: number, choice: Choice) {
     closeDialog();
@@ -345,13 +370,9 @@ function SnoozeDialogs() {
 
   return (
     <>
-      <CommandDialog
-        open={open && dialog?.kind === "snooze"}
-        onOpenChange={onOpenChange}
-      >
+      <PaletteDialog kind="snooze" title="Snooze thread">
         {dialog?.kind === "snooze" && (
           <Picker
-            key={key}
             until={
               snoozes.find((row) => row.threadId === dialog.threadId)?.until ??
               null
@@ -366,13 +387,9 @@ function SnoozeDialogs() {
             }}
           />
         )}
-      </CommandDialog>
-      <CommandDialog
-        open={open && dialog?.kind === "snoozed"}
-        onOpenChange={onOpenChange}
-      >
+      </PaletteDialog>
+      <PaletteDialog kind="snoozed" title="Snoozed threads">
         <SnoozedList
-          key={key}
           snoozes={snoozes}
           onOpen={(threadId) => {
             closeDialog();
@@ -380,7 +397,7 @@ function SnoozeDialogs() {
           }}
           onUnsnooze={unsnooze}
         />
-      </CommandDialog>
+      </PaletteDialog>
     </>
   );
 }
