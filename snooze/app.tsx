@@ -1,0 +1,440 @@
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import Moon02Icon from "@hugeicons/core-free-icons/Moon02Icon";
+import {
+  definePluginApp,
+  useBbContext,
+  useBbNavigate,
+  useRealtime,
+  useRealtimeConnectionState,
+  useRpc,
+  type PluginThreadHeaderActionProps,
+} from "@get-bb/plugin-sdk/app";
+import { defaultFilter, useCommandState } from "cmdk";
+import { toast } from "sonner";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "./components/ui/command";
+import { DialogTitle } from "./components/ui/dialog";
+import { useIsCompactViewport } from "./components/ui/hooks/use-compact-viewport";
+import type { Snooze, rpcContract } from "./server";
+import { CHANGED_CHANNEL } from "./shared";
+import { nextThread, sidebarThreadIds } from "./sidebar";
+import {
+  fmtUntil,
+  fmtWhen,
+  lastUsed,
+  parse,
+  presets,
+  type Choice,
+} from "./time";
+
+type Dialog = { kind: "snooze"; threadId: string } | { kind: "snoozed" };
+
+// Commands have no React tree and the header button exists only on thread
+// pages, so both open the dialogs through this store, and an app overlay
+// renders them. The last dialog stays set while it animates closed. Each
+// opening gets a new key, since BB's drawer on phones keeps its content
+// mounted.
+let dialogState: { dialog: Dialog | null; open: boolean; key: number } = {
+  dialog: null,
+  open: false,
+  key: 0,
+};
+const dialogListeners = new Set<() => void>();
+
+function setDialogState(next: typeof dialogState) {
+  dialogState = next;
+  for (const listener of dialogListeners) listener();
+}
+
+const openDialog = (dialog: Dialog) =>
+  setDialogState({ dialog, open: true, key: dialogState.key + 1 });
+const closeDialog = () => setDialogState({ ...dialogState, open: false });
+
+function useDialogState() {
+  return useSyncExternalStore(
+    (listener) => {
+      dialogListeners.add(listener);
+      return () => dialogListeners.delete(listener);
+    },
+    () => dialogState,
+  );
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The snoozes and the last choice, refetched after every server write. */
+function useSnoozes() {
+  const rpc = useRpc<typeof rpcContract>();
+  const [state, setState] = useState<{
+    snoozes: Snooze[];
+    last: Choice | null;
+  }>({ snoozes: [], last: null });
+  const latestRequest = useRef(0);
+
+  const refetch = useCallback(() => {
+    const request = ++latestRequest.current;
+    rpc.call("list").then(
+      (result) => {
+        if (request === latestRequest.current) setState(result);
+      },
+      () => undefined,
+    );
+  }, [rpc]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  useRealtime(CHANGED_CHANNEL, refetch);
+  const connection = useRealtimeConnectionState();
+  const previous = useRef(connection);
+  useEffect(() => {
+    if (previous.current === "reconnecting" && connection === "connected") {
+      refetch();
+    }
+    previous.current = connection;
+  }, [connection, refetch]);
+  return { rpc, ...state };
+}
+
+function TimeItem(props: {
+  title: string;
+  value?: string;
+  until: number;
+  now: number;
+  onSelect: () => void;
+}) {
+  return (
+    <CommandItem value={props.value ?? props.title} onSelect={props.onSelect}>
+      <span className="truncate">{props.title}</span>
+      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+        {fmtWhen(props.until, props.now)}
+      </span>
+    </CommandItem>
+  );
+}
+
+function Picker(props: {
+  /** The thread's wake time when it is snoozed. */
+  until: number | null;
+  last: Choice | null;
+  onSnooze: (until: number, choice: Choice) => void;
+  onUnsnooze: () => void;
+}) {
+  const { until, last, onSnooze, onUnsnooze } = props;
+  const [now] = useState(Date.now);
+  const [query, setQuery] = useState("");
+  const typed = query.trim();
+  const heading = (text: string) => (typed === "" ? text : undefined);
+
+  const presetRows = presets(now).map((preset) => ({
+    ...preset,
+    choice: { kind: "preset", id: preset.id } as const,
+  }));
+  // While typing, a preset under Last used would repeat a row below it.
+  const lastRow =
+    last !== null && (typed === "" || last.kind === "text")
+      ? lastUsed(last, now)
+      : null;
+
+  const typedUntil = typed === "" ? null : parse(typed, now);
+  const typedRow =
+    typedUntil !== null &&
+    ![...(lastRow === null ? [] : [lastRow]), ...presetRows].some(
+      (row) => row.until === typedUntil && defaultFilter(row.title, typed) > 0,
+    );
+
+  return (
+    <>
+      <DialogTitle className="sr-only">Snooze thread</DialogTitle>
+      <CommandInput
+        // Keeps typed text clear of the dialog's close button.
+        className="md:pr-6"
+        placeholder="Try: 8 am, 3 days, aug 7"
+        value={query}
+        onValueChange={setQuery}
+      />
+      <CommandList
+        // Tall enough for every row, so Next week never scrolls away.
+        className="max-h-[400px]"
+      >
+        {typedRow ? (
+          // Its own group stays first: cmdk only sorts rows within a group.
+          <CommandGroup forceMount>
+            <TimeItem
+              title={typed}
+              until={typedUntil}
+              now={now}
+              onSelect={() =>
+                onSnooze(typedUntil, { kind: "text", text: typed })
+              }
+            />
+          </CommandGroup>
+        ) : (
+          <CommandEmpty>No matching times</CommandEmpty>
+        )}
+        {until !== null && (
+          <CommandGroup
+            heading={heading(`Snoozed until ${fmtUntil(until, now)}`)}
+          >
+            <CommandItem value="Unsnooze" onSelect={onUnsnooze}>
+              Unsnooze
+            </CommandItem>
+          </CommandGroup>
+        )}
+        {lastRow !== null && last !== null && (
+          <CommandGroup heading={heading("Last used")}>
+            <TimeItem
+              title={lastRow.title}
+              // A zero-width space keeps it apart from the preset it repeats.
+              value={`${lastRow.title}​`}
+              until={lastRow.until}
+              now={now}
+              onSelect={() => onSnooze(lastRow.until, last)}
+            />
+          </CommandGroup>
+        )}
+        <CommandGroup heading={heading("Snooze until")}>
+          {presetRows.map((row) => (
+            <TimeItem
+              key={row.id}
+              title={row.title}
+              until={row.until}
+              now={now}
+              onSelect={() => onSnooze(row.until, row.choice)}
+            />
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </>
+  );
+}
+
+function SnoozedList(props: {
+  snoozes: Snooze[];
+  onOpen: (threadId: string) => void;
+  onUnsnooze: (threadId: string) => void;
+}) {
+  const { snoozes, onOpen, onUnsnooze } = props;
+  const [now] = useState(Date.now);
+  const compact = useIsCompactViewport();
+  const selected = useCommandState((state) => state.value);
+  // cmdk tells rows apart by value, so zero-width spaces keep equal titles apart.
+  const rows = snoozes.map((snooze, index) => ({
+    ...snooze,
+    value: snooze.title.trim() + "​".repeat(index),
+  }));
+
+  return (
+    <>
+      <DialogTitle className="sr-only">Snoozed threads</DialogTitle>
+      <CommandInput
+        className="md:pr-6"
+        placeholder="Search snoozed threads…"
+        onKeyDown={(event) => {
+          if (compact || event.key !== "Enter") return;
+          if (!event.metaKey && !event.ctrlKey) return;
+          event.preventDefault();
+          const row = rows.find((candidate) => candidate.value === selected);
+          if (row !== undefined) onUnsnooze(row.threadId);
+        }}
+      />
+      <CommandList>
+        <CommandEmpty>
+          {snoozes.length === 0 ? "No snoozed threads" : "No matching threads"}
+        </CommandEmpty>
+        <CommandGroup>
+          {rows.map((row) => (
+            <CommandItem
+              key={row.threadId}
+              value={row.value}
+              onSelect={() => onOpen(row.threadId)}
+              className="group"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate">{row.title}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  until {fmtUntil(row.until, now)}
+                </div>
+              </div>
+              <CommandShortcut className="hidden tracking-normal md:group-data-[selected=true]:inline">
+                Unsnooze ⌘↵
+              </CommandShortcut>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </>
+  );
+}
+
+function SnoozeDialogs() {
+  const { dialog, open, key } = useDialogState();
+  const { rpc, snoozes, last } = useSnoozes();
+  const context = useBbContext();
+  const navigate = useBbNavigate();
+  const onOpenChange = (next: boolean) => {
+    if (!next) closeDialog();
+  };
+
+  async function snooze(threadId: string, until: number, choice: Choice) {
+    closeDialog();
+    const wasOpen = context.threadId === threadId;
+    // Read the order before the thread leaves the sidebar.
+    const order = wasOpen ? sidebarThreadIds() : [];
+    try {
+      const { previous, hidden } = await rpc.call("snooze", {
+        threadId,
+        until,
+        choice,
+      });
+      if (wasOpen) {
+        const next = nextThread(order, threadId, hidden);
+        if (next === null) navigate.toCompose();
+        else navigate.toThread(next);
+      }
+      toast(`Snoozed until ${fmtUntil(until, Date.now())}`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const undo =
+              previous === null
+                ? rpc.call("unsnooze", { threadId })
+                : rpc.call("snooze", {
+                    threadId,
+                    until: previous,
+                    choice: null,
+                  });
+            undo.then(
+              () => {
+                if (wasOpen) navigate.toThread(threadId);
+              },
+              (error: unknown) =>
+                toast.error(`Could not undo the snooze: ${errorText(error)}`),
+            );
+          },
+        },
+      });
+    } catch (error) {
+      toast.error(`Could not snooze the thread: ${errorText(error)}`);
+    }
+  }
+
+  function unsnooze(threadId: string) {
+    rpc
+      .call("unsnooze", { threadId })
+      .catch((error: unknown) =>
+        toast.error(`Could not unsnooze the thread: ${errorText(error)}`),
+      );
+  }
+
+  return (
+    <>
+      <CommandDialog
+        open={open && dialog?.kind === "snooze"}
+        onOpenChange={onOpenChange}
+      >
+        {dialog?.kind === "snooze" && (
+          <Picker
+            key={key}
+            until={
+              snoozes.find((row) => row.threadId === dialog.threadId)?.until ??
+              null
+            }
+            last={last}
+            onSnooze={(until, choice) =>
+              void snooze(dialog.threadId, until, choice)
+            }
+            onUnsnooze={() => {
+              closeDialog();
+              unsnooze(dialog.threadId);
+            }}
+          />
+        )}
+      </CommandDialog>
+      <CommandDialog
+        open={open && dialog?.kind === "snoozed"}
+        onOpenChange={onOpenChange}
+      >
+        <SnoozedList
+          key={key}
+          snoozes={snoozes}
+          onOpen={(threadId) => {
+            closeDialog();
+            navigate.toThread(threadId);
+          }}
+          onUnsnooze={unsnooze}
+        />
+      </CommandDialog>
+    </>
+  );
+}
+
+function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
+  const { snoozes } = useSnoozes();
+  const until = snoozes.find((row) => row.threadId === threadId)?.until;
+  const label =
+    until === undefined
+      ? "Snooze thread"
+      : `Snoozed until ${fmtUntil(until, Date.now())}`;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={() => openDialog({ kind: "snooze", threadId })}
+      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)]/75 transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
+    >
+      <HugeiconsIcon
+        icon={Moon02Icon}
+        size={16}
+        strokeWidth={1.5}
+        fill={until === undefined ? "none" : "currentColor"}
+        className="max-md:pointer-coarse:size-5"
+      />
+    </button>
+  );
+}
+
+export default definePluginApp((app) => {
+  app.slots.experimental_threadHeaderAction({
+    id: "snooze",
+    title: "Snooze thread",
+    component: MoonButton,
+  });
+
+  app.slots.experimental_appOverlay({
+    id: "dialogs",
+    component: SnoozeDialogs,
+  });
+
+  app.commands.register({
+    id: "snooze-thread",
+    title: "Snooze thread",
+    isAvailable: ({ threadId }) => threadId !== null,
+    run: ({ threadId }) => {
+      if (threadId !== null) openDialog({ kind: "snooze", threadId });
+    },
+  });
+
+  app.commands.register({
+    id: "show-snoozed-threads",
+    title: "Show snoozed threads",
+    run: () => openDialog({ kind: "snoozed" }),
+  });
+});

@@ -92,5 +92,7 @@ plugins. The others:
   thread's right panel.
 - [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
   grid of icons.
+- [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
+  until its agent needs you.
 - [Server Switcher](../server-switcher): if you run several servers on bb
   connect, one click opens the next online one.

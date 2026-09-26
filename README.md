@@ -11,6 +11,7 @@ bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install super-hotkeys@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install dia-sidebar@sf-plugins
+bb plugin install snooze@sf-plugins
 bb plugin install pool-usage@sf-plugins
 bb plugin install server-switcher@sf-plugins
 ```
@@ -21,8 +22,9 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-Super Hotkeys, Bookmarks, and Dia Sidebar suit any BB setup. Pool Usage needs
-Account Pooler, and Server Switcher needs more than one server on bb connect.
+Super Hotkeys, Bookmarks, Dia Sidebar, and Snooze suit any BB setup. Pool Usage
+needs Account Pooler, and Server Switcher needs more than one server on bb
+connect.
 
 ### [Super Hotkeys](./super-hotkeys)
 
@@ -41,6 +43,13 @@ its thread scrolled to the message.
 A compact, wrapping grid of navigation icons, with live plugin indicators
 in the lower-right corner. Keeps BB's existing menus,
 hidden items, and customization.
+
+### [Snooze](./snooze)
+
+A moon button in the thread header and a command that hide a thread from the
+sidebar until a time you pick or type, the way Superhuman snoozes email. The
+thread comes back at that time, marked unread, or sooner when its agent finishes
+or needs an answer.
 
 ### [Pool Usage](./pool-usage)
 

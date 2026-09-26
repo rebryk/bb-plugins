@@ -41,10 +41,11 @@
   which keeps its format, and validate it against its `$schema`.
 - Add the plugin to the family everywhere, in the same order: general plugins
   first, setup-specific ones last, currently super-hotkeys, bookmarks,
-  dia-sidebar, pool-usage, server-switcher. The places are the root README's
-  install block, Plugins intro, and Plugins list; the collection's `pluginIds`;
-  and the `## More San Francisco Plugins` block of every other plugin's README
-  and overview. Copy each changed overview into `marketplace.json` as well.
+  dia-sidebar, snooze, pool-usage, server-switcher. The places are the root
+  README's install block, Plugins intro, and Plugins list; the collection's
+  `pluginIds`; and the `## More San Francisco Plugins` block of every other
+  plugin's README and overview. Copy each changed overview into
+  `marketplace.json` as well.
 - `<id>@sf-plugins` resolves only after the merge, since the catalog follows
   `main`. To try a pushed branch before that, run
   `bb plugin install 'git:https://github.com/rebryk/bb-plugins.git@<branch>' --subdirectory <id> --yes`.

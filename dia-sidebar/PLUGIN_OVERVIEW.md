@@ -46,6 +46,8 @@ others:
   slash search, and number keys that set up a new thread.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **Snooze**: hide a thread from the sidebar until a time you pick, or until its
+  agent needs you.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 - **Server Switcher**: if you run several servers on bb connect, one click opens
