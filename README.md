@@ -1,7 +1,8 @@
 # San Francisco Plugins
 
-A family of [bb](https://getbb.app) plugins by Yurii Rebryk, plus the
-marketplace catalog that serves them.
+A family of [bb](https://getbb.app) plugins by
+[Yurii Rebryk](https://x.com/rebryk), plus the marketplace catalog that serves
+them.
 
 ## Use this repository as a marketplace
 

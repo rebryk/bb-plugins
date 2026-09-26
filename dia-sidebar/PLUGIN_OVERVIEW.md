@@ -33,8 +33,9 @@ BB controls which indicators are available on compact screens.
 
 ## Choose your navigation
 
-Select Dia Sidebar under Settings → Appearance → Navigation. Choose BB again
-to return to the standard list. No external account or service is required.
+Select Dia Sidebar under Settings → Appearance → Navigation. Choose
+bb (built-in) there to return to the standard list. No external account or
+service is required.
 
 ## More San Francisco Plugins
 
