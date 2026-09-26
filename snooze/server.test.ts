@@ -59,6 +59,7 @@ async function setup(threads = family()) {
 
   const snooze = (threadId: string, until: number, choice: unknown = null) =>
     harness.behavior.callRpc("snooze", { threadId, until, choice }) as Promise<{
+      title: string;
       previous: number | null;
       hidden: string[];
     }>;
@@ -103,7 +104,11 @@ describe("snoozing", () => {
       id: "later",
     });
 
-    expect(result).toEqual({ previous: null, hidden: ["a", "b", "c"] });
+    expect(result).toEqual({
+      title: "Thread a",
+      previous: null,
+      hidden: ["a", "b", "c"],
+    });
     expect(updates()).toEqual([
       { threadId: "c", visibility: "hidden" },
       { threadId: "b", visibility: "hidden" },
@@ -131,7 +136,11 @@ describe("snoozing", () => {
     await snooze("a", NOW + HOUR, text);
 
     const again = await snooze("a", NOW + 2 * HOUR);
-    expect(again).toEqual({ previous: NOW + HOUR, hidden: ["a", "b", "c"] });
+    expect(again).toEqual({
+      title: "Thread a",
+      previous: NOW + HOUR,
+      hidden: ["a", "b", "c"],
+    });
     expect((await list()).last).toEqual(text);
     await harness.lifecycle.dispose();
   });

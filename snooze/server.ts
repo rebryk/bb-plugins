@@ -47,6 +47,8 @@ export const rpcContract = defineRpcContract({
       })
       .strict(),
     output: z.object({
+      /** The thread's title, for the toast. */
+      title: z.string(),
       /** When the thread was already snoozed, its previous wake time. */
       previous: z.number().nullable(),
       /** Every thread the snooze hides: the thread and its descendants. */
@@ -124,17 +126,14 @@ export default async function plugin(bb: BbPluginApi) {
     const snoozes = await load();
     const previous = snoozes[threadId];
     const hidden = [...new Set([...(previous?.hidden ?? []), ...tree])];
-    snoozes[threadId] = {
-      title: thread.title ?? thread.titleFallback ?? "Untitled thread",
-      until,
-      hidden,
-    };
+    const title = thread.title ?? thread.titleFallback ?? "Untitled thread";
+    snoozes[threadId] = { title, until, hidden };
     await save(snoozes);
     if (choice !== null) await kv.set("last", choice);
     // Deepest first: BB lifts a visible child of a hidden thread to the top.
     for (const id of [...tree].reverse()) await setVisibility(id, "hidden");
     publishChange();
-    return { previous: previous?.until ?? null, hidden };
+    return { title, previous: previous?.until ?? null, hidden };
   }
 
   async function wake(threadId: string, markUnread: boolean) {

@@ -4,10 +4,10 @@ Hide a thread until you need it, the way Superhuman snoozes email.
 
 Click the moon in the thread header, or run **Snooze thread** from the command
 palette, and pick when the thread comes back: **Later today**, **Tomorrow**,
-**Next week**, or the time you used last. Or type your own, like `8 am`,
-`in 2 hours`, `3 days`, `fri 3pm`, or `aug 7`, and the first row shows the
-moment it means. The thread and its sub-threads leave the sidebar, BB opens the
-next thread, and a toast offers **Undo**.
+**Next week**, or **Last used**, your last pick again. Or type your own, like
+`8 am`, `in 2 hours`, `3 days`, `fri 3pm`, or `aug 7`, and the first row shows
+the moment it means. The thread and its sub-threads leave the sidebar, BB opens
+the next thread, and a toast with the thread's title offers **Undo**.
 
 ## Back when it matters
 

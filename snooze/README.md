@@ -9,9 +9,7 @@ palette open the time picker and the list of snoozed threads.
 ```text
 Try: 8 am, 3 days, aug 7
 ───────────────────────────────────────────────
-Last used
-fri 3pm                     Fri, Oct 2, 3:00 PM
-Snooze until
+Last used                   Fri, Oct 2, 3:00 PM
 Later today                      Today, 6:00 PM
 Tomorrow                   Sun, Sep 27, 9:00 AM
 Next week                  Mon, Sep 28, 9:00 AM
@@ -21,13 +19,14 @@ Next week                  Mon, Sep 28, 9:00 AM
 
 - **Snooze a thread**: click the moon in the thread header, or run
   **Snooze thread** from the command palette. Pick **Later today**,
-  **Tomorrow**, **Next week**, or the time you used last, or type a time such as
-  `8 am`, `in 2 hours`, `3 days`, `fri 3pm`, `next mon`, `aug 7`, or
-  `tomorrow evening`. The first row shows the moment a typed time means, and
-  **Enter** snoozes until then.
+  **Tomorrow**, or **Next week**, or type a time such as `8 am`, `in 2 hours`,
+  `3 days`, `fri 3pm`, `next mon`, `aug 7`, or `tomorrow evening`. The first
+  row shows the moment a typed time means, and **Enter** snoozes until then.
+  **Last used** repeats your last pick from now, so after `fri 3pm` it means the
+  coming Friday.
 - **Keep going**: snoozing the open thread opens the next thread in the sidebar,
   the one above it when it was the last, or the new-thread screen when none is
-  left. A toast says until when, with **Undo**.
+  left. A toast shows until when and the thread's title, with **Undo**.
 - **See what's snoozed**: a snoozed thread's moon is filled, and its tooltip
   says until when. **Show snoozed threads** in the command palette lists every
   snoozed thread, soonest first. Type to filter and press **Enter** to open a
@@ -77,6 +76,9 @@ unsnooze there, so open the thread and pick **Unsnooze** from its moon.
   pages, so an `experimental_appOverlay` renders both dialogs; the moon is an
   `experimental_threadHeaderAction`. Both slots are experimental and may change
   in a BB update.
+- The toast is a custom toast in BB's toaster with the markup of BB's own toast
+  card, so it looks like BB's toasts, but BB's notification center doesn't list
+  it, and a BB update that restyles BB's toasts doesn't restyle it.
 
 While the plugin is disabled or removed, nothing wakes its snoozed threads, and
 they stay hidden, so unsnooze them before you remove it. To bring back a thread

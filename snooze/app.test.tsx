@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import {
   loadPluginApp,
   renderSlot,
@@ -12,7 +18,7 @@ import { nextThread, sidebarThreadIds } from "./sidebar";
 import { parse } from "./time";
 
 vi.mock("sonner", () => ({
-  toast: Object.assign(vi.fn(), { error: vi.fn() }),
+  toast: { custom: vi.fn(), dismiss: vi.fn() },
 }));
 
 interface Command {
@@ -69,10 +75,20 @@ function sidebar(html: string) {
 
 const rows = () =>
   [...document.querySelectorAll("[cmdk-item]")].map((row) => row.textContent);
+const selectedRow = () =>
+  document.querySelector('[cmdk-item][data-selected="true"]')?.textContent;
+
+/** Renders the card of the last toast the plugin showed, as BB's toaster would. */
+function renderToast() {
+  const [card, options] = vi.mocked(toast.custom).mock.calls.at(-1)!;
+  expect(options).toEqual({ className: "bb-app-toast" });
+  render(card("toast-1"));
+}
 
 async function openDialog(
   command: "snooze-thread" | "show-snoozed-threads",
   list: { snoozes: Snooze[]; last: unknown },
+  rpc: Record<string, (input: unknown) => unknown> = {},
 ) {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -85,10 +101,12 @@ async function openDialog(
       rpc: {
         list: () => list,
         snooze: (input) => ({
+          title: "Fix the login bug",
           previous: null,
           hidden: [(input as { threadId: string }).threadId],
         }),
         unsnooze: () => null,
+        ...rpc,
       },
     },
   );
@@ -159,28 +177,80 @@ describe("sidebar order", () => {
 describe("snooze picker", () => {
   const lastText = { snoozes: [], last: { kind: "text", text: "fri 3pm" } };
 
-  it("shows Last used and the presets with their times", async () => {
+  it("shows Last used and the presets with their times, without headings", async () => {
     await openDialog("snooze-thread", lastText);
     await screen.findByText("Last used");
-    expect(screen.getByText("Snooze until")).toBeTruthy();
+    expect(document.querySelector("[cmdk-group-heading]")).toBeNull();
     // Like BB's palette: no close button.
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     expect(rows()).toEqual([
-      "fri 3pmFri, Oct 2, 3:00 PM",
+      "Last usedFri, Oct 2, 3:00 PM",
       "Later todayToday, 6:00 PM",
       "TomorrowSun, Sep 27, 9:00 AM",
       "Next weekMon, Sep 28, 9:00 AM",
     ]);
   });
 
-  it("offers Unsnooze for a snoozed thread", async () => {
+  it("offers Unsnooze first for a snoozed thread, also after a search", async () => {
     const until = new Date(2026, 8, 27, 9).getTime();
     await openDialog("snooze-thread", {
       snoozes: [{ threadId: "t2", title: "Two", until }],
-      last: null,
+      last: { kind: "preset", id: "tomorrow" },
     });
-    await screen.findByText("Snoozed until tomorrow at 9:00 AM");
-    expect(rows()[0]).toBe("Unsnooze");
+    await screen.findByText("Unsnooze");
+    expect(document.querySelector("[cmdk-group-heading]")).toBeNull();
+    const all = [
+      "Unsnooze",
+      "Last usedSun, Sep 27, 9:00 AM",
+      "Later todayToday, 6:00 PM",
+      "TomorrowSun, Sep 27, 9:00 AM",
+      "Next weekMon, Sep 28, 9:00 AM",
+    ];
+    expect(rows()).toEqual(all);
+
+    // cmdk sorts by how well a row matches and moves Next week up.
+    const input = screen.getByPlaceholderText("Try: 8 am, 3 days, aug 7");
+    fireEvent.change(input, { target: { value: "n" } });
+    expect(rows()).toEqual(["Next weekMon, Sep 28, 9:00 AM", "Unsnooze"]);
+    fireEvent.change(input, { target: { value: "" } });
+    await vi.waitFor(() => {
+      expect(rows()).toEqual(all);
+      expect(selectedRow()).toBe("Unsnooze");
+    });
+  });
+
+  it("keeps the typed row first and filters Last used by its title", async () => {
+    const { slot } = await openDialog("snooze-thread", {
+      snoozes: [],
+      last: { kind: "text", text: "tue" },
+    });
+    const input = await screen.findByPlaceholderText(
+      "Try: 8 am, 3 days, aug 7",
+    );
+    await screen.findByText("Last used");
+    fireEvent.change(input, { target: { value: "used" } });
+    expect(rows()).toEqual(["Last usedTue, Sep 29, 9:00 AM"]);
+    for (const value of ["t", "tu", "tue"]) {
+      fireEvent.change(input, { target: { value } });
+    }
+    await vi.waitFor(() => {
+      expect(rows()).toEqual([
+        "tueTue, Sep 29, 9:00 AM",
+        "Last usedTue, Sep 29, 9:00 AM",
+      ]);
+      expect(selectedRow()).toBe("tueTue, Sep 29, 9:00 AM");
+    });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await vi.waitFor(() => {
+      expect(slot.inspection.rpcCalls).toContainEqual({
+        method: "snooze",
+        input: {
+          threadId: "t2",
+          until: parse("tue", NOW),
+          choice: { kind: "text", text: "tue" },
+        },
+      });
+    });
   });
 
   it("snoozes until a typed time, opens the next thread, and undoes", async () => {
@@ -209,16 +279,12 @@ describe("snooze picker", () => {
         choice: { kind: "text", text: "8 am" },
       },
     });
-    expect(toast).toHaveBeenCalledWith(
-      "Snoozed until tomorrow at 8:00 AM",
-      expect.anything(),
-    );
-
-    const options = vi.mocked(toast).mock.calls[0]?.[1] as {
-      action: { label: string; onClick: () => void };
-    };
-    expect(options.action.label).toBe("Undo");
-    act(() => options.action.onClick());
+    await vi.waitFor(() => expect(toast.custom).toHaveBeenCalledTimes(1));
+    renderToast();
+    expect(screen.getByText("Snoozed until tomorrow at 8:00 AM")).toBeTruthy();
+    expect(screen.getByText("Fix the login bug")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(toast.dismiss).toHaveBeenCalledWith("toast-1");
     await vi.waitFor(() => {
       expect(slot.inspection.navigateCalls.at(-1)).toEqual({
         method: "toThread",
@@ -229,6 +295,24 @@ describe("snooze picker", () => {
       method: "unsnooze",
       input: { threadId: "t2" },
     });
+  });
+
+  it("shows an error card without Undo when snoozing fails", async () => {
+    await openDialog("snooze-thread", lastText, {
+      snooze: () => {
+        throw new Error("Thread not found");
+      },
+    });
+    fireEvent.click(await screen.findByText("Tomorrow"));
+    await vi.waitFor(() => expect(toast.custom).toHaveBeenCalledTimes(1));
+    renderToast();
+    expect(screen.getByText("Could not snooze the thread")).toBeTruthy();
+    expect(screen.getByText("Thread not found")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss notification" }),
+    );
+    expect(toast.dismiss).toHaveBeenCalledWith("toast-1");
   });
 
   it("keeps a matching preset instead of a typed row with its time", async () => {

@@ -335,17 +335,11 @@ export type Choice =
   { kind: "preset"; id: PresetId } | { kind: "text"; text: string };
 
 /**
- * The Last used row, recomputed from `ref`: "fri 3pm" means the coming Friday.
+ * The Last used time, recomputed from `ref`: "fri 3pm" means the coming Friday.
  * Null when the choice has no time now, like Later today after 17:00.
  */
-export function lastUsed(
-  choice: Choice | null,
-  ref: number,
-): { title: string; until: number } | null {
+export function lastUsed(choice: Choice | null, ref: number): number | null {
   if (choice === null) return null;
-  if (choice.kind === "text") {
-    const until = parse(choice.text, ref);
-    return until === null ? null : { title: choice.text, until };
-  }
-  return presets(ref).find((p) => p.id === choice.id) ?? null;
+  if (choice.kind === "text") return parse(choice.text, ref);
+  return presets(ref).find((p) => p.id === choice.id)?.until ?? null;
 }

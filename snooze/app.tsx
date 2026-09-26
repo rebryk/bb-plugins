@@ -29,6 +29,8 @@ import {
 } from "./components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { useIsCompactViewport } from "./components/ui/hooks/use-compact-viewport";
+import { Icon } from "./components/ui/icon";
+import { usePortalScopeProps } from "./lib/portal-scope";
 import { cn } from "./lib/utils";
 import type { Snooze, rpcContract } from "./server";
 import { CHANGED_CHANNEL } from "./shared";
@@ -75,8 +77,84 @@ function useDialogState() {
   );
 }
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+type ToastCardProps = {
+  id: string | number;
+  tone: "success" | "error";
+  title: string;
+  description: string;
+  onUndo?: () => void;
+};
+
+/** The card of BB's own toasts. */
+function ToastCard(props: ToastCardProps) {
+  const { id, tone, title, description, onUndo } = props;
+  return (
+    // It renders in BB's toaster, so it sets the plugin's style scope itself.
+    <div
+      {...usePortalScopeProps()}
+      className="w-[var(--width,356px)] max-w-[calc(100vw-32px)] shrink-0 rounded-md border border-border bg-popover px-4 py-3 text-popover-foreground shadow-sm max-[600px]:w-[calc(100vw-32px)]"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-foreground">
+          <Icon
+            name={tone === "success" ? "CircleCheck" : "AlertCircle"}
+            className="size-4"
+            style={{ margin: 0 }}
+            aria-hidden
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-4 whitespace-pre-wrap break-words text-sm font-medium leading-5 [overflow-wrap:anywhere]">
+            {title}
+          </div>
+          <div className="mt-0.5 flex min-w-0 flex-col items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <div className="line-clamp-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              {description}
+            </div>
+            {onUndo && (
+              <button
+                type="button"
+                onClick={() => {
+                  onUndo();
+                  toast.dismiss(id);
+                }}
+                className="shrink-0 cursor-pointer rounded-md text-xs font-medium text-muted-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                Undo
+              </button>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Dismiss notification"
+          onClick={() => toast.dismiss(id)}
+          className="-mr-1 -mt-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-state-hover hover:text-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Icon
+            name="X"
+            className="size-3.5"
+            style={{ margin: 0 }}
+            aria-hidden
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function showToast(card: Omit<ToastCardProps, "id">) {
+  toast.custom((id) => <ToastCard id={id} {...card} />, {
+    className: "bb-app-toast",
+  });
+}
+
+function showError(title: string, error: unknown) {
+  showToast({
+    tone: "error",
+    title,
+    description: error instanceof Error ? error.message : String(error),
+  });
 }
 
 /** The snoozes and the last choice, refetched after every server write. */
@@ -115,14 +193,13 @@ function useSnoozes() {
 
 function TimeItem(props: {
   title: string;
-  value?: string;
   until: number;
   now: number;
   onSelect: () => void;
 }) {
   return (
     <CommandItem
-      value={props.value ?? props.title}
+      value={props.title}
       onSelect={props.onSelect}
       className="min-h-8"
     >
@@ -135,32 +212,22 @@ function TimeItem(props: {
 }
 
 function Picker(props: {
-  /** The thread's wake time when it is snoozed. */
-  until: number | null;
+  snoozed: boolean;
   last: Choice | null;
   onSnooze: (until: number, choice: Choice) => void;
   onUnsnooze: () => void;
 }) {
-  const { until, last, onSnooze, onUnsnooze } = props;
+  const { snoozed, last, onSnooze, onUnsnooze } = props;
   const [now] = useState(Date.now);
   const [query, setQuery] = useState("");
   const typed = query.trim();
-  const heading = (text: string) => (typed === "" ? text : undefined);
 
-  const presetRows = presets(now).map((preset) => ({
-    ...preset,
-    choice: { kind: "preset", id: preset.id } as const,
-  }));
-  // While typing, a preset under Last used would repeat a row below it.
-  const lastRow =
-    last !== null && (typed === "" || last.kind === "text")
-      ? lastUsed(last, now)
-      : null;
-
+  const presetRows = presets(now);
+  const lastUntil = lastUsed(last, now);
   const typedUntil = typed === "" ? null : parse(typed, now);
   const typedRow =
     typedUntil !== null &&
-    ![...(lastRow === null ? [] : [lastRow]), ...presetRows].some(
+    !presetRows.some(
       (row) => row.until === typedUntil && defaultFilter(row.title, typed) > 0,
     );
 
@@ -171,9 +238,14 @@ function Picker(props: {
         value={query}
         onValueChange={setQuery}
       />
-      <CommandList>
+      <CommandList
+        // While filtering, cmdk sorts the rows by moving them, and it leaves
+        // them there when the query is cleared, so the list mounts afresh.
+        key={query === "" ? "all" : "filtered"}
+      >
         {typedRow ? (
-          // Its own group stays first: cmdk only sorts rows within a group.
+          // cmdk moves ungrouped rows to the end of the list, so this group
+          // stays first.
           <CommandGroup forceMount>
             <TimeItem
               title={typed}
@@ -187,42 +259,32 @@ function Picker(props: {
         ) : (
           <CommandEmpty>No matching times</CommandEmpty>
         )}
-        {until !== null && (
-          <CommandGroup
-            heading={heading(`Snoozed until ${fmtUntil(until, now)}`)}
+        {snoozed && (
+          <CommandItem
+            value="Unsnooze"
+            onSelect={onUnsnooze}
+            className="min-h-8"
           >
-            <CommandItem
-              value="Unsnooze"
-              onSelect={onUnsnooze}
-              className="min-h-8"
-            >
-              Unsnooze
-            </CommandItem>
-          </CommandGroup>
+            Unsnooze
+          </CommandItem>
         )}
-        {lastRow !== null && last !== null && (
-          <CommandGroup heading={heading("Last used")}>
-            <TimeItem
-              title={lastRow.title}
-              // A zero-width space keeps it apart from the preset it repeats.
-              value={`${lastRow.title}​`}
-              until={lastRow.until}
-              now={now}
-              onSelect={() => onSnooze(lastRow.until, last)}
-            />
-          </CommandGroup>
+        {last !== null && lastUntil !== null && (
+          <TimeItem
+            title="Last used"
+            until={lastUntil}
+            now={now}
+            onSelect={() => onSnooze(lastUntil, last)}
+          />
         )}
-        <CommandGroup heading={heading("Snooze until")}>
-          {presetRows.map((row) => (
-            <TimeItem
-              key={row.id}
-              title={row.title}
-              until={row.until}
-              now={now}
-              onSelect={() => onSnooze(row.until, row.choice)}
-            />
-          ))}
-        </CommandGroup>
+        {presetRows.map((row) => (
+          <TimeItem
+            key={row.id}
+            title={row.title}
+            until={row.until}
+            now={now}
+            onSelect={() => onSnooze(row.until, { kind: "preset", id: row.id })}
+          />
+        ))}
       </CommandList>
     </>
   );
@@ -263,39 +325,37 @@ function SnoozedList(props: {
         <CommandEmpty>
           {snoozes.length === 0 ? "No snoozed threads" : "No matching threads"}
         </CommandEmpty>
-        <CommandGroup>
-          {rows.map((row) => (
-            <CommandItem
-              key={row.threadId}
-              value={row.value}
-              onSelect={() => onOpen(row.threadId)}
-              className="group min-h-11"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-foreground">{row.title}</div>
-                <div className="truncate text-xs leading-4 text-subtle-foreground">
-                  until {fmtUntil(row.until, now)}
-                </div>
+        {rows.map((row) => (
+          <CommandItem
+            key={row.threadId}
+            value={row.value}
+            onSelect={() => onOpen(row.threadId)}
+            className="group min-h-11"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-foreground">{row.title}</div>
+              <div className="truncate text-xs leading-4 text-subtle-foreground">
+                until {fmtUntil(row.until, now)}
               </div>
-              <button
-                type="button"
-                tabIndex={-1}
-                // Keeps focus in the search field and the click off the row.
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onUnsnooze(row.threadId);
-                }}
-                className="hidden h-7 shrink-0 items-center gap-1 rounded-sm px-1 text-xs text-subtle-foreground hover:text-foreground md:group-data-[selected=true]:inline-flex"
-              >
-                <span className="mr-1">Unsnooze</span>
-                <kbd className="rounded-sm bg-state-hover/50 px-1.5 py-1 font-sans text-xs leading-none tabular-nums text-subtle-foreground">
-                  {modifier} ↵
-                </kbd>
-              </button>
-            </CommandItem>
-          ))}
-        </CommandGroup>
+            </div>
+            <button
+              type="button"
+              tabIndex={-1}
+              // Keeps focus in the search field and the click off the row.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onUnsnooze(row.threadId);
+              }}
+              className="hidden h-7 shrink-0 items-center gap-1 rounded-sm px-1 text-xs text-subtle-foreground hover:text-foreground md:group-data-[selected=true]:inline-flex"
+            >
+              <span className="mr-1">Unsnooze</span>
+              <kbd className="rounded-sm bg-state-hover/50 px-1.5 py-1 font-sans text-xs leading-none tabular-nums text-subtle-foreground">
+                {modifier} ↵
+              </kbd>
+            </button>
+          </CommandItem>
+        ))}
       </CommandList>
     </>
   );
@@ -322,7 +382,11 @@ function PaletteDialog(props: {
       <DialogContent
         hideCloseButton
         aria-describedby={undefined}
-        className="top-[12%] max-w-[640px] translate-y-0 gap-0 p-0 shadow-lg sm:rounded-xl"
+        className={cn(
+          "top-[12%] max-w-[640px] translate-y-0 gap-0 p-0 shadow-lg sm:rounded-xl",
+          // In the drawer on phones: close to the handle, clear of the home bar.
+          "max-md:-mt-3 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]",
+        )}
       >
         <DialogTitle className="sr-only">{props.title}</DialogTitle>
         <Command
@@ -334,8 +398,6 @@ function PaletteDialog(props: {
             "[&_[cmdk-input-wrapper]]:py-1 [&_[cmdk-input-wrapper]_[data-icon-root]]:hidden",
             "[&_[cmdk-input]]:placeholder:font-light [&_[cmdk-input]]:placeholder:text-subtle-foreground [&_[cmdk-input]]:placeholder:opacity-70",
             "[&_[cmdk-list]]:max-h-[min(24rem,50dvh)] [&_[cmdk-list]]:p-1 [&_[cmdk-group]]:p-0",
-            // [cmdk-group] outranks the heading classes CommandGroup sets on itself.
-            "[&_[cmdk-group]_[cmdk-group-heading]]:py-1 [&_[cmdk-group]_[cmdk-group-heading]]:font-normal [&_[cmdk-group]_[cmdk-group-heading]]:leading-5 [&_[cmdk-group]_[cmdk-group-heading]]:text-subtle-foreground",
             "[&_[cmdk-item]]:cursor-pointer [&_[cmdk-item]]:gap-3 [&_[cmdk-item]]:rounded-md [&_[cmdk-item][data-selected=true]]:bg-state-hover [&_[cmdk-item][data-selected=true]]:text-foreground",
             "[&_[cmdk-empty]]:px-3 [&_[cmdk-empty]]:py-4 [&_[cmdk-empty]]:text-muted-foreground",
           )}
@@ -359,7 +421,7 @@ function SnoozeDialogs() {
     // Read the order before the thread leaves the sidebar.
     const order = wasOpen ? sidebarThreadIds() : [];
     try {
-      const { previous, hidden } = await rpc.call("snooze", {
+      const { title, previous, hidden } = await rpc.call("snooze", {
         threadId,
         until,
         choice,
@@ -369,30 +431,25 @@ function SnoozeDialogs() {
         if (next === null) navigate.toCompose();
         else navigate.toThread(next);
       }
-      toast(`Snoozed until ${fmtUntil(until, Date.now())}`, {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            const undo =
-              previous === null
-                ? rpc.call("unsnooze", { threadId })
-                : rpc.call("snooze", {
-                    threadId,
-                    until: previous,
-                    choice: null,
-                  });
-            undo.then(
-              () => {
-                if (wasOpen) navigate.toThread(threadId);
-              },
-              (error: unknown) =>
-                toast.error(`Could not undo the snooze: ${errorText(error)}`),
-            );
-          },
+      showToast({
+        tone: "success",
+        title: `Snoozed until ${fmtUntil(until, Date.now())}`,
+        description: title,
+        onUndo: () => {
+          const undo =
+            previous === null
+              ? rpc.call("unsnooze", { threadId })
+              : rpc.call("snooze", { threadId, until: previous, choice: null });
+          undo.then(
+            () => {
+              if (wasOpen) navigate.toThread(threadId);
+            },
+            (error: unknown) => showError("Could not undo the snooze", error),
+          );
         },
       });
     } catch (error) {
-      toast.error(`Could not snooze the thread: ${errorText(error)}`);
+      showError("Could not snooze the thread", error);
     }
   }
 
@@ -400,7 +457,7 @@ function SnoozeDialogs() {
     rpc
       .call("unsnooze", { threadId })
       .catch((error: unknown) =>
-        toast.error(`Could not unsnooze the thread: ${errorText(error)}`),
+        showError("Could not unsnooze the thread", error),
       );
   }
 
@@ -409,10 +466,7 @@ function SnoozeDialogs() {
       <PaletteDialog kind="snooze" title="Snooze thread">
         {dialog?.kind === "snooze" && (
           <Picker
-            until={
-              snoozes.find((row) => row.threadId === dialog.threadId)?.until ??
-              null
-            }
+            snoozed={snoozes.some((row) => row.threadId === dialog.threadId)}
             last={last}
             onSnooze={(until, choice) =>
               void snooze(dialog.threadId, until, choice)

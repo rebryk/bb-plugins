@@ -117,19 +117,13 @@ describe("formatting", () => {
 describe("lastUsed", () => {
   it("recomputes a typed choice from now", () => {
     const choice = { kind: "text", text: "fri 3pm" } as const;
-    expect(lastUsed(choice, SATURDAY)).toEqual({
-      title: "fri 3pm",
-      until: local(10, 2, 15),
-    });
-    expect(lastUsed(choice, local(10, 3, 10))?.until).toBe(local(10, 9, 15));
+    expect(lastUsed(choice, SATURDAY)).toBe(local(10, 2, 15));
+    expect(lastUsed(choice, local(10, 3, 10))).toBe(local(10, 9, 15));
   });
 
   it("recomputes a preset and hides it when it has no time now", () => {
     const choice = { kind: "preset", id: "later" } as const;
-    expect(lastUsed(choice, SATURDAY)).toMatchObject({
-      title: "Later today",
-      until: local(9, 26, 18),
-    });
+    expect(lastUsed(choice, SATURDAY)).toBe(local(9, 26, 18));
     expect(lastUsed(choice, local(9, 26, 17, 30))).toBeNull();
     expect(lastUsed(null, SATURDAY)).toBeNull();
   });
