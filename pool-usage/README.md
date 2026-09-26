@@ -92,5 +92,7 @@ plugins. The others:
   thread's right panel.
 - [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
   grid of icons.
+- [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
+  and tablets.
 - [Server Switcher](../server-switcher): if you run several servers on bb
   connect, one click opens the next online one.
