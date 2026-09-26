@@ -36,8 +36,8 @@ others:
   slash search, and number keys that set up a new thread.
 - **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
   icons.
-- **Pool Usage**: if you use Account Pooler, each account's limiting quota and
-  its reset time in one sidebar list.
+- **Pool Usage**: how much of each provider's capacity is in use and when it
+  frees up, in the sidebar footer.
 - **Server Switcher**: if you run several servers on bb connect, one click opens
   the next online one.
 

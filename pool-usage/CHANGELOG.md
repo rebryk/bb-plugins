@@ -3,6 +3,28 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.2 (2026-09-26)
+
+- The sidebar footer shows each provider's logo with the share of its capacity
+  in use, at the right end of the footer row. Besides Account Pooler's Claude
+  and Codex accounts, it covers every provider that reports usage to BB, such
+  as Cursor, and works without Account Pooler.
+- Accounts count by the vendors' stated plan multipliers: Claude Pro 1x, Max
+  5x or 20x, Team 1.25x (premium 6.25x); Codex Plus 1x, Pro $100 5x, Pro $200
+  20x; other plans 1x. An account Account Pooler can't use right now (held,
+  out of quota, logged out, failing, or without a reading for 30 minutes)
+  counts as used until it frees up.
+- Clicking a number opens that provider's card, styled like the footer's `…`
+  menu: the total, the number of accounts when there are several, and up to
+  four upcoming resets with the total after each. Claude Code is shown as
+  Claude. Escape or a click elsewhere closes it.
+- A new setting, **Red at, %** (80 by default), sets the percentage at which
+  the numbers turn red.
+- The per-account rows with usage bars are gone. If the footer summary can't
+  find its place in bb's footer, the **Account usage** icon stays and opens the
+  same cards.
+- Needs bb 0.43.4 or later.
+
 ## 0.2.1 (2026-09-22)
 
 - When Account Pooler's switch threshold can't be read, the plugin logs why at

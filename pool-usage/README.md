@@ -1,27 +1,32 @@
 # Pool Usage
 
-Pool Usage is a compact BB sidebar companion for the experimental Account
-Pooler. It renders one row per pooled Claude or Codex account:
+Pool Usage shows how much of each provider's capacity is in use, at the right
+end of the BB sidebar footer: Claude and Codex, including every account in
+Account Pooler, and any other provider that reports usage to BB, such as
+Cursor.
 
 ```text
-[provider icon]  Max (20x)  [usage bar]  95%
-                            Weekly        reset 2d 23h
+[ ] [ ] [ ]                                   [Claude] 60%  [Codex] 12%
 ```
 
 ## Use
 
-Click **Account usage** in the sidebar footer. The disclosure refreshes on open
-and every 30 seconds while it remains visible.
+Click a number to open that provider's card, in the same menu surface as the
+footer's `…` menu:
 
-Each row shows the window that decides whether the account can serve a request:
-the spent window that clears last, or else the window closest to its limit. An
-account whose 5-hour window is empty but whose weekly window is spent therefore
-reads `Weekly 95%` with the weekly reset, instead of an empty 5-hour bar.
+```text
+[Claude] Claude 2x     60%
+1h 25m                  9%
+1d 6h                   0%
+```
 
-The bar stays neutral below 75%, turns warning yellow at 75%, and critical red
-at 90%. A row Account Pooler will not route to — a spent window, or a hold after
-a rate-limit response — turns red with a red window/reset line, whatever the
-percentage reads.
+- `2x` is the number of accounts that count, shown when there are several.
+- Up to four lines show when the total drops next, as quota windows reset or
+  holds end, and what it drops to, assuming no new usage.
+- Escape or a click elsewhere closes the card.
+
+**Red at, %** in the plugin's settings (80 by default) turns the numbers red at
+or above that value.
 
 The built-in **Provider usage** plugin may be disabled if its footer item is
 redundant:
@@ -32,23 +37,32 @@ bb plugin disable provider-usage
 
 ## How it works
 
-- Account Pooler owns credentials and upstream quota refreshes; this plugin
-  only reads its redacted `status.get` RPC response.
-- Spent is measured with Account Pooler's own `switchThreshold`, read from its
-  `config.get` RPC, and a window past its reset is ignored until the next
-  observation replaces it.
-- The tier label comes from Account Pooler's redacted subscription metadata
-  (`Max (5x)`, `Max (20x)`, `Pro`, and so on). Because Account Pooler currently
-  omits Codex's `plan_type`, Pool Usage supplements it from BB's official Codex
-  usage result when the account emails match. A dash is shown only when neither
-  source exposes the tier.
+- Each account counts in proportion to its plan, by the vendors' stated
+  multipliers. Claude: Pro 1x, Max 5x or 20x, a standard Team seat 1.25x and a
+  premium seat 6.25x. Codex: Plus 1x, Pro $100 5x, Pro $200 20x. Other plans
+  count as 1x; disabled accounts and API keys don't count.
+- An account's free capacity is what its tightest quota window leaves. A window
+  past its reset is empty until the next reading replaces it. A weekly window
+  limits an account that also has a five-hour window only once it runs low.
+- For providers Account Pooler serves, accounts come from its redacted
+  `status.get` RPC, and a window at or past its `switchThreshold` (from
+  `config.get`) is spent. A held account counts as fully used until its hold
+  ends, and so does one with an expired login, an error, or no reading from the
+  last 30 minutes. Codex plans missing there come from BB's official Codex
+  usage when the account emails match.
+- Other providers, or every provider without Account Pooler, are read from BB's
+  provider usage sources; a window there is spent at 100%.
+- Credentials never enter the plugin. The numbers refresh every 30 seconds.
+- The footer summary stands in for the plugin's own **Account usage** footer
+  icon. bb's footer markup isn't a versioned plugin API, so if a bb update
+  changes it, the summary steps aside and the icon comes back; clicking it
+  opens the same cards in bb's footer panel.
 
 ## Install
 
-Enable and configure Account Pooler first, then install the plugin:
+Needs bb 0.43.4 or later. Account Pooler is optional.
 
 ```sh
-bb plugin enable account-pool
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install pool-usage@sf-plugins
 ```

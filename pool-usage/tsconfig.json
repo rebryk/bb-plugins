@@ -7,7 +7,8 @@
     "jsx": "react-jsx",
     "lib": [
       "ES2022",
-      "DOM"
+      "DOM",
+      "DOM.Iterable"
     ],
     "types": [
       "node"
@@ -21,10 +22,7 @@
     "skipLibCheck": false
   },
   "include": [
-    "server.ts",
-    "app.tsx",
-    "presentation.ts",
-    "*.test.ts",
-    "*.test.tsx"
+    "*.ts",
+    "*.tsx"
   ]
 }
