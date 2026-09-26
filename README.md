@@ -44,9 +44,9 @@ hidden items, and customization.
 
 ### [Pool Usage](./pool-usage)
 
-A compact sidebar footer list with one row per Account Pooler account: the
-provider mark, the subscription tier, a usage bar, and the quota window that
-actually limits the account together with its reset countdown.
+One number per provider at the right end of the sidebar footer: how much of
+each provider's capacity is in use, across Account Pooler accounts, weighted by
+plan. Click it for the next resets.
 
 ### [Server Switcher](./server-switcher)
 

@@ -1,70 +1,147 @@
-section[data-testid="plugin-sidebar-footer-disclosure-pool-usage-pool-usage"] {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+/* The plugin's own footer icon, hidden while the summary stands in for it. */
+li[data-pool-usage-anchor] {
+  display: none;
 }
 
-.pool-usage-root {
-  padding-inline: 8px;
-  width: 100%;
-}
-
-.pool-usage-row {
-  display: grid;
-  grid-template-columns: 1rem 3.75rem minmax(0, 1fr);
-  align-items: start;
-  column-gap: 0.5rem;
-  min-height: 1.875rem;
-  padding-block: 2px;
-}
-
-.pool-usage-provider,
-.pool-usage-plan {
-  margin-top: 0.0625rem;
-}
-
-.pool-usage-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pool-usage-list--scrollable {
-  max-height: min(18rem, 48vh);
-  overflow-y: auto;
-}
-
-.pool-usage-meta {
-  margin-top: 2px;
-}
-
-.pool-usage-meta.pool-usage-meta--blocked {
+.pool-usage-hot {
   color: var(--destructive);
 }
 
-.pool-usage-track {
-  background: var(--muted);
+.pool-usage-panel {
+  display: grid;
+  gap: 4px;
 }
 
-.pool-usage-fill {
+/* Footer summary */
+
+.pool-usage-footer {
+  display: flex;
+  align-items: center;
+  gap: 1px;
   min-width: 0;
-  transition: width 300ms ease-out;
+  margin-left: auto;
+  list-style: none;
 }
 
-.pool-usage-fill--neutral {
-  background: var(--muted-foreground);
+/* bb's badges follow the summary; when they wrap above it, keep them right. */
+.pool-usage-footer ~ li {
+  margin-inline-start: auto;
 }
 
-.pool-usage-fill--warning {
-  background: var(--warning);
+.pool-usage-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
 }
 
-.pool-usage-fill--critical {
-  background: var(--destructive);
+.pool-usage-button:hover {
+  background: var(--sidebar-accent, var(--accent));
+  color: var(--sidebar-foreground, var(--foreground));
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pool-usage-fill {
-    transition: none;
-  }
+.pool-usage-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* Outranks the size classes bb's provider icon carries. */
+.pool-usage-button .pool-usage-logo {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pool-usage-button .pool-usage-logo > * {
+  width: 100%;
+  height: 100%;
+}
+
+/* Provider card, in bb's menu surface or its footer panel */
+
+.pool-usage-popover {
+  position: fixed;
+  min-width: 150px;
+  max-width: calc(100vw - 16px);
+}
+
+.pool-usage-card {
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pool-usage-head,
+.pool-usage-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+}
+
+.pool-usage-head {
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.pool-usage-head .pool-usage-logo {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pool-usage-head .pool-usage-logo > * {
+  width: 100%;
+  height: 100%;
+}
+
+.pool-usage-name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.pool-usage-name small,
+.pool-usage-steps li > span:first-child,
+.pool-usage-note {
+  color: var(--muted-foreground);
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.pool-usage-total {
+  margin-left: auto;
+  padding-left: 16px;
+  font-weight: 600;
+}
+
+.pool-usage-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+}
+
+.pool-usage-steps li {
+  justify-content: space-between;
+}
+
+.pool-usage-note {
+  margin: 0;
+  padding: 3px 8px;
+  font-size: 11.5px;
 }
