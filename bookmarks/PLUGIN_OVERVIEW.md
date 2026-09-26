@@ -26,3 +26,20 @@ keep browsing. Hover a bookmark to copy its full text or remove it.
 Bookmarks live in the plugin's own SQLite database on your bb server. Each one
 keeps a copy of the message text, so a bookmark stays readable after its thread
 is deleted. Nothing is sent to an agent or an external service.
+
+## More San Francisco Plugins
+
+Bookmarks is one of the San Francisco Plugins, a family of BB plugins. The
+others:
+
+- **Super Hotkeys**: Superhuman-like keyboard navigation, with shortcut hints,
+  slash search, and number keys that set up a new thread.
+- **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
+  icons.
+- **Pool Usage**: if you use Account Pooler, each account's limiting quota and
+  its reset time in one sidebar list.
+- **Server Switcher**: if you run several servers on bb connect, one click opens
+  the next online one.
+
+See all of them, with install steps, at
+[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).

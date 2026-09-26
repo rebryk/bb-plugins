@@ -36,6 +36,13 @@ the response. The plugin copies, stores, and sends no tokens or native
 credentials. The backend has no settings, storage, RPC methods, or background
 services.
 
+## Install
+
+```sh
+bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
+bb plugin install server-switcher@sf-plugins
+```
+
 ## Development
 
 ```sh
@@ -49,3 +56,18 @@ bb plugin install . --yes
 
 Requires BB 0.43+ and Plugin SDK 0.5.9+. A local installation needs to keep this
 directory on disk.
+
+## More San Francisco Plugins
+
+Server Switcher is one of the
+[San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
+plugins. The others:
+
+- [Super Hotkeys](../super-hotkeys): Superhuman-like keyboard navigation, with
+  shortcut hints, slash search, and number keys that set up a new thread.
+- [Bookmarks](../bookmarks): save any chat message and jump back to it from the
+  thread's right panel.
+- [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
+  grid of icons.
+- [Pool Usage](../pool-usage): if you use Account Pooler, each account's
+  limiting quota and its reset time in one sidebar list.

@@ -1,29 +1,33 @@
-# bb-plugins
+# San Francisco Plugins
 
-Personal [bb](https://getbb.app) plugins, plus the marketplace catalog that
-serves them.
+A family of [bb](https://getbb.app) plugins by Yurii Rebryk, plus the
+marketplace catalog that serves them.
 
 ## Use this repository as a marketplace
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
-bb plugin install pool-usage@rebryk-bb-plugins
-bb plugin install bookmarks@rebryk-bb-plugins
-bb plugin install dia-sidebar@rebryk-bb-plugins
-bb plugin install server-switcher@rebryk-bb-plugins
+bb plugin install super-hotkeys@sf-plugins
+bb plugin install bookmarks@sf-plugins
+bb plugin install dia-sidebar@sf-plugins
+bb plugin install pool-usage@sf-plugins
+bb plugin install server-switcher@sf-plugins
 ```
 
-`bb marketplace refresh rebryk-bb-plugins` re-reads the catalog; it never
-installs or updates a plugin on its own. The catalog tracks `main`, so
+`bb marketplace refresh sf-plugins` re-reads the catalog; it never installs or
+updates a plugin on its own. The catalog tracks `main`, so
 `bb plugin update pool-usage` follows this repository's latest commit.
 
 ## Plugins
 
-### [Pool Usage](./pool-usage)
+Super Hotkeys, Bookmarks, and Dia Sidebar suit any BB setup. Pool Usage needs
+Account Pooler, and Server Switcher needs more than one server on bb connect.
 
-A compact sidebar footer list with one row per Account Pooler account: the
-provider mark, the subscription tier, a usage bar, and the quota window that
-actually limits the account together with its reset countdown.
+### [Super Hotkeys](./super-hotkeys)
+
+Superhuman-like keyboard navigation: hints with the remaining keys of visible
+shortcuts, slash to search threads, a command that opens the Plugins page, and
+number keys that set up a new thread's project, model, machine, and branch.
 
 ### [Bookmarks](./bookmarks)
 
@@ -36,6 +40,12 @@ its thread scrolled to the message.
 A compact, wrapping grid of navigation icons, with live plugin indicators
 in the lower-right corner. Keeps BB's existing menus,
 hidden items, and customization.
+
+### [Pool Usage](./pool-usage)
+
+A compact sidebar footer list with one row per Account Pooler account: the
+provider mark, the subscription tier, a usage bar, and the quota window that
+actually limits the account together with its reset countdown.
 
 ### [Server Switcher](./server-switcher)
 

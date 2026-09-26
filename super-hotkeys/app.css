@@ -1,0 +1,66 @@
+/* controller.ts marks each control that gets a pill; the pill follows it. */
+[data-super-hotkeys-key]::after {
+  content: attr(data-super-hotkeys-key);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font: 500 10px/1 var(--font-sans, system-ui);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  white-space: nowrap;
+  pointer-events: none;
+}
+[data-super-hotkeys-anchor] {
+  position: relative;
+}
+/* Rows and options: over the trailing slot. Icon buttons: over the icon. */
+[data-super-hotkeys-mode="end"]::after,
+[data-super-hotkeys-mode="icon"]::after {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+}
+[data-sidebar-rename-row][data-super-hotkeys-key]::after {
+  right: 6px;
+}
+[data-super-hotkeys-mode="icon"]::after {
+  right: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+[data-super-hotkeys-mode="icon"] {
+  overflow: visible !important;
+}
+[data-super-hotkeys-mode="icon"] > *,
+[data-super-hotkeys-mode="end"] [data-icon="Check"],
+[data-sidebar-rename-row][data-super-hotkeys-key] > :last-child {
+  visibility: hidden;
+}
+[data-sidebar-rename-row][data-super-hotkeys-key] > :last-child {
+  min-width: 28px;
+}
+/* New-thread controls: in the chevron's slot, so typing moves nothing. */
+[data-super-hotkeys-mode="chevron"] > svg:last-child {
+  display: none;
+}
+/* Provider tabs: beside the icon. */
+[data-super-hotkeys-mode="tab"] {
+  width: auto !important;
+  padding-inline: 4px !important;
+  gap: 4px;
+}
+/* BB's own delayed hint, where a pill already shows the keys. */
+[data-super-hotkeys-key] kbd[aria-hidden="true"].pointer-events-none,
+[data-super-hotkeys-key] + kbd[aria-hidden="true"].pointer-events-none {
+  display: none !important;
+}

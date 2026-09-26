@@ -27,3 +27,20 @@ credentials and tokens never enter the plugin or frontend.
 
 Disabled, held, and unavailable accounts stay in place with quiet inline
 states, preserving the pool's stable order without expanding the interface.
+
+## More San Francisco Plugins
+
+Pool Usage is one of the San Francisco Plugins, a family of BB plugins. The
+others:
+
+- **Super Hotkeys**: Superhuman-like keyboard navigation, with shortcut hints,
+  slash search, and number keys that set up a new thread.
+- **Bookmarks**: save any chat message and jump back to it from the thread's
+  right panel.
+- **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
+  icons.
+- **Server Switcher**: if you run several servers on bb connect, one click opens
+  the next online one.
+
+See all of them, with install steps, at
+[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).
