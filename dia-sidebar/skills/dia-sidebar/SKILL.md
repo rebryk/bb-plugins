@@ -10,7 +10,8 @@ Settings → Appearance → Navigation. Choose BB to restore the standard list.
 
 This is a layout plugin. Match BB's footer icon controls and use host theme
 tokens instead of choosing a separate visual theme. Default geometry is
-32 px buttons, 16 px icons, 4 px gaps and 8 px horizontal padding. Keep vertical
+32 px buttons, 16 px icons, no gaps and 8 px horizontal padding. Buttons touch
+because only the hovered and current ones show a background. Keep vertical
 padding at zero because BB's adjacent sections already provide spacing. Compact coarse
 pointer viewports use 36 px buttons and 20 px icons. Keep BB's native rounded-md
 radius and focus ring, and the footer's muted icon tone and hover treatment.

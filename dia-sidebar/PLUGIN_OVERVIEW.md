@@ -3,8 +3,8 @@ Keep your navigation close at hand while leaving more room for threads.
 ## A grid of icons
 
 Dia Sidebar turns the top sidebar navigation into compact square icon buttons
-with small gaps. The grid wraps automatically as the sidebar gets narrower or
-wider. Buttons match BB's footer controls in size and appearance,
+that sit edge to edge. The grid wraps automatically as the sidebar gets
+narrower or wider. Buttons match BB's footer controls in size and appearance,
 follow the active BB theme, keep the current destination highlighted, and
 reveal their names on hover. The grid adds no vertical padding between BB's
 header and thread list.
