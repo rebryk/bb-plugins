@@ -42,6 +42,8 @@ others:
   right panel.
 - **Dia Sidebar**: the sidebar's navigation as a compact, wrapping grid of
   icons.
+- **Snooze**: hide a thread from the sidebar until a time you pick, or until its
+  agent needs you.
 - **Terminal Paste**: a Paste button for the terminal on phones and tablets.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.

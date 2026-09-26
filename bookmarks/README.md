@@ -71,6 +71,8 @@ plugins. The others:
   shortcut hints, slash search, and number keys that set up a new thread.
 - [Dia Sidebar](../dia-sidebar): the sidebar's navigation as a compact, wrapping
   grid of icons.
+- [Snooze](../snooze): hide a thread from the sidebar until a time you pick, or
+  until its agent needs you.
 - [Terminal Paste](../terminal-paste): a Paste button for the terminal on phones
   and tablets.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use
