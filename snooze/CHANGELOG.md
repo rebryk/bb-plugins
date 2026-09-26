@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `snooze/v<version>`.
 
+## 0.1.1 (2026-09-26)
+
+- In Show snoozed threads, clearing the search lists the soonest snooze first
+  again and selects it. The rows used to keep the order the search had sorted
+  them into.
+
 ## 0.1.0 (2026-09-26)
 
 - First release: a moon button in the thread header and a Snooze thread command

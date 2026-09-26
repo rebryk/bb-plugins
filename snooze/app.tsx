@@ -297,6 +297,7 @@ function SnoozedList(props: {
 }) {
   const { snoozes, onOpen, onUnsnooze } = props;
   const [now] = useState(Date.now);
+  const [query, setQuery] = useState("");
   const compact = useIsCompactViewport();
   const selected = useCommandState((state) => state.value);
   // Like BB's key hints: ⌘ on Apple keyboards, Ctrl elsewhere.
@@ -313,6 +314,8 @@ function SnoozedList(props: {
     <>
       <CommandInput
         placeholder="Search snoozed threads…"
+        value={query}
+        onValueChange={setQuery}
         onKeyDown={(event) => {
           if (compact || event.key !== "Enter") return;
           if (!event.metaKey && !event.ctrlKey) return;
@@ -321,7 +324,10 @@ function SnoozedList(props: {
           if (row !== undefined) onUnsnooze(row.threadId);
         }}
       />
-      <CommandList>
+      <CommandList
+        // As in the picker, the list mounts afresh when the query is cleared.
+        key={query === "" ? "all" : "filtered"}
+      >
         <CommandEmpty>
           {snoozes.length === 0 ? "No snoozed threads" : "No matching threads"}
         </CommandEmpty>
