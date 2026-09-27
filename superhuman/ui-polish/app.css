@@ -1,0 +1,90 @@
+/*
+ * BB tints the icons in its bars in three tones, some near white and some
+ * gray, even within one bar, and fades the sidebar's a little more. Here they
+ * share one, the subtle foreground; text such as the thread's title and the
+ * selected tab stay brighter, and other plugins' images keep their colors.
+ */
+:is(
+    [data-testid="app-page-header-content-row"],
+    [data-testid="app-sidebar-trigger-overlay"],
+    main > div:has(> [aria-label*="right panel"]),
+    [data-testid="thread-secondary-panel-top-chrome"],
+    [data-testid="app-sidebar-primary-actions"],
+    [data-sidebar="footer"]
+  )
+  :is(button, a):not([aria-pressed="true"], [aria-current="page"], [data-active="true"])
+  svg[data-icon-root] {
+  color: var(--subtle-foreground);
+  /* Over the fade of the sidebar's footer and of Superhuman's tiles. */
+  opacity: 1 !important;
+}
+
+/*
+ * BB wraps some icons, such as the thread info panel's Environment icon, in a
+ * sized box that is at least as big as the icon. The icon fills the box, so
+ * Safari takes the icon's own 24px for the box's least size, and the box
+ * pushes the label aside. The box keeps the size BB gives it.
+ */
+span.min-w-max.min-h-max[class*="size-"]:has(> svg.size-full) {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The navigation's "…" menu takes the rows of BB's other menus, such as the footer's. */
+[aria-label="More sidebar navigation"] {
+  :is([data-sidebar-navigation-more-item], [data-testid="sidebar-navigation-customize-trigger"]) {
+    /* A block, so the line around the row adds no space below it. */
+    display: flex;
+    height: calc(var(--spacing, 0.25rem) * 6.5);
+  }
+
+  /* A row's "…" takes the row's full height. */
+  [data-sidebar-hover-actions-mobile] > button { height: 100%; }
+}
+
+@media (width < 48rem) and (pointer: coarse) {
+  /*
+   * The navigation's "…" sheet takes the rows of BB's other sheets, such as the
+   * footer's, and leaves room for the home indicator like them.
+   */
+  [data-persistent-drawer-content] > [aria-label="More sidebar navigation"] {
+    gap: calc(var(--spacing, 0.25rem) * 0.5);
+    padding: calc(var(--spacing, 0.25rem) * 2);
+    padding-bottom: max(calc(var(--spacing, 0.25rem) * 2), env(safe-area-inset-bottom));
+
+    > [role="list"] {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--spacing, 0.25rem) * 0.5);
+    }
+
+    :is([data-sidebar-navigation-more-item], [data-testid="sidebar-navigation-customize-trigger"]) {
+      height: calc(var(--spacing, 0.25rem) * 9);
+    }
+  }
+
+  /* The right panel's buttons take the size of the header's on a phone. */
+  [data-testid="thread-secondary-panel-top-chrome"]
+    :is(
+      [aria-label^="Previous tab"],
+      [aria-label^="Next tab"],
+      [aria-label^="Open new tab"],
+      [aria-label^="Hide right panel"]
+    )
+    > svg {
+    width: calc(var(--spacing, 0.25rem) * 5);
+    height: calc(var(--spacing, 0.25rem) * 5);
+  }
+
+  /*
+   * A picker's list, such as the thread info panel's branches, takes the rows
+   * of BB's other sheets on a phone.
+   */
+  [data-persistent-drawer-content] .overflow-y-auto > button.w-full[class*="py-[0.3125rem]"] {
+    padding-block: calc(var(--spacing, 0.25rem) * 2);
+
+    & + & {
+      margin-top: calc(var(--spacing, 0.25rem) * 0.5);
+    }
+  }
+}

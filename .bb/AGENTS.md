@@ -40,11 +40,11 @@
   script that writes `json.dumps(data, indent=2, ensure_ascii=False) + "\n"`,
   which keeps its format, and validate it against its `$schema`.
 - Add the plugin to the family everywhere, in the same order: general plugins
-  first, setup-specific ones last, currently bookmarks, pool-usage. The places
-  are the root README's install block, Plugins intro, and Plugins list; the
-  collection's `pluginIds`; and the `## More San Francisco Plugins` block of
-  every other plugin's README and overview that has one. Copy each changed
-  overview into `marketplace.json` as well.
+  first, setup-specific ones last, currently superhuman, bookmarks, pool-usage.
+  The places are the root README's install block, Plugins intro, and Plugins
+  list; the collection's `pluginIds`; and the `## More San Francisco Plugins`
+  block of every other plugin's README and overview that has one. Copy each
+  changed overview into `marketplace.json` as well.
 - `<id>@sf-plugins` resolves only after the merge, since the catalog follows
   `main`. To try a pushed branch before that, run
   `bb plugin install 'git:https://github.com/rebryk/bb-plugins.git@<branch>' --subdirectory <id> --yes`.
@@ -84,3 +84,22 @@ Plugins in BB Community, currently Bookmarks and Pool Usage, stand alone: their
 README and overview describe only the plugin and have no family block. BB
 Community keeps its own copy of each overview, so a change to one needs a pull
 request to [get-bb/marketplace](https://github.com/get-bb/marketplace) as well.
+
+## Superhuman
+
+- Each feature has its own directory whose `app.tsx` or `app.ts` default-exports
+  `register<Feature>(app: PluginAppBuilder)`, called from the root `app.tsx`. A
+  server part default-exports `register<Feature>Server(bb)`, called from the
+  root `server.ts`.
+- The whole plugin shares one namespace for content scripts, slots, commands,
+  footer items, settings, RPC methods, services, storage keys, and realtime
+  channels, so give each a specific name: `listSnoozes`, not `list`.
+  `app.test.tsx` and `server.test.ts` pin the ids each side registers.
+- A setting that turns a feature on or off goes in the root `server.ts`, on by
+  default unless the feature takes something away, as Zoom Lock takes pinch
+  zoom.
+- A feature's tests load it alone with
+  `loadPluginApp(asPluginApp(() => import("./app")))`, from `testing.ts`.
+- The README and overview stay short: one intro line and a list of features,
+  each a bold name, a period, and one line. The README has no `## Use` or
+  `## How it works`.
