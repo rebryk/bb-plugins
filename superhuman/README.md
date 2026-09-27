@@ -50,5 +50,7 @@ plugins. The others:
 
 - [Bookmarks](../bookmarks): save any chat message and jump back to it from the
   thread's right panel.
+- [San Francisco](../san-francisco): a quiet macOS-style theme after the Aside
+  browser, with your pick of the eight macOS accent colors.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use
   and when it frees up, in the sidebar footer.

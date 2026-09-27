@@ -19,6 +19,11 @@
       "id": "navigation",
       "displayName": "Navigation",
       "description": "Change how you move between threads, app pages, and servers."
+    },
+    {
+      "id": "themes-and-appearance",
+      "displayName": "Themes & Appearance",
+      "description": "Personalize how bb looks and feels."
     }
   ],
   "collections": [
@@ -28,6 +33,7 @@
       "pluginIds": [
         "superhuman",
         "bookmarks",
+        "san-francisco",
         "pool-usage"
       ]
     }
@@ -123,12 +129,50 @@
         "./screenshots/superhuman/dia-sidebar.png",
         "./screenshots/superhuman/dia-sidebar-wrapped.png"
       ],
-      "overview": "Superhuman-style features for BB:\n\n- **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and\n  number keys for a new thread's menus.\n- **Snooze.** Hide a thread until a set time or until its agent needs you.\n- **Archive Button.** Archive a thread from its header, next to Snooze.\n- **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.\n- **Terminal Paste.** A Paste button for the terminal on phones and tablets.\n- **Server Switcher.** A **Change Server** button in the sidebar footer.\n- **Phone Layout.** BB's bars at the bottom of a phone's screen, with or\n  without the thread's title.\n- **Zoom Lock.** No zooming the page, off by default.\n- **UI Polish.** Icons in one tone, including other plugins' in the thread\n  header, and even menu rows.\n\n## More San Francisco Plugins\n\nSuperhuman is one of the San Francisco Plugins, a family of BB plugins. The\nothers:\n\n- **Bookmarks**: save any chat message and jump back to it from the thread's\n  right panel.\n- **Pool Usage**: how much of each provider's capacity is in use and when it\n  frees up, in the sidebar footer.\n\nSee all of them, with install steps, at\n[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).\n",
+      "overview": "Superhuman-style features for BB:\n\n- **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and\n  number keys for a new thread's menus.\n- **Snooze.** Hide a thread until a set time or until its agent needs you.\n- **Archive Button.** Archive a thread from its header, next to Snooze.\n- **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.\n- **Terminal Paste.** A Paste button for the terminal on phones and tablets.\n- **Server Switcher.** A **Change Server** button in the sidebar footer.\n- **Phone Layout.** BB's bars at the bottom of a phone's screen, with or\n  without the thread's title.\n- **Zoom Lock.** No zooming the page, off by default.\n- **UI Polish.** Icons in one tone, including other plugins' in the thread\n  header, and even menu rows.\n\n## More San Francisco Plugins\n\nSuperhuman is one of the San Francisco Plugins, a family of BB plugins. The\nothers:\n\n- **Bookmarks**: save any chat message and jump back to it from the thread's\n  right panel.\n- **San Francisco**: a quiet macOS-style theme after the Aside browser, with\n  your pick of the eight macOS accent colors.\n- **Pool Usage**: how much of each provider's capacity is in use and when it\n  frees up, in the sidebar footer.\n\nSee all of them, with install steps, at\n[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).\n",
       "source": {
         "git": {
           "url": "https://github.com/rebryk/bb-plugins.git",
           "ref": "main",
           "subdir": "superhuman"
+        }
+      }
+    },
+    {
+      "id": "san-francisco",
+      "displayName": "San Francisco",
+      "description": "A quiet macOS-style theme after the Aside browser, with your pick of the eight macOS accent colors.",
+      "icon": {
+        "url": "./san-francisco/assets/icon.svg"
+      },
+      "tags": [
+        "theme",
+        "appearance",
+        "macos",
+        "light",
+        "dark",
+        "accent-color",
+        "colors",
+        "interface"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "themes-and-appearance",
+      "screenshots": [
+        "./screenshots/san-francisco/home.png",
+        "./screenshots/san-francisco/settings.png",
+        "./screenshots/san-francisco/settings-dark.png",
+        "./screenshots/san-francisco/accent.png"
+      ],
+      "overview": "Make BB look like a calm, native Mac app, in the quiet style of the Aside\nbrowser.\n\n## A quiet window\n\nThe content sits on the gray window frame as one white card with soft corners.\nText uses the system font at 14 px, SF Pro on a Mac. Hierarchy comes from\nshades of gray rather than lines: primary text is near black, and secondary\ntext a softer gray. Icons use a thinner stroke, and only menus, popovers and\nthe command palette cast a soft shadow. Dark mode follows the same rules, with\na near-black frame, a slightly lighter card and near-white text.\n\nText is at least as easy to read as in BB's default palette. Dark mode's card\nis lighter than BB's, so its gray text, accent text and BB's terminal, diff,\nstatus and code colors are brighter to match.\n\n## Familiar places\n\nIn the sidebar, rows are a soft black and the open thread is a white pill.\nWhen Search threads is visible in the navigation, it becomes a search field.\nOn a desktop the sidebar loses its row of back and forward buttons, and its\ntoggle moves into the thread's header, before the title. Thread and panel\nheaders lose their dividers. The composer gets larger corners, a soft shadow\nand one round send button with an up arrow; Stop is the same circle with a\nsquare. Above the composer, background work becomes one outlined card, and\nqueued messages a sheet tucked behind the composer. Right-panel tabs become\nquiet pills, and an empty new tab centers its hint above outlined buttons.\n\n## Settings like a document\n\nSettings pages show a Settings › Page breadcrumb and a large page title.\nSection headings are small caps, and rows sit in cards split by full-width\nlines. Selects shrink to their text and use a double chevron. Buttons, inputs\nand badges are lighter, and menus and popovers are compact.\n\n## One accent color\n\nPick one of the eight macOS accent colors: Blue, Purple, Pink, Red, Orange,\nYellow, Green or Graphite. It underlines links and colors file names, focus\nrings, text selection, switches and checkboxes; everything else stays\nneutral. Provider marks keep their shapes but take the surrounding text color.\n\n## Turn it on\n\nChoose San Francisco under Settings → Appearance → Palette, then click an\naccent swatch under Settings → San Francisco. BB applies the palette before\nthe first paint and a non-Blue accent a moment later, once plugins load. Light\nand dark follow BB's Theme setting. Choose Default to return to BB's look. No\nexternal account or service is required.\n\n## More San Francisco Plugins\n\nSan Francisco is one of the San Francisco Plugins, a family of BB plugins. The\nothers:\n\n- **Superhuman**: Superhuman-style speed for BB, with shortcut hints, snooze,\n  a compact grid of navigation icons, and a phone layout.\n- **Bookmarks**: save any chat message and jump back to it from the thread's\n  right panel.\n- **Pool Usage**: how much of each provider's capacity is in use and when it\n  frees up, in the sidebar footer.\n\nSee all of them, with install steps, at\n[github.com/rebryk/bb-plugins](https://github.com/rebryk/bb-plugins).\n",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "san-francisco"
         }
       }
     }

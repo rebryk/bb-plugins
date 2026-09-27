@@ -40,7 +40,8 @@
   script that writes `json.dumps(data, indent=2, ensure_ascii=False) + "\n"`,
   which keeps its format, and validate it against its `$schema`.
 - Add the plugin to the family everywhere, in the same order: general plugins
-  first, setup-specific ones last, currently superhuman, bookmarks, pool-usage.
+  first, setup-specific ones last, currently superhuman, bookmarks,
+  san-francisco, pool-usage.
   The places are the root README's install block, Plugins intro, and Plugins
   list; the collection's `pluginIds`; and the `## More San Francisco Plugins`
   block of every other plugin's README and overview that has one. Copy each

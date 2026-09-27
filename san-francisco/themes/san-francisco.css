@@ -1,0 +1,2493 @@
+/*
+ * San Francisco: bb in the quiet macOS style of the Aside browser.
+ *
+ * One theme for every accent. The plugin frontend mirrors the Accent color
+ * setting to data-sf-accent on <html>; until it loads, and for Blue, the
+ * defaults below apply.
+ *
+ * No text has less contrast than in bb's default palette. --sf-soft carries
+ * bb's text contrast a step under --foreground, the grays match or exceed bb's,
+ * and dark mode, whose card and popovers are lighter than bb's, brightens the
+ * accent text and bb's terminal, diff, status and code colors to match.
+ *
+ * Palette, type, radii and shadows are bb theme tokens. The rest restyles bb
+ * 0.43 markup: data attributes and roles where bb provides them, Tailwind
+ * utility combinations where it does not. bb's utilities live in cascade
+ * layers, so these unlayered rules win without !important. The exceptions are
+ * inline styles, bb's layered !important utilities and other plugins'
+ * unlayered CSS; the rules that meet them say how.
+ */
+
+/* ───────────────────────── accent ───────────────────────── */
+
+:root {
+  --sf-accent-light: #007aff;
+  --sf-accent-light-text: #0066d6;
+  --sf-accent-dark: #0a84ff;
+  --sf-accent-dark-text: #75b7ff;
+  /* Marks drawn on the accent: checks and radio dots. */
+  --sf-on-accent: #ffffff;
+}
+
+:root[data-sf-accent="purple"] {
+  --sf-accent-light: #953d96;
+  --sf-accent-light-text: #8a3a8b;
+  --sf-accent-dark: #a550a7;
+  --sf-accent-dark-text: #e19be2;
+}
+
+:root[data-sf-accent="pink"] {
+  --sf-accent-light: #f74f9e;
+  --sf-accent-light-text: #c42a72;
+  --sf-accent-dark: #f74f9e;
+  --sf-accent-dark-text: #ff8fc1;
+}
+
+:root[data-sf-accent="red"] {
+  --sf-accent-light: #e0383e;
+  --sf-accent-light-text: #c42429;
+  --sf-accent-dark: #ff5257;
+  --sf-accent-dark-text: #ff9495;
+}
+
+:root[data-sf-accent="orange"] {
+  --sf-accent-light: #f7821b;
+  --sf-accent-light-text: #ad5700;
+  --sf-accent-dark: #f7821b;
+  --sf-accent-dark-text: #ffa552;
+}
+
+:root[data-sf-accent="yellow"] {
+  --sf-accent-light: #ffc600;
+  --sf-accent-light-text: #8f6c00;
+  --sf-accent-dark: #ffc600;
+  --sf-accent-dark-text: #ffd84f;
+  /* White would be 1.6:1 on yellow. */
+  --sf-on-accent: rgb(0 0 0 / 0.78);
+}
+
+:root[data-sf-accent="green"] {
+  --sf-accent-light: #62ba46;
+  --sf-accent-light-text: #347d20;
+  --sf-accent-dark: #62ba46;
+  --sf-accent-dark-text: #86d46b;
+}
+
+:root[data-sf-accent="graphite"] {
+  --sf-accent-light: #8c8c8c;
+  --sf-accent-light-text: #636363;
+  --sf-accent-dark: #8c8c8c;
+  --sf-accent-dark-text: #b3b3b3;
+}
+
+/* ───────────────────────── tokens: light ───────────────────────── */
+
+/* :root also matches html.dark, so .dark below redefines every literal color. */
+:root,
+.light {
+  --sf-accent: var(--sf-accent-light);
+  --sf-accent-text: var(--sf-accent-light-text);
+
+  --canvas: #ffffff;
+  --ink: #161616;
+  --popover: #ffffff;
+  --primary: #1c1c1c;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --accent: #f0eff0;
+  --muted: #efefef;
+  --muted-foreground: #525252;
+  --subtle-foreground: #636363;
+  --readback-foreground: #5b5b5b;
+  --border: #dfdfdf;
+  --border-hairline: #dfdfdf;
+  --border-seam: #e6e6e6;
+  --input: #d6d6d6;
+  --state-hover: rgb(10 10 10 / 0.05);
+  --state-active: rgb(10 10 10 / 0.08);
+  --surface-selected: rgb(10 10 10 / 0.06);
+  --surface-selected-border: rgb(10 10 10 / 0.14);
+  --sidebar: #fafafa;
+  --sidebar-accent: #efeeef;
+  --sidebar-border: #dfdfdf;
+  --destructive: #a5000f;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #94000c;
+  --warning-text: #c2410c;
+
+  /* bb tints these surfaces with its ink. San Francisco's ink is darker, so
+     they keep bb's values rather than turn a shade darker than bb's. */
+  --surface-raised: rgb(51 51 51 / 0.025);
+  --surface-raised-solid: #f9f9f9;
+  --surface-recessed: rgb(51 51 51 / 0.06);
+  --surface-recessed-solid: #f1f1f1;
+  --surface-recessed-soft-solid: #f5f5f5;
+
+  --sf-strong: #0a0a0a;
+  --sf-soft: #2e2e2e;
+  --sf-fill: #f3f3f3;
+  --sf-chip: #ebebeb;
+  --sf-bubble: #f4f3f4;
+  --sf-danger-soft: #fcefee;
+  --sf-danger-text: #94000c;
+  --sf-focus-border: color-mix(in srgb, var(--sf-accent) 80%, var(--border));
+  --sf-accent-ring: color-mix(in srgb, var(--sf-accent) 32%, transparent);
+  --sf-switch-off: #e3e3e3;
+  --sf-switch-thumb: #ffffff;
+  --sf-switch-thumb-off: #ffffff;
+  --sf-pill-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 3px rgb(0 0 0 / 0.09);
+  --sf-segment-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.1);
+  --sf-pop-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.05), 0 12px 32px -8px rgb(0 0 0 / 0.16), 0 3px 8px -3px rgb(0 0 0 / 0.07);
+  --sf-composer-shadow: 0 1px 2px rgb(0 0 0 / 0.03), 0 8px 24px -10px rgb(0 0 0 / 0.12);
+}
+
+/* ───────────────────────── tokens: dark ───────────────────────── */
+
+/* The card and popovers are lighter than bb's, so the grays and bb's terminal,
+   diff and status colors are brighter too. */
+.dark {
+  --sf-accent: var(--sf-accent-dark);
+  --sf-accent-text: var(--sf-accent-dark-text);
+
+  --canvas: #1b1b1c;
+  --ink: #ededed;
+  --popover: #232325;
+  --primary: #ededed;
+  --primary-foreground: #161616;
+  --secondary: #232325;
+  --accent: #262628;
+  --muted: #2a2a2c;
+  --muted-foreground: #c6c6c6;
+  --subtle-foreground: #a5a5a5;
+  --readback-foreground: #b1b1b1;
+  --border: #333335;
+  --border-hairline: #333335;
+  --border-seam: #2c2c2e;
+  --input: #3f3f42;
+  --state-hover: rgb(255 255 255 / 0.06);
+  --state-active: rgb(255 255 255 / 0.09);
+  --surface-selected: rgb(255 255 255 / 0.07);
+  --surface-selected-border: rgb(255 255 255 / 0.16);
+  --sidebar: #111112;
+  --sidebar-accent: #222224;
+  --sidebar-border: #333335;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #ff7b72;
+  --warning-text: #ffa566;
+  --success: #5cd58e;
+  --attention: #ffc049;
+  --warning: #ffa068;
+  --pr-merged: #ad8dff;
+  --diff-added: #30e4a2;
+  --diff-removed: #ff8282;
+
+  --ansi-0: #8b8b8b;
+  --ansi-1: #df6464;
+  --ansi-2: #20c37f;
+  --ansi-3: #eeee28;
+  --ansi-4: #428ee2;
+  --ansi-5: #cf60cf;
+  --ansi-6: #21afd4;
+  --ansi-7: #eeeeee;
+  --ansi-8: #a1a1a1;
+  --ansi-9: #ff7b7a;
+  --ansi-10: #32d992;
+  --ansi-11: #fdfe4e;
+  --ansi-12: #61b1f9;
+  --ansi-13: #dd76dd;
+  --ansi-14: #34bfe2;
+
+  --surface-raised: rgb(237 237 237 / 0.025);
+  --surface-raised-solid: #1f1f20;
+  --surface-recessed: rgb(237 237 237 / 0.06);
+  --surface-recessed-solid: #252526;
+  --surface-recessed-soft-solid: #222223;
+
+  --sf-strong: #fafafa;
+  --sf-soft: #d4d4d4;
+  --sf-fill: #232325;
+  --sf-chip: #2c2c2e;
+  --sf-bubble: #262628;
+  --sf-danger-soft: rgb(255 99 88 / 0.15);
+  /* On the red fill, lighter than --destructive-text to keep bb's contrast,
+     hovered too; a focused field's border stays 3:1 on the dark canvas. */
+  --sf-danger-text: #ffa39b;
+  --sf-focus-border: color-mix(in srgb, var(--sf-accent) 85%, var(--border));
+  --sf-accent-ring: color-mix(in srgb, var(--sf-accent) 40%, transparent);
+  --sf-switch-off: #3a3a3c;
+  --sf-switch-thumb: #ffffff;
+  --sf-switch-thumb-off: #d4d4d4;
+  --sf-pill-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+  --sf-segment-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+  --sf-pop-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 14px 36px -8px rgb(0 0 0 / 0.6), 0 3px 8px -3px rgb(0 0 0 / 0.4);
+  --sf-composer-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.5);
+}
+
+/* ───────────────────────── tokens: shared ───────────────────────── */
+
+:root,
+.light,
+.dark {
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--canvas);
+  --card-foreground: var(--ink);
+  --popover-foreground: var(--ink);
+  --secondary-foreground: var(--ink);
+  --accent-foreground: var(--ink);
+  --border-seam-vertical: var(--border-seam);
+  --sidebar-foreground: var(--ink);
+  --sidebar-accent-foreground: var(--ink);
+
+  /* One accent: link underlines, file names, focus, selection, switches and the
+     "New" divider. */
+  --ring: color-mix(in srgb, var(--sf-accent) 60%, transparent);
+  --sidebar-ring: var(--ring);
+  --timeline-accent: var(--sf-accent-text);
+  --file-accent: var(--sf-accent-text);
+  --sf-selection: color-mix(in srgb, var(--sf-accent) 22%, transparent);
+  /* Focus inside menus and the sidebar: a quiet ring, not the accent. Centered
+     dialogs have no row fill to show focus, so theirs is gray at 4:1 or more. */
+  --sf-quiet-ring: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --sf-dialog-ring: color-mix(in srgb, var(--foreground) 60%, transparent);
+  /* Empty checkboxes and radios: at least as visible as bb's --input. */
+  --sf-check-border: color-mix(in srgb, var(--foreground) 30%, transparent);
+  --sf-send: color-mix(in srgb, var(--sf-strong) 52%, var(--canvas));
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --radius: 0.625rem;
+  --icon-stroke-width: 1.5;
+
+  /* Flat surfaces; only floating layers cast a soft, wide shadow. A transparent
+     shadow rather than none, which would void Tailwind's whole box-shadow list
+     and with it the focus rings. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow: 0 0 #0000;
+  --shadow-md: var(--sf-pop-shadow);
+  --shadow-lg: var(--sf-pop-shadow);
+  --shadow-xl: var(--sf-pop-shadow);
+  --shadow-2xl: var(--sf-pop-shadow);
+  --shadow-lift: var(--sf-composer-shadow);
+}
+
+/* 14 px text and 30 px rows on desktop; bb keeps its own touch sizes. */
+@media (width >= 768px), (pointer: fine) {
+  :root {
+    --text-sm: 0.875rem;
+    --text-xs: 0.78125rem;
+    --text-2xs: 0.65625rem;
+    --bb-sidebar-row-height: 1.875rem;
+  }
+
+  /* Monospace text (logs, code, shortcut recorders) keeps bb's 12 px. */
+  :is(pre, code, .font-mono).text-xs {
+    font-size: 0.75rem;
+  }
+}
+
+/* ───────────────────────── base ───────────────────────── */
+
+::selection {
+  background-color: var(--sf-selection);
+}
+
+/* Links keep bb's text color and take an accent underline. */
+[data-markdown-preview] a[href] {
+  text-decoration-color: var(--sf-accent-text);
+  text-underline-offset: 2px;
+}
+
+[data-markdown-preview] a[href]:hover {
+  text-decoration-color: currentColor;
+}
+
+/* A code span that wraps closes its box on each line. */
+[data-markdown-preview] :not(pre) > code {
+  padding: 1px 5px;
+  border: 1px solid var(--border-seam);
+  border-radius: 4px;
+  background-color: var(--sf-fill);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* The quote bar stays as visible as bb's; the palette's selected border is fainter. */
+[data-markdown-preview] blockquote {
+  border-left-color: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+}
+
+/* Code blocks keep bb's 13 px line box, so the 12 px code keeps bb's line pitch. */
+[data-markdown-preview] pre.bb-code-highlight {
+  font-size: 0.8125rem;
+}
+
+/* bb's syntax colors, brightened for the lighter code block. bb's rule loads
+   later and unlayered, so :root outranks it. */
+:root.dark .bb-code-highlight {
+  --sh-keyword: #ff9095;
+  --sh-string: #89da9a;
+  --sh-class: #86c2ff;
+  --sh-property: #a5c3ff;
+  --sh-entity: #c3b7ff;
+  --sh-jsxliterals: #c3b7ff;
+}
+
+/* ───────────────────────── window: a floating content card ───────────────────────── */
+
+@media (width >= 768px) {
+  [data-testid="app-layout-root"] {
+    background-color: var(--sidebar);
+  }
+
+  [data-testid="app-layout-root"] > main[data-sidebar="inset"] {
+    align-self: stretch;
+    height: auto;
+    margin: 6px 6px 6px 0;
+    overflow: hidden;
+    border: 1px solid var(--border-seam);
+    border-radius: 14px;
+  }
+
+  [data-testid="app-layout-root"] > .peer[data-state="collapsed"] ~ main[data-sidebar="inset"] {
+    margin-left: 6px;
+  }
+
+  /* The card edge replaces the sidebar's seam and its resize line. */
+  [data-side="left"] > [data-sidebar="panel"] {
+    border-right-color: transparent;
+  }
+
+  [data-testid="app-sidebar-resize-handle"]:not(:hover)::before,
+  [data-testid="settings-sidebar-resize-handle"]:not(:hover)::before {
+    background-color: transparent;
+  }
+
+  /* On hover a 2 px line covers the card edge and the pixel beside it, as bb's
+     line does its seam, along the straight part: 6 px margin plus the 14 px
+     corner. */
+  [data-testid="app-sidebar-resize-handle"]::before,
+  [data-testid="settings-sidebar-resize-handle"]::before {
+    top: 20px;
+    bottom: 20px;
+    left: 6px;
+    width: 2px;
+    translate: none;
+  }
+
+  /* The sidebar starts at the top of the window: its top row, with the back
+     and forward buttons, is gone, and its first control sits on the line of
+     the card's header. The sidebar toggle moves into that header, before the
+     title of the top-left pane, 16 px in from the card's edge as the right
+     panel's button is from the other edge, open or collapsed. The anchor keeps
+     it there while the sidebar slides or is resized. BB's Mac app has its own
+     toggle, moved the same way; outside full screen, the row stays there as
+     empty room for the window buttons, which BB's toggle starts 84 px in to
+     clear. */
+  @supports (anchor-name: --sf-card) {
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) > main[data-sidebar="inset"] {
+      anchor-name: --sf-card;
+    }
+
+    :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]) {
+      position-anchor: --sf-card;
+      top: calc(anchor(top) + 1px);
+      left: calc(anchor(left) + 17px);
+      padding-left: 0;
+    }
+
+    [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"] {
+      left: max(84px, calc(anchor(left) + 17px));
+    }
+
+    /* The Mac app shifts its header controls 2 px down, but not the home
+       page's right panel button, so there the toggle stays on its line. */
+    [data-testid="app-layout-root"]:has([data-testid="root-compose-main-window-drag-strip"]) > [data-testid="app-desktop-sidebar-trigger"] > [data-sidebar="trigger"] {
+      --bb-macos-chrome-control-y: 0px;
+    }
+
+    /* BB's shortcut hint beside the toggle would cover the title, so it hangs
+       below the toggle. */
+    :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]) > kbd {
+      top: calc(50% + 18px);
+      left: 0;
+      margin-left: 0;
+    }
+
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-testid$="-sidebar-top-reserve-row"] {
+      display: none;
+    }
+
+    [data-testid="app-layout-root"]:has(> [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"]) [data-testid$="-sidebar-top-reserve-row"] > * {
+      display: none;
+    }
+
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-sidebar="sidebar"]:has(> [data-testid="app-sidebar-top-reserve-row"]) {
+      padding-top: calc(env(safe-area-inset-top) + 14px);
+    }
+
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-sidebar="sidebar"]:has(> [data-testid="settings-sidebar-top-reserve-row"]) {
+      padding-top: calc(env(safe-area-inset-top) + 8px);
+    }
+
+    /* BB reserves 32 px for the collapsed toggle; the toggle and an 8 px gap
+       take 36 px, open or collapsed. Of split panes, the first at each level
+       holds the window's top-left corner, or the maximized one. */
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) [data-testid="app-page-header-content-row"]:is([data-maximized] *, :not([data-split-resize-grid-root] > :not(:first-child) *)) {
+      padding-left: 36px;
+    }
+
+    /* Past the window buttons, where BB reserves 104 px, the title starts 8 px
+       after the toggle: 84 + 28 + 8 px from the window's edge, less the card's
+       7 px and the header's 16 px. */
+    [data-testid="app-layout-root"]:has(> [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"]) [data-testid="app-page-header-content-row"][class*="pl-[104px]"] {
+      padding-left: 97px;
+    }
+  }
+
+  /* Without anchor positioning, the sidebar's top row lines up with the card's
+     header row: 7 px down, the card's margin and edge. The toggle stays on
+     that line with the sidebar collapsed, in the card. */
+  @supports not (anchor-name: --sf-card) {
+    [data-testid$="-sidebar-top-reserve-row"]:not([class*="app-region:drag"]) {
+      margin-top: 7px;
+    }
+
+    [data-testid="app-sidebar-trigger-overlay"] {
+      translate: 0 7px;
+    }
+
+    [data-testid="app-sidebar-trigger-overlay"]:has(> [data-sidebar="trigger"][aria-expanded="false"]) {
+      translate: 7px 7px;
+    }
+  }
+
+  /* The home page has no header; its right panel button, fixed to the window,
+     sits where a header puts it in the card, the card's margin and edge
+     further in. BB's Mac app already leaves that spot out of its drag strip. */
+  main[data-sidebar="inset"] .fixed[class*="top-[calc(0.625rem+env(safe-area-inset-top))]"] {
+    top: calc(env(safe-area-inset-top) + 17px);
+    right: calc(env(safe-area-inset-right) + 23px);
+  }
+}
+
+/* The right panel shares the card: white instead of the sidebar gray. */
+[id$="-secondary-panel"] {
+  --sf-rail: var(--sidebar);
+}
+
+[id$="-secondary-panel"] > aside {
+  --sidebar: var(--background);
+}
+
+/* xterm paints the page's --sidebar, so while a terminal shows, the panel and
+   its tab row keep it: no seam. */
+[id$="-secondary-panel"] > aside:has(section[data-app-terminal]),
+[id$="-secondary-panel"] section[data-app-terminal] {
+  --sidebar: var(--sf-rail);
+}
+
+/* ───────────────────────── sidebar ───────────────────────── */
+
+/* Rows and their icons share one soft black, group labels are gray, and the
+   current row is black on a white pill. */
+[data-sidebar="sidebar"] {
+  color: var(--sf-soft);
+}
+
+[data-testid="app-sidebar-top-reserve-row"] button,
+[data-testid="app-sidebar-trigger-overlay"] button,
+[data-testid="app-desktop-sidebar-trigger"] button {
+  color: var(--sf-soft);
+}
+
+[data-testid="app-sidebar-top-reserve-row"] button:hover:not(:disabled),
+[data-testid="app-sidebar-trigger-overlay"] button:hover,
+[data-testid="app-desktop-sidebar-trigger"] button:hover {
+  color: var(--foreground);
+}
+
+[data-sidebar="group-label"] {
+  color: var(--muted-foreground);
+}
+
+/* Thread rows, sortable (projects) or not (chronological); group headers have
+   no hover actions. */
+[data-sidebar-rename-row].bb-sidebar-hover-actions-row {
+  border-radius: 8px;
+  color: var(--sf-soft);
+}
+
+/* Settings links, but not the footer's gear and update badges, which keep the
+   footer's look. */
+[data-sidebar-rename-row].bb-sidebar-hover-actions-row:not(.bb-sidebar-selected-row):hover,
+[data-sidebar="sidebar"] a[href^="/settings"]:not([aria-current="page"], [data-sidebar="footer"] *):hover,
+[data-sidebar="sidebar"] a[href="/"]:hover {
+  color: var(--foreground);
+}
+
+[data-sidebar="sidebar"] a[href^="/settings"]:not([aria-current="page"], [data-sidebar="footer"] *),
+[data-sidebar="sidebar"] a[href="/"] {
+  color: var(--sf-soft);
+}
+
+[data-sidebar="sidebar"] a[href^="/settings"]:not([data-sidebar="footer"] *) > :is(svg, [data-icon-root]),
+[data-sidebar="sidebar"] a[href="/"] > :is(svg, [data-icon-root]) {
+  color: currentColor;
+}
+
+/* Navigation. The tile rules of Superhuman's Dia Sidebar load after the
+   theme with more specific selectors; :not(#san-francisco) lifts these above
+   them without !important. */
+[data-sidebar-navigation-item]:not(#san-francisco) > button,
+[data-testid="sidebar-navigation-more-trigger"]:not(#san-francisco) {
+  color: var(--sf-soft);
+}
+
+[data-sidebar-navigation-item]:not(#san-francisco) > button:hover,
+[data-testid="sidebar-navigation-more-trigger"]:not(#san-francisco):hover {
+  color: var(--foreground);
+}
+
+[data-sidebar-navigation-item]:not(#san-francisco) > button > :first-child,
+[data-testid="sidebar-navigation-more-trigger"]:not(#san-francisco) > :first-child {
+  opacity: 1;
+}
+
+[data-sidebar-rename-row].bb-sidebar-hover-actions-row.bb-sidebar-selected-row,
+[data-sidebar="sidebar"] a[aria-current="page"],
+[data-sidebar-navigation-item]:not(#san-francisco) > button[aria-current="page"] {
+  color: var(--sf-strong);
+  background-color: var(--background);
+  box-shadow: var(--sf-pill-shadow);
+}
+
+/* The pill's shadow would replace bb's focus ring. */
+:is([data-sidebar-rename-row].bb-sidebar-hover-actions-row.bb-sidebar-selected-row, [data-sidebar="sidebar"] a[aria-current="page"], [data-sidebar-navigation-item]:not(#san-francisco) > button[aria-current="page"]):focus-visible {
+  box-shadow: var(--sf-pill-shadow), 0 0 0 2px var(--sf-dialog-ring);
+}
+
+/* In dark mode a hovered row stays below the selected pill, and the pill takes
+   a light edge, as its shadow does not show on the dark panel. */
+.dark [data-sidebar="sidebar"] {
+  --sidebar-accent: color-mix(in srgb, var(--background) 70%, var(--sidebar));
+  --sf-pill-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.11), 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+/* Customizing, the panel and its hovered row take the palette's step back. */
+.dark [data-sidebar-navigation-customize-mode="true"] {
+  --sidebar-accent: color-mix(in srgb, var(--foreground) 8%, var(--sidebar));
+}
+
+/* A hairline between the navigation and the threads. */
+[data-testid="app-sidebar-navigation-divider"] {
+  margin-top: 10px;
+  margin-bottom: 2px;
+  border-top-color: var(--border-seam);
+}
+
+/* Superhuman's Dia Sidebar grid keeps its own tile spacing; the theme adds
+   2 px above its first row. Superhuman's Phone layout sets the grid in one row
+   at the foot of the sidebar drawer BB opens below 768 px, lined up with a
+   thread's bar, so the theme leaves that grid and its Search threads to it. */
+[data-dia-sidebar] [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"], #san-francisco, [data-phone-layout] [role="dialog"] *) {
+  padding-top: 2px;
+}
+
+/* The Dia Sidebar tiles' badges: a bare 6 px status dot and a small count
+   chip. */
+[data-dia-sidebar] [data-plugin-nav-sidebar-accessory] span.rounded-full:is(.size-4, .h-4.w-4):not(.bg-muted):has(> span.size-1\.5.rounded-full) {
+  width: 6px;
+  height: 6px;
+  background-color: transparent;
+}
+
+[data-dia-sidebar] [data-plugin-nav-sidebar-accessory] span.h-4.rounded-full:is(.bg-muted, [class*="bg-red-500"], [class*="bg-amber-500"], [class*="bg-green-500"]):not(.w-4) {
+  height: 12px;
+  gap: 2px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 12px;
+}
+
+[data-dia-sidebar] [data-plugin-nav-sidebar-accessory] span.h-4.rounded-full.bg-muted {
+  background-color: var(--sf-chip);
+  color: var(--muted-foreground);
+}
+
+[data-dia-sidebar] [data-plugin-nav-sidebar-accessory] span.h-4.rounded-full.bg-muted > span.rounded-full.border {
+  display: none;
+}
+
+/* Search threads as a field with its shortcut, above the other destinations;
+   an icon in Superhuman's phone grid, as above. */
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) {
+  order: -1;
+  width: auto;
+  height: auto;
+  margin-bottom: 4px;
+}
+
+[data-dia-sidebar] [data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) {
+  flex: 1 0 100%;
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button {
+  width: 100%;
+  height: 30px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 6px 0 9px;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  background-color: var(--background);
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: text;
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button:hover {
+  color: var(--muted-foreground);
+  background-color: var(--background);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 16%, var(--border));
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--border), 0 0 0 2px var(--sf-dialog-ring);
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button > svg:first-child {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button > span:last-child {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  clip-path: none;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button > span:last-child > span:first-child::after {
+  content: "…";
+}
+
+/* bb renders its shortcut only while Search threads has a key, with the real
+   chord; it stays on show as the field's chip. */
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button > span:last-child > span + span {
+  opacity: 1;
+}
+
+[data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button kbd {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background-color: var(--sf-fill);
+  color: var(--foreground);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 20px;
+  opacity: 1;
+}
+
+/* Phones keep bb's 36 px touch height and have no shortcut to show. */
+@media (width < 768px) and (pointer: coarse) {
+  [data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button {
+    height: 36px;
+  }
+
+  [data-sidebar-navigation-item="__bb__/search-threads"]:not(#san-francisco, [data-phone-layout] [role="dialog"] [data-dia-sidebar] *) > button > span:last-child > span + span {
+    display: none;
+  }
+}
+
+[data-sidebar="footer"] [data-sidebar="menu-button"] {
+  color: var(--sf-soft);
+}
+
+[data-sidebar="footer"] [data-sidebar="menu-button"]:hover {
+  color: var(--foreground);
+}
+
+/* ───────────────────────── headers ───────────────────────── */
+
+/* In the card the page header needs no hairline; the full-width phone header
+   keeps bb's. A scrolled timeline, in a split pane too, fades out under it
+   instead of being cut. */
+@media (width >= 768px) {
+  main[data-sidebar="inset"] header:has(> [data-testid="app-page-header-content-row"]) {
+    border-bottom-color: transparent;
+  }
+
+  main[data-sidebar="inset"] header:has(> [data-testid="app-page-header-content-row"]):has(+ [data-thread-window], + * > [data-thread-window])::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: 16px;
+    background: linear-gradient(var(--background) 4px, transparent);
+    pointer-events: none;
+  }
+}
+
+/* An inactive split pane keeps bb's dimmed title; the rename field matches
+   the title. */
+main[data-sidebar="inset"] header .bb-thread-title:not(.text-muted-foreground\/60),
+main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\/60) > input[aria-label="Thread name"] {
+  color: var(--sf-strong);
+  font-weight: 500;
+}
+
+/* Header icons are gray, darker than bb's; the thread menu keeps bb's near-black. */
+[data-app-page-header-actions] button:has(> svg:only-child),
+[data-app-page-header-actions] button:has(> [data-icon-root]:only-child) {
+  color: var(--muted-foreground);
+}
+
+[data-testid="thread-detail-header-actions-menu"] button {
+  color: var(--sf-soft);
+}
+
+[data-app-page-header-actions] button:has(> svg:only-child):hover,
+[data-app-page-header-actions] button:has(> [data-icon-root]:only-child):hover,
+[data-testid="thread-detail-header-actions-menu"] button:hover {
+  color: var(--foreground);
+}
+
+/* The editor split button and Commit: outlined controls, 32 and 30 px tall,
+   with 8 px around the split button. Narrow windows keep bb's sizes, so the
+   thread title keeps its room. */
+[data-thread-header-workflow-actions] button.border {
+  border-color: var(--border);
+  border-radius: 8px;
+}
+
+@media (width >= 768px) {
+  [data-thread-header-workflow-actions] button.border {
+    height: 30px;
+  }
+
+  [data-thread-header-workflow-actions] div:has(> button.border.rounded-r-none) {
+    margin: 0 4px;
+  }
+
+  [data-thread-header-workflow-actions] div:has(> button.border.rounded-r-none) button.border {
+    height: 32px;
+  }
+}
+
+[data-thread-header-workflow-actions] button.border.rounded-r-none {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  color: var(--muted-foreground);
+}
+
+[data-thread-header-workflow-actions] button.border.rounded-l-none {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--muted-foreground);
+}
+
+[data-thread-header-workflow-actions] button.border:not(.rounded-r-none, .rounded-l-none) {
+  color: var(--sf-strong);
+}
+
+@media (width >= 768px) {
+  [data-thread-header-workflow-actions] button.border:not(.rounded-r-none, .rounded-l-none) {
+    padding: 0 11px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+}
+
+/* ───────────────────────── timeline ───────────────────────── */
+
+[data-message-column] .group\/message .rounded-xl.bg-surface-recessed {
+  border-color: transparent;
+  border-radius: 16px;
+  background-color: var(--sf-bubble);
+}
+
+/* Settled rows ("Explored …", "Read …", "Context compacted"): one light gray,
+   not washed out. */
+[data-timeline-row-id] .group\/toggle .opacity-40,
+[data-timeline-row-id] > .rounded-md.opacity-40 {
+  opacity: 0.6;
+}
+
+/* bb scrolls the divider's top edge to the top of the timeline, under the
+   header's 16 px fade. Its box starts 12 px higher, so the label lands below
+   the fade and keeps bb's place in the list. */
+@media (width >= 768px) {
+  [data-testid="thread-unread-divider"] {
+    margin-top: -12px;
+    padding-top: 16px;
+    pointer-events: none;
+  }
+}
+
+/* ───────────────────────── above the composer ───────────────────────── */
+
+/* Background work (commands, agents or both): one outlined card of flat rows.
+   With several items the toggle heads the card like a row. */
+[data-scroll-footer] section[aria-label^="Background "] {
+  border-color: var(--border);
+  border-radius: 12px;
+  background-color: var(--background);
+}
+
+#thread-background-commands-card-toggle,
+[data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"]) {
+  min-height: 34px;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: transparent;
+  box-shadow: none;
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+
+[data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"]) + :is([aria-label^="Background command:"], [aria-label^="Background agent:"]) {
+  border-top: 1px solid var(--border-seam);
+}
+
+:is(#thread-background-commands-card-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .text-muted-foreground:not(.tabular-nums) {
+  color: var(--foreground);
+}
+
+:is(#thread-background-commands-card-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .font-medium {
+  color: var(--sf-strong);
+}
+
+/* A running workflow: the same 12 px card, its toggle without a plate. */
+[data-scroll-footer] section[aria-label="Workflow"] {
+  border-radius: 12px;
+}
+
+#thread-workflow-card-toggle {
+  background-color: transparent;
+}
+
+/* Its step list and the background card's open list: bb's rows and scroll
+   fades paint the canvas color over a popover fill, which in bb is the same
+   color. */
+[data-scroll-footer] section:is([aria-label="Workflow"], [aria-label^="Background "]) .bg-popover {
+  background-color: var(--background);
+}
+
+/* Changes and merge base, and a model fallback notice stacked below them:
+   bb's lightly filled bar, rounder. */
+[data-scroll-footer] section:is([aria-label="Thread context before sending"], [aria-label="Model fallback"]) {
+  border-color: var(--border);
+  border-radius: 12px;
+}
+
+[data-scroll-footer] section:is([aria-label="Thread context before sending"], [aria-label="Model fallback"]) > :first-child {
+  min-height: 34px;
+  padding: 0 6px;
+  font-size: var(--text-sm);
+}
+
+/* The notice has no padded buttons, so its icon and close sit where the bar's do. */
+[data-scroll-footer] section[aria-label="Model fallback"] > :first-child {
+  padding: 0 8px 0 14px;
+}
+
+/* An open pull request's Merge split button matches the bar's 14 px text. */
+[data-scroll-footer] section[aria-label="Thread context before sending"] button:is([aria-label="Choose pull request merge method"], :has(+ [aria-label="Choose pull request merge method"])) {
+  height: 24px;
+  font-size: var(--text-sm);
+}
+
+#thread-prompt-banner-git-toggle {
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+
+/* Open, the icon takes the text color, as in bb. */
+#thread-prompt-banner-git-toggle[aria-expanded="false"] > svg:first-child {
+  color: var(--muted-foreground);
+}
+
+[data-scroll-footer] section[aria-label="Thread context before sending"] [data-promptbox-hide-compact] {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+[data-scroll-footer] section[aria-label="Thread context before sending"] button[aria-label="Branch"] {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--foreground);
+}
+
+/* Queued messages: a sheet tucked behind the composer, in its color. The
+   label and the rows start where the composer text does (19px in), the
+   reorder grip sits in the gutter left of the text, and hairlines are inset
+   to the text. The row actions paint surface-raised-solid, so it follows. */
+[data-scroll-footer] section[aria-label="Queued messages"] {
+  --surface-raised-solid: var(--background);
+  --color-surface-raised-solid: var(--background);
+  border-color: var(--border);
+  border-radius: 18px 18px 0 0;
+  background-color: var(--background);
+  box-shadow: none;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] > header {
+  padding: 0 8px 0 14px;
+  border-bottom-color: transparent;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] > header span.font-medium {
+  color: var(--sf-soft);
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] > header .text-2xs {
+  color: var(--subtle-foreground);
+}
+
+/* The handle that opens the queue workspace, as a grabber. */
+[data-scroll-footer] section[aria-label="Queued messages"] > header > button > span {
+  width: 26px;
+  height: 3px;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] li[data-queued-message-row] {
+  padding: 2px 14px 2px 0;
+  border-bottom-width: 0;
+  background: linear-gradient(var(--border-seam), var(--border-seam)) left 18px bottom / calc(100% - 36px) 1px no-repeat;
+}
+
+/* The next batch ends here; the line parts around bb's drag handle. */
+[data-scroll-footer] section[aria-label="Queued messages"] li[data-queued-message-group-boundary-row] {
+  background: linear-gradient(to right, transparent 18px, var(--border-seam) 18px calc(50% - 16px), transparent calc(50% - 16px) calc(50% + 16px), var(--border-seam) calc(50% + 16px) calc(100% - 18px), transparent calc(100% - 18px)) left bottom / 100% 1px no-repeat;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] li[data-queued-message-row]:last-child {
+  background: none;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] li[data-queued-message-row] > div {
+  gap: 0;
+}
+
+[data-scroll-footer] section[aria-label="Queued messages"] button[aria-label^="Reorder queued message"] {
+  width: 18px;
+  margin-left: 0;
+  padding: 0;
+}
+
+/* bb pins the row text with !text-xs !leading-4 (layered !important), so it
+   takes the composer's 14/20 through the variables those utilities read. */
+[data-scroll-footer] section[aria-label="Queued messages"] li[data-queued-message-row] span.truncate {
+  --text-xs: var(--text-sm);
+  --spacing: 0.3125rem;
+}
+
+/* ───────────────────────── composer ───────────────────────── */
+
+form[data-promptbox] {
+  border-color: var(--border);
+  border-radius: 18px;
+}
+
+[data-promptbox-editor-scroll] {
+  padding-left: 18px;
+}
+
+/* The send control: one round button with an up arrow, gray while there is
+   nothing to send, black once there is. Stop is the same circle with a
+   square; while bb is busy the circle holds bb's spinner. bb forces the send
+   menu's buttons transparent with layered !important, so the circle is an
+   inset shadow as deep as its radius and the icon a mask. A labeled submit
+   (the handoff's "New thread") keeps bb's look.
+   The circle is one size in every state: 30 px on desktops and tablets, and
+   36 px on phones, where bb's thread circle is 32 and its new-thread row 40.
+   The phone's voice button and the recording controls (bb's cross and check)
+   take the same circle with bb's icons; the voice button and the check fill
+   like a ready send, so the circle keeps its tone as the states change.
+   bb's + sits --sf-plus-center from the row's edge (wider on phones). */
+form[data-promptbox] {
+  --sf-send-size: 30px;
+  --sf-plus-center: 24px;
+}
+
+@media (width < 768px) and (pointer: coarse) {
+  form[data-promptbox] {
+    --sf-send-size: 36px;
+    --sf-plus-center: 26px;
+  }
+}
+
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) {
+  gap: 2px;
+  background-color: transparent;
+  color: var(--canvas);
+}
+
+/* A narrow composer resizes the button to 2rem with a two-attribute
+   selector, and phones size it by padding. */
+[data-promptbox-submit-action]:not(#san-francisco, [aria-label^="Create new thread"], :has(> [data-promptbox-submit-label])),
+[data-promptbox-voice-controls] button {
+  flex: none;
+  width: var(--sf-send-size);
+  min-width: var(--sf-send-size);
+  height: var(--sf-send-size);
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
+}
+
+[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label])) {
+  --sf-send-fill: var(--sf-send);
+  border: 0;
+  color: var(--canvas);
+  box-shadow: inset 0 0 0 calc(var(--sf-send-size) / 2) var(--sf-send-fill);
+  opacity: 1;
+}
+
+[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label])):focus-visible {
+  box-shadow: inset 0 0 0 calc(var(--sf-send-size) / 2) var(--sf-send-fill), 0 0 0 2px var(--background), 0 0 0 3.5px var(--ring);
+}
+
+/* Recording lays bb's cross, waveform and check over the action row. They
+   take the row's padding, so the check lands where the send circle was and
+   the cross where the + was. */
+[data-promptbox-voice-controls] {
+  padding: inherit;
+  padding-left: calc(var(--sf-plus-center) - var(--sf-send-size) / 2);
+}
+
+[data-promptbox-voice-controls] > div {
+  height: 100%;
+  padding: 0;
+}
+
+/* bb swaps the row and the recording controls with a fade and a 4 px drop
+   that does not animate, so mid-fade the two circles would part; both fade
+   in place. */
+form[data-promptbox] :is([data-promptbox-voice-controls], [data-promptbox-standard-actions]) {
+  translate: none;
+  scale: none;
+}
+
+/* A collapsed follow-up composer floats the row 8 px from its edge; it keeps
+   the open row's 13 px, so the circle stays put as the composer opens or
+   starts recording. */
+form[data-promptbox-compact] [data-promptbox-action-row] {
+  right: 13px;
+}
+
+@container follow-up-composer style(--follow-up-composer-container-compact: true) {
+  [data-follow-up-composer]:not([data-follow-up-composer-expanded]) [data-promptbox]:not([data-promptbox-voice-active]) [data-promptbox-action-row] {
+    right: 13px;
+  }
+}
+
+/* The phone's voice button and the recording check fill like a ready send,
+   and their icons take the arrow's weight. */
+[data-promptbox-submit-action][aria-label*="voice" i],
+[data-promptbox-voice-controls] button:not([aria-label^="Cancel"]) {
+  background-color: var(--sf-strong);
+  color: var(--canvas);
+}
+
+[data-promptbox-submit-action][aria-label*="voice" i] svg [stroke-width],
+[data-promptbox-voice-controls] button:not([aria-label^="Cancel"]) svg [stroke-width] {
+  stroke-width: 2;
+}
+
+/* Only where there is hover: iOS keeps :hover on a tapped button, so the
+   check that replaces the tapped mic would come up lighter. */
+@media (hover: hover) {
+  [data-promptbox-submit-action][aria-label*="voice" i]:hover,
+  [data-promptbox-voice-controls] button:not([aria-label^="Cancel"]):hover {
+    background-color: color-mix(in srgb, var(--sf-strong) 80%, var(--canvas));
+  }
+}
+
+[data-promptbox-submit-action][aria-label*="voice" i]:focus-visible,
+[data-promptbox-voice-controls] button:focus-visible {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 3.5px var(--ring);
+}
+
+/* With no fill under it, the shadow ring bleeds through the gap's soft inner
+   edge; an outline draws the same ring cleanly. */
+[data-promptbox-voice-controls] button[aria-label^="Cancel"]:focus-visible {
+  box-shadow: none;
+  outline: 1.5px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Ready to send: the menu turns bg-foreground, or the button itself where
+   there is no menu (phones). */
+[data-promptbox-send-menu].bg-foreground [data-promptbox-submit-action],
+[data-promptbox-submit-action].bg-foreground,
+[data-promptbox-submit-action][aria-label^="Stop"] {
+  --sf-send-fill: var(--sf-strong);
+}
+
+@media (hover: hover) {
+  [data-promptbox-send-menu].bg-foreground [data-promptbox-submit-action]:hover,
+  [data-promptbox-submit-action].bg-foreground:hover,
+  [data-promptbox-submit-action][aria-label^="Stop"]:hover {
+    --sf-send-fill: color-mix(in srgb, var(--sf-strong) 80%, var(--canvas));
+  }
+}
+
+[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label])) > :not([data-icon="Loading"]) {
+  display: none;
+}
+
+[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label], > [data-icon="Loading"]))::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 7-7 7 7M12 19V5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+[data-promptbox-submit-action][aria-label^="Stop"]::before {
+  width: 10px;
+  height: 10px;
+  border-radius: 2.5px;
+  mask: none;
+}
+
+/* Send options: a quiet chevron beside the circle, with bb's hover fill. It
+   shows once there is text, left of the circle so the circle keeps its corner;
+   Tab follows it there. */
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) {
+  reading-flow: flex-visual;
+}
+
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"] {
+  order: -1;
+  border-radius: 8px;
+}
+
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"] > svg {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"]:is(:hover, [data-state="open"]) {
+  box-shadow: inset 0 0 0 20px var(--state-hover);
+}
+
+/* The model picker's trigger: the model in the text color, its level and
+   chevron keep bb's grays. */
+form[data-promptbox] button[aria-label^="Provider, model and reasoning"] {
+  color: var(--foreground);
+}
+
+/* Under the composer: black labels, gray icons. */
+[data-follow-up-composer-footer] .text-muted-foreground {
+  color: var(--foreground);
+}
+
+[data-follow-up-composer-footer] .text-muted-foreground svg {
+  color: var(--muted-foreground);
+}
+
+/* Editing a sent message: the cap over the composer nests its 18 px corners. */
+[data-sent-message-inline-editor-host] section[aria-label="Editing message"] {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+/* The @ mention card, rounded like the cards above the composer. Its sticky
+   group labels paint the canvas color, so within it the canvas takes the
+   card's popover color, as in the menus. */
+[class*="@container/mention-menu"] {
+  --background: var(--popover);
+  border-radius: 12px;
+}
+
+/* The palette's muted fill sits within a shade of its surfaces, so bb's muted
+   chips get a fill that reads: the question card's active tab, the Send
+   later summary and a hotkey number on the highlighted row. */
+[data-testid="user-question-banner"] .bg-muted {
+  background-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+
+.dark [role="dialog"] .bg-muted\/50 {
+  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+[data-superhuman-key]:is([data-selected="true"], [data-highlighted])::after {
+  background-color: var(--canvas);
+}
+
+/* ───────────────────────── right panel ───────────────────────── */
+
+/* Quiet tabs: no icon, the close cross after the title, gray pill when active. */
+[data-secondary-panel-tab-content] .group\/tab-pill > button > span:first-child {
+  display: none;
+}
+
+[data-secondary-panel-tab-content] .group\/tab-pill {
+  font-size: var(--text-sm);
+}
+
+[data-secondary-panel-tab-content] .group\/tab-pill > button:not([data-tab-pill-close]) {
+  padding-left: 10px;
+  padding-right: 6px;
+}
+
+[data-secondary-panel-tab-content] .group\/tab-pill [data-tab-pill-close] {
+  position: static;
+  translate: none;
+  margin-right: 6px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Only the active tab shows its cross, as in the mockup, so the gaps stay even
+   and a click anywhere on a short title selects it; a middle click still
+   closes. Keyboard focus shows it over the title's end, which fades out.
+   Phones show every cross, as bb does. */
+@media not ((width < 768px) and (pointer: coarse)) {
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active) > button:not([data-tab-pill-close]) {
+    padding-right: 10px;
+  }
+
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active) [data-tab-pill-close] {
+    position: absolute;
+    top: 50%;
+    left: auto;
+    right: 6px;
+    translate: 0 -50%;
+    margin-right: 0;
+  }
+
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active, :has(> [data-tab-pill-close]:focus-visible)) [data-tab-pill-close] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):has(> [data-tab-pill-close]:focus-visible) > button:not([data-tab-pill-close]) {
+    -webkit-mask-image: linear-gradient(to left, transparent 24px, #000 36px);
+    mask-image: linear-gradient(to left, transparent 24px, #000 36px);
+  }
+
+  /* A status after the title ("(deleted)", "(exited)") would fade instead, so
+     those tabs make room while the cross shows. */
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):has(> [data-tab-pill-close]:focus-visible) > button:not([data-tab-pill-close]):has(> span.ml-1.shrink-0) {
+    padding-right: 26px;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+[data-secondary-panel-tab-content] .group\/tab-pill.bg-state-active {
+  background-color: var(--sf-chip);
+  color: var(--sf-strong);
+}
+
+/* A hovered tab sits halfway to the active pill, as in bb. */
+[data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):hover {
+  background-color: rgb(10 10 10 / 0.04);
+}
+
+.dark [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):hover {
+  background-color: rgb(255 255 255 / 0.035);
+}
+
+[data-testid="thread-secondary-panel-top-chrome"] button:not([aria-label^="Hide right panel"]) > svg:only-child,
+[data-testid="thread-secondary-panel-top-chrome"] .group\/tab-pill:not(.bg-state-active) {
+  color: var(--muted-foreground);
+}
+
+[data-testid="thread-secondary-panel-top-chrome"] button[aria-label^="Hide right panel"] {
+  color: var(--sf-strong);
+  background-color: var(--sf-chip);
+}
+
+/* Superhuman grays the chrome's icons on the svg itself, unlayered and later;
+   :not(#san-francisco) keeps the chip's strong icon. */
+[data-testid="thread-secondary-panel-top-chrome"] button[aria-label^="Hide right panel"]:not(#san-francisco) > svg {
+  color: inherit;
+}
+
+/* The mockup's tighter insets: the tab row 8 px from the edges, the file
+   search 12 px. */
+@media (width >= 768px) {
+  [data-testid="thread-secondary-panel-top-chrome"] {
+    padding-inline: 8px;
+  }
+
+  [data-panel-new-tab-page] {
+    padding-inline: 12px;
+  }
+}
+
+[data-panel-new-tab-page] input[aria-label^="Search files"] {
+  font-size: var(--text-sm);
+}
+
+/* A thinner focus ring for the panel's compact fields. */
+[id$="-secondary-panel"] :is(input, textarea).border.border-input:focus-visible:not(.focus-visible\:ring-0) {
+  box-shadow: 0 0 0 2px var(--sf-accent-ring);
+}
+
+/* New tab: a centered hint, "or", then the actions as outlined buttons. */
+[data-panel-new-tab-page] > :first-child {
+  flex: 1;
+}
+
+[data-panel-new-tab-page] [data-testid="new-tab-actions"] {
+  flex: 1;
+  justify-content: center;
+}
+
+[data-testid="new-tab-actions"] > section > :first-child {
+  display: none;
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px 24px;
+}
+
+[data-panel-new-tab-page]:has(input[aria-label^="Search files"]) [data-testid="new-tab-actions"] > section > .flex-col::before {
+  content: "Open a file to preview it here.\A or";
+  flex: 0 0 100%;
+  margin-bottom: 10px;
+  white-space: pre;
+  text-align: center;
+  line-height: 2.4;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  background:
+    linear-gradient(var(--border), var(--border)) calc(50% - 66px) calc(100% - 15px) / 88px 1px no-repeat,
+    linear-gradient(var(--border), var(--border)) calc(50% + 66px) calc(100% - 15px) / 88px 1px no-repeat;
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col .group {
+  width: auto;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+  color: var(--sf-soft);
+  font-size: var(--text-sm);
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col .group:is(:hover, :focus-within) {
+  background-color: var(--state-hover);
+  color: var(--foreground);
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col .group:has(> button:first-child:focus-visible) {
+  border-color: var(--sf-focus-border);
+  box-shadow: 0 0 0 2px var(--sf-accent-ring);
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col .group > button:first-child {
+  gap: 7px;
+}
+
+[data-testid="new-tab-actions"] > section > .flex-col .group > button:first-child > span:last-child {
+  color: inherit;
+}
+
+/* bb's drag handle, hidden until hover or focus as in bb, in the button's
+   end padding so the buttons keep their width. */
+[data-testid="new-tab-actions"] > section > .flex-col .group > button[aria-label^="Reorder"] {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  width: 11px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+/* Without hover bb always shows it, so the buttons make room for its 20 px. */
+@media (hover: none) {
+  [data-testid="new-tab-actions"] > section > .flex-col .group {
+    padding-right: 24px;
+  }
+
+  [data-testid="new-tab-actions"] > section > .flex-col .group > button[aria-label^="Reorder"] {
+    top: 0;
+    right: 2px;
+    width: 20px;
+    height: 100%;
+  }
+}
+
+[data-panel-new-tab-page] section:has(> .border-dashed) > :first-child {
+  display: none;
+}
+
+[data-panel-new-tab-page] section > .border-dashed {
+  border-color: transparent;
+  padding: 8px;
+  color: var(--muted-foreground);
+}
+
+/* ───────────────────────── settings ───────────────────────── */
+
+/* Breadcrumbs and a large page title; the content script names the page. */
+main[data-sidebar="inset"] header [data-sf-page] {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+main[data-sidebar="inset"] header [data-sf-page] > p {
+  flex: none;
+  font-weight: 400;
+  color: var(--sf-soft);
+}
+
+main[data-sidebar="inset"] header [data-sf-page] > p::after {
+  content: "›";
+  margin: 0 7px;
+  color: var(--subtle-foreground);
+}
+
+main[data-sidebar="inset"] header [data-sf-page]::after {
+  content: attr(data-sf-page);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--sf-strong);
+}
+
+/* A machine, a project or a plugin's details: "Settings › Machines › Mac".
+   The title row's pseudo-elements are reordered around bb's "Settings". */
+main[data-sidebar="inset"] header [data-sf-page-parent] > p {
+  display: contents;
+}
+
+main[data-sidebar="inset"] header [data-sf-page-parent]::before {
+  content: attr(data-sf-page-parent);
+  order: 1;
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--sf-soft);
+}
+
+main[data-sidebar="inset"] header [data-sf-page-parent] > p::before {
+  content: "›";
+  order: 2;
+  margin: 0 7px;
+  color: var(--subtle-foreground);
+}
+
+main[data-sidebar="inset"] header [data-sf-page-parent]::after {
+  order: 3;
+}
+
+[data-sf-page-title]::before {
+  content: attr(data-sf-page-title);
+  display: block;
+  margin: 4px 0 22px 16px;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  color: var(--sf-strong);
+}
+
+[data-sf-page-title] > p.text-muted-foreground:first-child {
+  margin: -14px 0 0 16px;
+}
+
+/* Plugin, machine and project pages open with their own name. */
+[data-sf-page-title=""]::before,
+[data-sf-page-title]:has(h1)::before {
+  content: none;
+}
+
+/* Section headings: small caps, inset like the row text inside cards. Only a
+   page's own sections (not nested ones, or headings holding names, badges or
+   code), and not where the plugin draws its own settings text, which keeps
+   bb's edge. A plugin's details (under Installed plugins, as on /plugins) keep
+   bb's sentence-case headings on purpose: its overview's own subheadings are
+   bb's small caps, and caps sections would flatten the two levels. */
+[data-sf-page-title] section:not(section section) > :first-child > :first-child:has(> :first-child > h2),
+[data-sf-page-title]:not([data-sf-page-title=""], :has([data-testid="plugin-settings-sections"] :is([data-bb-plugin-root] > :not(.border, style), .space-y-3 > :is(h3, p)))) section[data-resource-detail-section] > :is(:first-child:has(> h2), p),
+[data-sf-page-title=""] > div > .space-y-3:first-child,
+[data-sf-page-title] [data-updates-machine] section > :first-child > :first-child:has(> :first-child > h2) {
+  padding-inline: 16px;
+}
+
+[data-sf-page-title] section:not(section section) > :first-child > :first-child > :first-child > h2:not(.text-lg, :has(span, code, .font-mono)),
+[data-sf-page-title]:not([data-sf-page-title=""]) section[data-resource-detail-section] > :first-child > h2:not(:has(span, code, .font-mono)) {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sf-soft);
+}
+
+[data-sf-page-title] section.space-y-3 > :not(:first-child) {
+  margin-top: 8px;
+}
+
+/* A first heading that only repeats the title gives way to it: its description
+   becomes the title's lead and its actions move up beside the title. */
+[data-sf-page-title] :is(h2[data-sf-duplicate], :has(> h2[data-sf-duplicate]:only-child)),
+[data-sf-page-title] section > :first-child:has(> :only-child > :only-child > h2[data-sf-duplicate]:only-child) {
+  display: none;
+}
+
+[data-sf-page-title] section > :first-child:has(> :only-child > :only-child > h2[data-sf-duplicate]:only-child) + * {
+  margin-top: 0;
+}
+
+[data-sf-page-title] section > :first-child:has(h2[data-sf-duplicate]) {
+  margin-top: -14px;
+}
+
+[data-sf-page-title] :is(h2[data-sf-duplicate], :has(> h2[data-sf-duplicate]:only-child)) + p {
+  margin-top: 0;
+}
+
+[data-sf-page-title] h2[data-sf-duplicate] + p {
+  padding-left: 16px;
+}
+
+@media (min-width: 640px) {
+  [data-sf-page-title] section > :first-child:has(> :first-child > :only-child > h2[data-sf-duplicate]:only-child):has(> :nth-child(2)) {
+    margin-top: -54px;
+  }
+
+  [data-sf-page-title] section > :first-child:has(> :first-child > :only-child > h2[data-sf-duplicate]:only-child):has(> :nth-child(2)) + * {
+    margin-top: 22px;
+  }
+
+  /* With a lead (Projects), only the actions move up: 54 px of title less the lead's 14. */
+  [data-sf-page-title] section > :first-child:has(> :first-child > :first-child > h2[data-sf-duplicate]:only-child):has(> :first-child > p:nth-child(2)) > :nth-child(2) {
+    margin-top: -40px;
+  }
+}
+
+@media (max-width: 639px) {
+  [data-sf-page-title] section > :first-child > :first-child:has(> :only-child > h2[data-sf-duplicate]:only-child) {
+    display: none;
+  }
+
+  /* Phones wrap a heading's actions under it, on the heading's inset. */
+  [data-sf-page-title] section:not(section section) > :first-child > :first-child:has(> :first-child > h2) + * {
+    margin-inline-start: 16px;
+  }
+}
+
+/* Cards made only of setting rows: grouped rows split by full-width lines.
+   Cards that also hold a search field or lists (Keyboard) keep bb's padding. */
+[data-sf-page-title] .rounded-lg.border.bg-card:has(> .space-y-5 > [data-control-placement]) {
+  border-radius: 12px;
+  border-color: var(--border);
+}
+
+[data-sf-page-title] .rounded-lg.border.bg-card:has(> .space-y-5 > [data-control-placement]):not(:has(> .space-y-5 > :not([data-control-placement]))) {
+  padding: 0;
+}
+
+[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement] {
+  min-height: 50px;
+  margin-block: 0;
+  padding: 10px 16px;
+}
+
+[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement] {
+  border-top: 1px solid var(--border);
+}
+
+/* A last row's field or list under its label keeps the side inset below it, so
+   its edge and the card's read as one inset group. */
+[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement="below"]:last-child {
+  padding-bottom: 16px;
+}
+
+/* The Sidebar footer list's last item drops its divider, as bb means it to;
+   the drag library's hidden nodes after it keep it from being :last-child. */
+[data-sf-page-title] [data-control-placement] .rounded-md.border > .last\:border-b-0:not(:has(~ .last\:border-b-0)) {
+  border-bottom-width: 0;
+}
+
+/* A plugin's own settings get the same card instead of a gray well, also when
+   its settings section renders bb's Configuration markup. */
+[data-testid^="plugin-detail-"] > .rounded-md.border:has(> .space-y-4 > [data-control-placement]):not(:has(> .space-y-4 > :not([data-control-placement]))),
+[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border:has(> .space-y-4 > [data-control-placement]):not(:has(> .space-y-4 > :not([data-control-placement]))) {
+  padding: 0;
+  border-radius: 12px;
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+[data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement],
+[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] {
+  min-height: 50px;
+  margin-block: 0;
+  padding: 10px 16px;
+}
+
+[data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement],
+[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement] {
+  border-top: 1px solid var(--border);
+}
+
+/* The header's enable switch ends where the switches in those rows do, and its
+   icon and name start on the section headings' inset. */
+main:has([data-testid^="plugin-detail-"] .rounded-md.border > .space-y-4 > [data-control-placement]) header > button[role="switch"].mr-\[13px\] {
+  margin-right: 17px;
+}
+
+[data-sf-page-title]:not([data-sf-page-title=""], :has([data-testid="plugin-settings-sections"] :is([data-bb-plugin-root] > :not(.border, style), .space-y-3 > :is(h3, p)))) header:has(> button[role="switch"]):has(+ * > section[data-resource-detail-section]) > .flex.min-w-0:first-child {
+  margin-inline-start: 16px;
+}
+
+/* San Francisco's swatches stand in for its Accent color select, and their own
+   CSS hides it (accent-picker.tsx). The select waits a few seconds for them,
+   keeping their place, and shows if the plugin's frontend never draws them. */
+[data-testid="plugin-detail-san-francisco"] > .rounded-md.border:has(> .space-y-4 > [data-control-placement]:only-child button[aria-label="Accent color"]) {
+  animation: sf-await-swatches 0s 5s backwards;
+}
+
+/* The gray well bb draws while the settings load. */
+[data-testid="plugin-detail-san-francisco"] > .rounded-md.border:empty {
+  visibility: hidden;
+}
+
+@keyframes sf-await-swatches {
+  from {
+    visibility: hidden;
+  }
+}
+
+/* While it waits, its row takes the swatches' layout, so nothing below moves
+   when they arrive: a 240 px label beside a 260 × 50 strip, or a 28 px strip
+   under it in rows under 520 px (keep in step with accent-picker.tsx). Phones
+   stack both alike. */
+@media (min-width: 640px) {
+  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) {
+    container: sf-accent-wait / inline-size;
+    animation: sf-await-row 0s 5s backwards;
+  }
+
+  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .flex-1 {
+    animation: sf-await-label 0s 5s backwards;
+  }
+
+  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .shrink-0 {
+    animation: sf-await-strip 0s 5s backwards;
+  }
+
+  @container sf-accent-wait (width < 520px) {
+    [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .shrink-0 {
+      animation-name: sf-await-strip-under;
+    }
+  }
+}
+
+@keyframes sf-await-row {
+  from {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 10px;
+  }
+}
+
+@keyframes sf-await-label {
+  from {
+    flex-basis: 240px;
+  }
+}
+
+@keyframes sf-await-strip {
+  from {
+    width: 260px;
+    height: 50px;
+  }
+}
+
+@keyframes sf-await-strip-under {
+  from {
+    width: 320px;
+    max-width: 100%;
+    height: 28px;
+  }
+}
+
+/* Controls sit centered on a row's label and description. */
+@media (min-width: 640px) {
+  [data-sf-page-title] :is([data-control-placement="inline"], [data-control-placement="trailing"]) {
+    align-items: center;
+  }
+
+  /* A plugin's trailing control sits in a line box 4 px taller than a switch. */
+  [data-sf-page-title] [data-control-placement="trailing"] > :last-child > .space-y-1 {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+
+/* The environment variables grid keeps a switch in a 32 px cell. */
+[data-sf-page-title] .size-8 > button[role="switch"] {
+  width: 32px;
+  height: 18px;
+}
+
+[data-sf-page-title] .size-8 > button[role="switch"] > span {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sf-page-title] .size-8 > button[role="switch"] > span[data-state="checked"] {
+  translate: 14px 0;
+}
+
+[data-control-placement] p.text-foreground:first-child {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+[data-control-placement] p.text-xs,
+[data-sf-page-title] .text-subtle-foreground\/75 {
+  color: var(--subtle-foreground);
+}
+
+/* Updates draws its "Up to date" check in --input, which San Francisco lightens
+   for field borders; the check stays at least as visible as bb's. */
+svg.text-input {
+  color: var(--sf-check-border);
+}
+
+/* Search fields (Installed plugins, Archived threads) take the rows' 14 px text. */
+@media (width >= 768px), (pointer: fine) {
+  main[data-sidebar="inset"]:has(header [data-sf-page]) input.pl-8.text-xs {
+    font-size: var(--text-sm);
+  }
+}
+
+/* Archived threads: a project's name and count on the heading's inset. */
+[data-sf-page-title] section.space-y-2 > .flex.items-center.gap-2.px-0\.5.text-xs.font-medium:has(> h3) {
+  padding-inline: 16px;
+}
+
+/* Plugin marketplaces: row text on the heading's inset. */
+[data-sf-page-title] ul.space-y-2 > li.rounded-md.border.p-3 {
+  padding: 12px 15px;
+  border-radius: 12px;
+}
+
+/* Installed plugins. */
+[data-testid^="plugin-row-"] > div {
+  border-radius: 12px;
+}
+
+[data-testid^="plugin-row-"] .border-t {
+  border-top-color: var(--border);
+}
+
+/* Settings sidebar: a gap under "Back to app" and 30 px group labels in the
+   thread list's label color. */
+[data-testid="settings-sidebar-top-reserve-row"] + div:has(> div > a[href="/"]) {
+  padding-bottom: 16px;
+}
+
+[data-testid="settings-sidebar-top-reserve-row"] ~ [data-sidebar="content"] > div > .mt-4 {
+  margin-top: 12px;
+}
+
+[data-testid="settings-sidebar-top-reserve-row"] ~ [data-sidebar="content"] div.text-xs.leading-5.text-subtle-foreground\/75 {
+  padding-block: 5px;
+  color: var(--muted-foreground);
+}
+
+[data-testid="settings-sidebar-top-reserve-row"] ~ [data-sidebar="content"] > div > .mt-1 {
+  margin-top: 2px;
+}
+
+/* ───────────────────────── controls ───────────────────────── */
+
+/* Switches: larger, in the accent color. */
+button[role="switch"] {
+  width: 38px;
+  height: 20px;
+  background-color: var(--sf-switch-off);
+}
+
+button[role="switch"][data-state="checked"] {
+  background-color: var(--sf-accent);
+}
+
+button[role="switch"] > span {
+  width: 16px;
+  height: 16px;
+  margin-left: 1px;
+  background-color: var(--sf-switch-thumb-off);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 0 0 0.5px rgb(0 0 0 / 0.04);
+}
+
+button[role="switch"] > span[data-state="checked"] {
+  background-color: var(--sf-switch-thumb);
+  translate: 18px 0;
+}
+
+/* Checkboxes and radios keep bb's size, round a little more and fill with the
+   accent when on. Only boxes with bb's border fill, so the review's drawn
+   check circles stay as they are. */
+button[role="checkbox"].border,
+span[data-category-option-checkbox],
+[data-testid="user-question-banner"] button > span.size-4.border.rounded {
+  border-radius: 25%;
+}
+
+button[role="checkbox"].border[data-state="unchecked"],
+span[data-category-option-checkbox][data-state="disabled"],
+[data-testid="user-question-banner"] button > span.size-4.border.border-input,
+button[role="radio"] > span.rounded-full.border:is(.border-input, .border-border) {
+  border-color: var(--sf-check-border);
+}
+
+button[role="checkbox"].border:is([data-state="checked"], [data-state="indeterminate"]),
+span[data-category-option-checkbox][data-state="enabled"],
+[data-testid="user-question-banner"] button > span.size-4.border.bg-primary,
+button[role="radio"] > span.rounded-full.border.border-foreground {
+  border-color: var(--sf-accent);
+  background-color: var(--sf-accent);
+  color: var(--sf-on-accent);
+}
+
+button[role="radio"] > span.rounded-full.border.border-foreground > span.rounded-full {
+  background-color: var(--sf-on-accent);
+}
+
+/* A bolder check, so it reads on the accent as bb's thin one does on black.
+   The stroke width is an attribute on each path. */
+button[role="checkbox"].border:is([data-state="checked"], [data-state="indeterminate"]) svg *,
+span[data-category-option-checkbox][data-state="enabled"] svg *,
+[data-testid="user-question-banner"] button > span.size-4.border.bg-primary svg * {
+  stroke-width: 2.5;
+}
+
+/* The check takes the box's color. Superhuman grays icons in the sidebar's
+   top actions block ([data-testid=app-sidebar-primary-actions]), where
+   Customize sidebar's boxes sit, with an unlayered rule that loads later;
+   :not(#san-francisco) lifts this above it. */
+button[role="checkbox"].border:not(#san-francisco) svg {
+  color: inherit;
+}
+
+button[role="checkbox"].border:focus-visible {
+  box-shadow: 0 0 0 3px var(--sf-accent-ring);
+}
+
+input {
+  accent-color: var(--sf-accent);
+}
+
+/* Settings selects: sized to their text with a double chevron, like a macOS
+   pop-up button. On phones they keep bb's full row width. */
+@media (width >= 640px) {
+  [data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child) {
+    width: auto;
+    min-width: 0;
+  }
+}
+
+[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child) {
+  height: 28px;
+  gap: 5px;
+  padding: 0 5px 0 10px;
+  border-color: var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child):is(:hover, [data-state="open"]) {
+  background-color: color-mix(in srgb, var(--foreground) 5%, var(--background));
+}
+
+[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child) > svg:last-child {
+  display: none;
+}
+
+[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child)::after {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--muted-foreground);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Buttons: a light outline at bb's sizes, so a dialog's Cancel matches the
+   button beside it; destructive is red text on a soft fill. Checkboxes,
+   switches, radios, combo boxes, shortcut recorders and icon-only buttons
+   share bb's outline classes and keep their own look. */
+button.border.border-input:not([role="checkbox"], [role="switch"], [role="radio"], [role="combobox"], .min-w-24, :has(> svg:only-child)),
+a.border.border-input:not(:has(> svg:only-child)) {
+  border-color: var(--border);
+  border-radius: 8px;
+  color: var(--sf-strong);
+}
+
+/* Shortcut recorders take the same outline; one that is recording looks like a
+   focused text field. */
+button.border.border-input.min-w-24 {
+  border-color: var(--border);
+}
+
+button.border.border-ring.min-w-24 {
+  border-color: var(--sf-focus-border);
+  box-shadow: 0 0 0 3px var(--sf-accent-ring);
+}
+
+/* In settings rows, 30 px push buttons with 14 px text; phones keep bb's size.
+   Pop-up buttons with an outline stay on the selects' 28 px. */
+@media (width >= 768px), (pointer: fine) {
+  [data-control-placement] button.border.border-input:not([role="checkbox"], [role="switch"], [role="radio"], [role="combobox"], .min-w-24, :has(> svg:only-child), [aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child)) {
+    height: 30px;
+    padding: 0 11px;
+    font-size: var(--text-sm);
+  }
+
+  /* A resource toolbar's buttons (Installed plugins, Archived threads) take its
+     search field's 14 px text, at bb's 32 px. */
+  main[data-sidebar="inset"]:has(header [data-sf-page]) :is([data-resource-toolbar]:has(input.pl-8.text-xs) button, div.flex-wrap:has(> div > input.pl-8.text-xs) > button).text-xs {
+    font-size: var(--text-sm);
+  }
+}
+
+/* Keyboard focus on push and pop-up buttons: the text fields' accent ring.
+   Menus, dialogs and the sidebar keep their gray one. */
+:is(button.border.border-input:not([role="checkbox"], [role="switch"], [role="radio"], [role="combobox"], :has(> svg:only-child)), [data-control-placement] button[aria-haspopup="menu"]):focus-visible:not(:is([data-radix-popper-content-wrapper], [role="dialog"].fixed, [role="alertdialog"].fixed, [data-sidebar="sidebar"]) *) {
+  border-color: var(--sf-focus-border);
+  box-shadow: 0 0 0 3px var(--sf-accent-ring);
+}
+
+button.bg-destructive,
+a.bg-destructive {
+  color: var(--sf-danger-text);
+  background-color: var(--sf-danger-soft);
+}
+
+button.bg-destructive:hover,
+a.bg-destructive:hover {
+  background-color: color-mix(in srgb, var(--sf-danger-text) 8%, var(--sf-danger-soft));
+}
+
+/* In dark mode a lighter hover, so the text keeps bb's hover contrast. */
+.dark button.bg-destructive:hover,
+.dark a.bg-destructive:hover {
+  background-color: color-mix(in srgb, var(--sf-danger-text) 5%, var(--sf-danger-soft));
+}
+
+/* The soft fill leaves less room than bb's solid red, so a disabled one fades
+   a little less than bb's half, to keep bb's contrast. */
+button.bg-destructive:disabled {
+  opacity: 0.56;
+}
+
+/* Inputs: a light border and a soft accent ring on focus, unless bb turns the
+   ring off (the right panel's autofocused file search). */
+input.border-input,
+textarea.border-input {
+  border-color: var(--border);
+  border-radius: 8px;
+}
+
+input.border.border-input:focus-visible:not(.focus-visible\:ring-0),
+textarea.border.border-input:focus-visible:not(.focus-visible\:ring-0) {
+  border-color: var(--sf-focus-border);
+  box-shadow: 0 0 0 3px var(--sf-accent-ring);
+}
+
+/* One placeholder gray, the darkest of the three bb mixes (muted, subtle and
+   subtle at 70%). */
+input::placeholder,
+textarea::placeholder,
+.tiptap p.is-editor-empty::before {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+/* Badges and key caps: soft 20 px plates without borders. Setting labels,
+   hosts, skill source chips (Included, BB Official), the marketplace Official
+   badge and archived child-thread tags; the last two keep bb's text color. */
+span.shrink-0.rounded-sm.border.text-2xs.leading-none,
+.inline-flex.rounded-md.border.text-2xs.font-normal,
+.rounded-md.border-border\/40.bg-surface-recessed\/45.text-2xs,
+span.inline-flex.rounded.border.text-xs.px-2.py-0\.5.bg-background.shrink-0 {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-color: transparent;
+  border-radius: 6px;
+  background-color: var(--sf-chip);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+span.shrink-0.rounded-sm.border.text-2xs.leading-none,
+.rounded-md.border-border\/40.bg-surface-recessed\/45.text-2xs {
+  color: var(--muted-foreground);
+}
+
+/* A plugin's category keeps its own tint and border (inline) on the same plate. */
+span.rounded.border.px-1\.5.py-1.text-2xs {
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+/* Real key caps only; bb's own shortcut hints are quiet gray text and stay so,
+   and a key inside a two-part chip (Web | ⇧⌘O) stays a flat segment. */
+kbd:not(.text-subtle-foreground, .rounded-none, [aria-hidden="true"]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background-color: var(--sf-fill);
+  color: var(--foreground);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+span.inline-flex.items-stretch.overflow-hidden.rounded.border:has(> kbd.rounded-none) {
+  border-radius: 6px;
+}
+
+/* Date and time fields mark the edited part with the selection color. */
+input::-webkit-datetime-edit-year-field:focus,
+input::-webkit-datetime-edit-month-field:focus,
+input::-webkit-datetime-edit-day-field:focus,
+input::-webkit-datetime-edit-hour-field:focus,
+input::-webkit-datetime-edit-minute-field:focus,
+input::-webkit-datetime-edit-ampm-field:focus {
+  background-color: var(--sf-selection);
+  color: inherit;
+}
+
+/* ───────────────────────── menus, popovers, palette, dialogs ───────────────────────── */
+
+/* Menus, popovers and hover cards; a bare popover frame hands this to its card.
+   Plugins' own popovers (Pool Usage) portal the same card to the body. */
+[data-radix-menu-content][role="menu"],
+[data-radix-popper-content-wrapper] > .border.bg-popover,
+[data-radix-popper-content-wrapper] > [role="dialog"]:not(.border) > .border.bg-popover:only-child,
+body > .border.bg-popover {
+  border-color: var(--border);
+  border-radius: 10px;
+  box-shadow: var(--sf-pop-shadow);
+}
+
+/* Centered dialogs and toasts float too; the full-screen image viewer does not. */
+[role="dialog"].fixed.left-\[50\%\],
+[role="alertdialog"].fixed.left-\[50\%\],
+.bb-app-toast > .rounded-md.border.bg-popover,
+[data-sonner-toast][data-styled="true"] {
+  box-shadow: var(--sf-pop-shadow);
+}
+
+/* Plugins' own toasts take the app toast's colors instead of sonner's. */
+[data-sonner-toaster]:is([data-theme], [data-sonner-theme]) {
+  --normal-bg: var(--popover);
+  --normal-border: var(--border);
+  --normal-text: var(--popover-foreground);
+}
+
+/* Focus inside menus, popovers, drawers and the sidebar is a quiet gray ring,
+   the row fill marks it too; text fields keep their accent ring. */
+[data-radix-popper-content-wrapper],
+[role="dialog"].fixed,
+[role="alertdialog"].fixed,
+[data-sidebar="sidebar"] {
+  --ring: var(--sf-quiet-ring);
+  --sidebar-ring: var(--sf-quiet-ring);
+}
+
+/* Centered dialogs open with focus on a button and have no row fill, so their
+   ring stays gray but as easy to follow as bb's. */
+[role="dialog"].fixed.left-\[50\%\],
+[role="alertdialog"].fixed.left-\[50\%\] {
+  --ring: var(--sf-dialog-ring);
+}
+
+/* The image viewer is always a dark scrim, so its ring is light. */
+[role="dialog"].fixed.inset-0.bg-black\/70 {
+  --ring: rgb(255 255 255 / 0.7);
+}
+
+/* A popover hands focus back to its trigger on close, which after its search
+   field counts as keyboard focus, so the trigger takes the quiet ring too. */
+button[aria-haspopup="dialog"] {
+  --ring: var(--sf-quiet-ring);
+}
+
+/* No row fill marks the sidebar's icon buttons, links and group headers, or the
+   options buttons in its overflow, so they take the dialogs' firmer ring. */
+[data-sidebar="sidebar"] :is(button, a[href], [role="button"]):not([role="checkbox"]):focus-visible,
+[aria-label="More sidebar navigation"][role="dialog"] .bb-sidebar-hover-actions button:focus-visible {
+  --ring: var(--sf-dialog-ring);
+  --sidebar-ring: var(--sf-dialog-ring);
+}
+
+/* File trees draw focus as a 1 px outline in the ring color, too thin for the
+   ring's 60 %, so they take the solid accent. */
+file-tree-container {
+  --ring: var(--sf-accent);
+}
+
+/* Popovers and centered dialogs sit a step above the canvas in dark mode.
+   bb paints dialogs, and the headers and sticky labels inside popovers, with
+   the canvas color, so within them the canvas takes the popover color. */
+[data-radix-popper-content-wrapper] > *,
+[role="dialog"].fixed.bg-background.left-\[50\%\],
+[role="alertdialog"].fixed.bg-background.left-\[50\%\] {
+  --background: var(--popover);
+}
+
+/* Count badges in popover lists keep bb's line box, so the 10.5 px text does
+   not add half a pixel to every filter row. */
+[data-radix-popper-content-wrapper] [role="option"] .rounded-full.text-2xs.leading-none {
+  line-height: 10px;
+}
+
+/* Menus: compact 26 px rows in 12.5 px text, as in macOS. */
+[data-radix-menu-content][role="menu"] {
+  padding: 4px;
+}
+
+/* A 150 px floor, unless bb sizes the menu itself (trigger width, w-*, min-w-*). */
+[data-radix-menu-content][role="menu"].min-w-28:not([class*=" w-"], [class*=":w-"]) {
+  min-width: 150px;
+}
+
+/* Menus opened from the palette keep bb's floor, so the thread search filter,
+   aligned to its button at the palette's right edge, stays inside it. */
+[data-testid="command-palette"] ~ [data-radix-popper-content-wrapper] > [data-radix-menu-content][role="menu"].min-w-28 {
+  min-width: 7rem;
+}
+
+[data-radix-menu-content] :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]) {
+  min-height: 26px;
+  gap: 8px;
+  padding-block: 4px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 17px;
+}
+
+/* An 8 px inset; checkbox and radio items keep bb's gutters for their marks
+   (pl-8, pr-8) and take it only on their plain edge. */
+[data-radix-menu-content] :is([role="menuitem"], [role="menuitemcheckbox"].px-2, [role="menuitemradio"].px-2) {
+  padding-inline: 8px;
+}
+
+[data-radix-menu-content] :is([role="menuitemcheckbox"], [role="menuitemradio"]).pl-2 {
+  padding-left: 8px;
+}
+
+/* Item text follows the item's 12.5 px, whatever size bb gives it. */
+[data-radix-menu-content] [role^="menuitem"] :is(.text-xs, .text-sm) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Options with a description: the title over a smaller note, top-aligned.
+   bb's text-xs notes take 11.5 px, its text-2xs notes stay a step below. */
+[data-radix-menu-content] :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):is(.items-start, :has(.block + .block)) {
+  align-items: flex-start;
+}
+
+[data-radix-menu-content] [role^="menuitem"] .block:has(+ .block) {
+  font-size: 12.5px;
+  line-height: 16px;
+}
+
+[data-radix-menu-content] [role^="menuitem"] :is(.block + .block, .text-xs.text-muted-foreground:not(:first-child)) {
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
+[data-radix-menu-content] [role^="menuitem"] .block + .block.text-2xs {
+  font-size: 10.5px;
+  line-height: 14px;
+}
+
+/* One note gray for both kinds, bb's darker muted tier. */
+[data-radix-menu-content] [role^="menuitem"] .block + .block {
+  margin-top: 1px;
+  color: var(--muted-foreground);
+}
+
+/* A narrow window with a mouse shows these menus as a bottom drawer; its
+   notes take the same sizes, so a long one does not wrap a lone word, and
+   bb's 10 px for the smallest, so none wraps onto more lines than in bb. */
+@media (width >= 768px), (pointer: fine) {
+  [data-persistent-drawer-content] [role^="menuitem"] .block:has(+ .block) {
+    font-size: 12.5px;
+    line-height: 16px;
+  }
+
+  [data-persistent-drawer-content] [role^="menuitem"] .block + .block {
+    font-size: 11.5px;
+    line-height: 15px;
+  }
+
+  [data-persistent-drawer-content] [role^="menuitem"] .block + .block.text-2xs {
+    font-size: 10px;
+    line-height: 14px;
+  }
+}
+
+[data-radix-menu-content] [role="separator"] {
+  margin: 4px -4px;
+  background-color: var(--border);
+}
+
+/* Group labels, in either of bb's two label styles. */
+[data-radix-menu-content] .px-2.text-xs:is(.font-medium.text-muted-foreground, .text-subtle-foreground):not([role]) {
+  padding: 6px 8px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* Tooltips: compact tags. */
+[data-radix-popper-content-wrapper] > :has(> [role="tooltip"]) {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* The context window card: 12 px figures, as in the menus' notes. */
+@media (width >= 768px), (pointer: fine) {
+  .\@container\/context-window .text-xs {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+
+/* The sidebar's More list takes the menu rows. bb focuses its first row on
+   open, so focus shows as the hover fill rather than a ring. */
+@media (width >= 768px), (pointer: fine) {
+  [aria-label="More sidebar navigation"][role="dialog"] :is([data-sidebar-overflow-item], [data-testid$="-customize-trigger"]),
+  [aria-label="More sidebar navigation"][role="dialog"] .bb-sidebar-hover-actions button {
+    height: 26px;
+    border-radius: 6px;
+    font-size: 12.5px;
+  }
+
+  /* A block row, so the wrapper's line box does not add a pixel under it. */
+  [aria-label="More sidebar navigation"][role="dialog"] [data-sidebar-overflow-item] {
+    display: flex;
+  }
+}
+
+[aria-label="More sidebar navigation"][role="dialog"] [data-sidebar-overflow-item]:focus-visible {
+  box-shadow: 0 0 #0000;
+}
+
+/* As in a menu, one row is lit: a hovered row takes the fill from the focused one. */
+[aria-label="More sidebar navigation"][role="dialog"]:has([data-sidebar-overflow-item]:hover) [data-sidebar-overflow-item]:focus-visible:not(:hover) {
+  background-color: transparent;
+}
+
+/* Group labels in popovers take the menu labels' 12 px. */
+[data-radix-popper-content-wrapper] .sticky.text-xs.font-medium.text-muted-foreground {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Model picker: 352 px wide, with 32 px provider tabs, a bare 36 px search row,
+   26 px rows in 12.5 px text and a segmented reasoning control. The frame keys
+   on the tab strip, so a provider tab without a model list keeps its size. */
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> .border-b.pt-1 > button.border-b-2) {
+  width: 352px;
+  max-width: calc(100vw - 16px);
+}
+
+@media (width >= 768px), (pointer: fine) {
+  [data-radix-popper-content-wrapper] > [role="dialog"] > .border-b.pt-1:has(> button.border-b-2) {
+    padding-inline: 8px;
+  }
+
+  [data-radix-popper-content-wrapper] > [role="dialog"] > .border-b.pt-1 > button.border-b-2 {
+    width: 32px;
+    height: 32px;
+  }
+
+  [data-radix-popper-content-wrapper] > [role="dialog"]:has([role="listbox"][aria-label="Models"]) > .border-b.py-1 {
+    padding: 0;
+  }
+
+  [data-radix-popper-content-wrapper] .relative:has(> input[aria-label="Search models"]) > svg {
+    left: 12px;
+  }
+
+  [data-radix-popper-content-wrapper] input[aria-label="Search models"] {
+    height: 36px;
+    padding: 0 12px 0 36px;
+    font-size: 12.5px;
+  }
+
+  /* The list's label takes the menus' label inset. */
+  [data-radix-popper-content-wrapper] [role="listbox"][aria-label="Models"] > .sticky.top-0.px-2 {
+    padding: 6px 8px 4px;
+  }
+}
+
+/* Its rows, its empty search result and the More models list beside it. */
+[data-radix-popper-content-wrapper] [role="listbox"][aria-label="Models"] :is([role="option"], button[aria-haspopup="menu"]),
+[data-radix-popper-content-wrapper] [role="listbox"][aria-label="Models"] > .px-2.text-xs.text-muted-foreground:not(.sticky),
+[data-radix-popper-content-wrapper] > [role="dialog"]:has([role="listbox"][aria-label="Models"]) .shrink-0.p-1 > button,
+[data-radix-popper-content-wrapper] > [role="dialog"] > button.w-full.select-none.justify-between.rounded-sm {
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 17px;
+}
+
+/* Branch lists keep bb's 12 px rows, so no more long names wrap than in bb. */
+[data-radix-popper-content-wrapper] > [role="dialog"] .overflow-y-auto > button.w-full.min-w-0.rounded-sm.text-left.text-xs {
+  min-height: 26px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+[data-radix-popper-content-wrapper] [role="radiogroup"][aria-label="Reasoning"] {
+  margin: 0 2px;
+}
+
+[role="radiogroup"][aria-label="Reasoning"] {
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+[role="radiogroup"][aria-label="Reasoning"] > button[role="radio"] {
+  flex: 1 1 0;
+  min-width: max-content;
+  padding: 0 6px;
+  border-radius: 6px;
+}
+
+/* 24 px segments on desktop; the phone drawer keeps bb's touch height and text.
+   The section takes the mockup's 6 px above and below the track. */
+@media (width >= 768px), (pointer: fine) {
+  [role="radiogroup"][aria-label="Reasoning"] > button[role="radio"] {
+    height: 24px;
+    font-size: var(--text-xs);
+  }
+
+  [data-radix-popper-content-wrapper] .shrink-0.px-2:has(> [role="radiogroup"][aria-label="Reasoning"]) {
+    padding-bottom: 6px;
+  }
+
+  [data-radix-popper-content-wrapper] .shrink-0.px-2:has(> [role="radiogroup"][aria-label="Reasoning"]) > .sticky.mb-2 {
+    margin-bottom: 6px;
+  }
+}
+
+/* On phones below 390 px the six segments take the model rows' 14 px so they
+   fit the track, and below 350 px an iOS segmented control's 13 px. */
+@media (width < 390px) and (pointer: coarse) {
+  [role="radiogroup"][aria-label="Reasoning"] > button[role="radio"] {
+    padding: 0 4px;
+    font-size: 14px;
+  }
+}
+
+@media (width < 350px) and (pointer: coarse) {
+  [role="radiogroup"][aria-label="Reasoning"] > button[role="radio"] {
+    padding: 0 3px;
+    font-size: 13px;
+  }
+}
+
+[role="radiogroup"][aria-label="Reasoning"] > button[role="radio"][data-state="on"] {
+  color: var(--sf-strong);
+  background-color: var(--canvas);
+  box-shadow: var(--sf-segment-shadow);
+}
+
+/* No row fill marks a focused segment, so it takes the dialogs' firmer ring,
+   drawn beside the selected segment's shadow. */
+[role="radiogroup"][aria-label="Reasoning"] {
+  --ring: var(--sf-dialog-ring);
+}
+
+[role="radiogroup"][aria-label="Reasoning"] > button[role="radio"][data-state="on"]:focus-visible {
+  box-shadow: 0 0 0 1px var(--ring), var(--sf-segment-shadow);
+}
+
+/* The centered palette takes the dialog frame and clips its rows to the
+   corners; in the phone drawer it stays flush with the sheet. */
+[data-testid="command-palette"][role="dialog"] {
+  overflow: hidden;
+}
+
+[data-testid="command-palette"]:not([role="dialog"]) {
+  box-shadow: 0 0 #0000;
+}
+
+/* Shortcut chips in the palette: a light plate that turns popover-colored on the
+   selected row, so it never melts into the row's fill. The text is a step
+   darker than bb's to stay as legible on either plate. Thread rows keep the
+   chip in a sibling of the option. */
+[data-testid="command-palette"] :is([role="option"], div:not([role]):has(> [role="option"])) kbd {
+  height: 20px;
+  padding-block: 0;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--muted-foreground);
+}
+
+[data-testid="command-palette"] :is([role="option"]:is([aria-selected="true"], [data-selected="true"]), div:not([role]):has(> [role="option"]:is([aria-selected="true"], [data-selected="true"]))) kbd {
+  background-color: var(--popover);
+}
+
+@media (width >= 768px) {
+  [role="dialog"].fixed.left-\[50\%\],
+  [role="alertdialog"].fixed.left-\[50\%\] {
+    border-radius: 14px;
+  }
+}
+
+/* ───────────────────────── icons ───────────────────────── */
+
+/* Provider marks keep their shape but lose their tint. The tint is an inline
+   style, hence !important. */
+[data-provider-icon-tint] {
+  color: inherit !important;
+}

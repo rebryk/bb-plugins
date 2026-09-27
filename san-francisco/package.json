@@ -1,0 +1,61 @@
+{
+  "name": "bb-plugin-san-francisco",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.43.4",
+    "bbPluginSdk": ">=0.5.9"
+  },
+  "bb": {
+    "name": "San Francisco",
+    "description": "A quiet macOS-style theme after the Aside browser, with your pick of the eight macOS accent colors.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [],
+    "themes": [
+      {
+        "id": "san-francisco",
+        "name": "San Francisco",
+        "description": "Quiet macOS styling after the Aside browser. Set the accent color under Settings → San Francisco.",
+        "css": "./themes/san-francisco.css"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.9",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cron-parser": "^5.5.0",
+    "hono": "^4.11.9",
+    "jsdom": "^27.0.1",
+    "playwright-core": "^1.63.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  },
+  "author": "Yurii Rebryk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "san-francisco"
+  },
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/san-francisco#readme",
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "node scripts/check-live.mjs"
+  }
+}
