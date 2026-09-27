@@ -10,6 +10,7 @@ them.
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
+bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
 
@@ -19,7 +20,7 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All three suit any BB setup. With Account Pooler, Pool Usage counts every pooled
+All four suit any BB setup. With Account Pooler, Pool Usage counts every pooled
 account, and with more than one server on bb connect, Superhuman's Change Server
 button switches between them.
 
@@ -39,6 +40,12 @@ the keyboard features and the phone layout, and turn on the zoom lock.
 A bookmark button on every chat message and a Bookmarks tab in the thread's
 right panel that lists the saved messages across threads; clicking one opens
 its thread scrolled to the message.
+
+### [San Francisco](./san-francisco)
+
+A quiet macOS-style theme after the Aside browser: the content as a white card
+on the gray window frame, the system font, a round send button, settings laid
+out like a document, and your pick of the eight macOS accent colors.
 
 ### [Pool Usage](./pool-usage)
 
