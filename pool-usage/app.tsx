@@ -320,9 +320,12 @@ type MeasuredSummary = ProviderSummary & { used: number };
 
 /** bb's dropdown menu surface, so the card looks like the footer's "…" menu. */
 const MENU_CLASS =
-  "z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[side=top]:slide-in-from-bottom-2";
+  "z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-in-from-top-2";
 
-/** A provider's card above its footer button, open until Escape or a press outside. */
+/**
+ * A provider's card next to its footer button, on the side with more room,
+ * open until Escape or a press outside.
+ */
 function UsagePopover({
   anchor,
   onClose,
@@ -349,17 +352,25 @@ function UsagePopover({
   }, [anchor, onClose]);
 
   const rect = anchor.getBoundingClientRect();
+  const { innerWidth, innerHeight } = window;
+  // Above a footer at the bottom of the window, below one at the top.
+  const above = rect.top > innerHeight - rect.bottom;
   return createPortal(
     <div
       ref={ref}
       role="dialog"
       aria-label={`${card.usage.name} usage`}
       data-state="open"
-      data-side="top"
+      data-side={above ? "top" : "bottom"}
       className={`pool-usage-popover ${MENU_CLASS}`}
       style={{
-        bottom: window.innerHeight - rect.top + 6,
-        left: Math.max(8, rect.left),
+        ...(above
+          ? { bottom: innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
+        // Near the right edge, the card grows leftward from the button's end.
+        ...(rect.left + rect.right > innerWidth
+          ? { right: Math.max(8, innerWidth - rect.right) }
+          : { left: Math.max(8, rect.left) }),
       }}
     >
       <UsageCard {...card} />
