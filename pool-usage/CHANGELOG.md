@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.3 (2026-09-26)
+
+- A provider's card opens below its button when the sidebar footer sits at the
+  top of the window, as another plugin can place it on a phone, and grows
+  leftward from a button near the window's right edge, so it stays on screen.
+
 ## 0.2.2 (2026-09-26)
 
 - The sidebar footer shows each provider's logo with the share of its capacity

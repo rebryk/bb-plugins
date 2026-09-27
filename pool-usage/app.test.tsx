@@ -325,6 +325,38 @@ describe("footer summary", () => {
     expect(slot.queryByRole("dialog")).toBeNull();
   });
 
+  it("opens the card on the side of the button with more room", async () => {
+    renderFooter();
+    const { slot } = await renderOverlay(() => snapshot);
+    const codex = await slot.findByRole("button", { name: "Codex: 90% used" });
+    const place = (left: number, top: number) =>
+      vi.spyOn(codex, "getBoundingClientRect").mockReturnValue({
+        left,
+        right: left + 40,
+        top,
+        bottom: top + 24,
+      } as DOMRect);
+    const { innerWidth, innerHeight } = window;
+
+    // A footer at the bottom-left of the window.
+    place(100, innerHeight - 40);
+    fireEvent.click(codex);
+    let card = slot.getByRole("dialog", { name: "Codex usage" });
+    expect(card.dataset.side).toBe("top");
+    expect(card.style.bottom).toBe("46px");
+    expect(card.style.left).toBe("100px");
+    fireEvent.click(codex);
+
+    // A footer at the top-right, as on a phone with the footer moved up.
+    place(innerWidth - 60, 8);
+    fireEvent.click(codex);
+    card = slot.getByRole("dialog", { name: "Codex usage" });
+    expect(card.dataset.side).toBe("bottom");
+    expect(card.style.top).toBe("38px");
+    expect(card.style.right).toBe("20px");
+    expect(card.style.left).toBe("");
+  });
+
   it("keeps the footer icon when usage can't be summarized", async () => {
     const { row, icon } = renderFooter();
     const { slot } = await renderOverlay(() => empty);
