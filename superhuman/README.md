@@ -14,11 +14,9 @@ has a key. It adds eight features:
 - **Terminal Paste**: a Paste button for the terminal on phones and tablets.
 - **Server Switcher**: a **Change Server** button in the sidebar footer that
   opens your next online server on bb connect.
-- **Phone Layout**: on a phone, BB's bars at the bottom of the screen, within
-  reach of the thumb, and a right panel that slides in beside the page.
-- **Zoom Lock**: a page that stays at 100%, off until you turn it on.
-- **UI Polish**: one tone for the icons in BB's bars, even menu rows, and a
-  Safari layout fix.
+- **Phone Layout**: BB's bars at the bottom of a phone's screen.
+- **Zoom Lock**: no zooming the page, off by default.
+- **UI Polish**: even icons and menu rows.
 
 The plugin's settings turn off the keyboard features and Phone Layout, and turn
 on Zoom Lock. The others are always on, though BB's Navigation setting can bring
@@ -162,44 +160,15 @@ elsewhere, or Escape closes the field.
 
 ### Phone Layout
 
-On a phone, the bars BB puts at the top of the screen move to the bottom:
-
-- **Page header**: the header of a thread, Settings, Plugins, Skills, and
-  plugin pages, with the sidebar button. On the home page, the sidebar and right
-  panel buttons.
-- **Right panel**: the row of tabs and buttons, below the panel's content. A
-  new tab stacks its search field, actions, and recent files up from that row.
-- **Dia Sidebar**: the grid of icons, level with a page's header. The sidebar
-  footer takes the top.
-
-The right panel slides in beside the page at the screen's full width, as the
-sidebar does from the left, and the sidebar button moves with the page. The
-sidebars drop BB's row with the back and forward buttons. While the on-screen
-keyboard is open, the bars hide and leave the room to the page.
-
-A phone is a touch screen narrower than 768 px; tablets and desktops keep BB's
-layout. **Phone layout** in the plugin's settings turns the feature off.
+On a phone, BB's bars move to the bottom of the screen.
 
 ### Zoom Lock
 
-Turn on **Zoom lock** in the plugin's settings to keep the page at 100%: a
-pinch, a double tap, or a focused text field with small type doesn't zoom it. It
-takes pinch zoom away, so it starts off.
+When on, pinches and double taps don't zoom the page.
 
 ### UI Polish
 
-UI Polish is always on:
-
-- **Icon tone**: the icons in the page header, the right panel's row, and the
-  sidebar's top buttons and footer share one tone, BB's subtle foreground,
-  instead of three. Selected ones stay brighter.
-- **Menu rows**: the rows of the navigation's **More** menu match BB's other
-  menus, 26 px on a desktop and 36 px on a phone. On a phone, a picker's list,
-  such as the branches in the thread info panel, takes the same rows.
-- **Right panel icons**: on a phone, the right panel's buttons have the page
-  header's 20 px icons.
-- **Safari**: the thread info panel's **Environment** row lines up with the
-  others.
+The icons in BB's bars share one tone, and menus share one row height.
 
 ## How it works
 
@@ -330,47 +299,15 @@ can't list or select servers, so the desktop app gets no button.
 
 ### Phone Layout
 
-- An app overlay reads the setting and, while it's on, sets `data-phone-layout`
-  on `<html>`. `phone-layout/app.css` and `phone-layout/slide.css` apply only
-  under that attribute and `@media (width < 48rem) and (pointer: coarse)`.
-- The bars move with `order` and `flex-direction: column-reverse`, so focus
-  order and screen readers keep BB's.
-- The sidebar button is a fixed overlay. CSS anchor positioning puts it on the
-  page header's row; without anchor positioning, it sits on the bottom inset.
-  BB moves the page with inline styles and classes as the sidebar or the right
-  panel opens, so `phone-layout/layout.ts` copies the page's left edge into the
-  button's `translate` on each frame while the page moves.
-- `slide.css` gives the right panel the screen's width and slides it in with
-  `translate`. BB's swipe closes the panel by moving the page with an inline
-  `translate`, which `phone-layout/slide.ts` copies onto the panel.
-- BB sets `--bb-safe-area-bottom` on `<body>` only while the on-screen keyboard
-  is open, and the bars hide while it's set.
-- Selectors are BB 0.43.4's `data-testid`, `data-sidebar`, and ARIA labels.
-  When a BB update changes them, a bar stays where BB puts it.
+CSS restyles BB's markup on touch screens under 768 px wide.
 
 ### Zoom Lock
 
-`zoom-lock/lock.ts` appends `maximum-scale=1, user-scalable=no` to BB's viewport
-meta tag. BB's mobile app and an installed web app honor it, which also stops
-the zoom into a text field with small type. A Safari tab ignores those limits,
-so the lock also cancels `gesturestart` and `gesturechange` for a pinch, and
-sets `touch-action: manipulation` on the page for a double tap. Turning the
-setting off restores all three.
+It sets `user-scalable=no` and cancels Safari's pinch gestures.
 
 ### UI Polish
 
-UI Polish is `ui-polish/app.css` alone and registers nothing.
-
-- The icon tone applies to BB's icons, `svg[data-icon-root]`, in buttons and
-  links that aren't pressed, current, or active, so other plugins' images keep
-  their colors. It also clears the fade BB puts on the footer's icons.
-- The menu rows target `[aria-label="More sidebar navigation"]` and, in BB's
-  bottom sheet, `data-persistent-drawer-content`. A picker's rows are found by
-  BB's utility classes, so a BB update that changes them brings back BB's rows.
-- BB wraps some icons, such as the Environment row's, in a box at least as big
-  as its content. Safari takes the icon's own 24 px for that size, and the box
-  pushes the label aside. The fix drops the box's least size, so it keeps the
-  size BB gives it.
+CSS only.
 
 ## Install
 

@@ -54,12 +54,11 @@ connect account. In the BB mobile app, a tap opens **This device**, where
 
 ## Phone layout
 
-On a phone, the page's header, the right panel's tabs, and Dia Sidebar's icons
-move to the bottom of the screen, and the right panel slides in beside the page.
+On a phone, BB's bars move to the bottom of the screen.
 
 ## Zoom lock
 
-When you turn it on, the page stays at 100%: pinches and double taps don't zoom.
+When on, pinches and double taps don't zoom the page.
 
 ## Polish
 
