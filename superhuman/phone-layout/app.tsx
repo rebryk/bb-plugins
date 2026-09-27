@@ -5,15 +5,24 @@ import { startPanelSlide } from "./slide";
 import "./app.css";
 import "./slide.css";
 
-// The setting reaches the page through this React bridge.
+// The settings reach the page through this React bridge.
 function PhoneLayout() {
   const { values } = useSettings();
   const enabled = values?.phoneLayout !== false;
+  const title = values?.threadTitle !== false;
   useEffect(() => {
     if (!enabled) return;
     const stops = [startPhoneLayout(document), startPanelSlide(document)];
     return () => stops.forEach((stop) => stop());
   }, [enabled]);
+  useEffect(() => {
+    if (title) return;
+    const root = document.documentElement;
+    root.dataset.hideThreadTitle = "";
+    return () => {
+      delete root.dataset.hideThreadTitle;
+    };
+  }, [title]);
   return null;
 }
 

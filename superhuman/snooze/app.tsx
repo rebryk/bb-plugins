@@ -511,7 +511,7 @@ function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
       aria-label={label}
       title={label}
       onClick={() => openDialog({ kind: "snooze", threadId })}
-      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)]/75 transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
+      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)] transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
     >
       <HugeiconsIcon
         icon={Moon02Icon}

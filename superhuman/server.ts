@@ -3,7 +3,7 @@ import registerSnoozeServer from "./snooze/server";
 
 export default async function plugin(bb: BbPluginApi) {
   // The browser reads these: the keyboard features in hotkeys/controller.ts,
-  // the zoom lock and the phone layout in their app.tsx.
+  // the rest in their features' app.tsx.
   bb.settings.define({
     threadShortcuts: {
       type: "boolean",
@@ -27,6 +27,18 @@ export default async function plugin(bb: BbPluginApi) {
       type: "boolean",
       label: "Phone layout",
       description: "On a phone, the bars move to the bottom.",
+      default: true,
+    },
+    threadTitle: {
+      type: "boolean",
+      label: "Thread title",
+      description: "On a phone, the bar shows the thread's title.",
+      default: true,
+    },
+    archiveButton: {
+      type: "boolean",
+      label: "Archive button",
+      description: "An Archive button next to Snooze.",
       default: true,
     },
   });

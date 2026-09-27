@@ -1,0 +1,4 @@
+/* With the setting off, the button's empty group takes no gap in the row. */
+[data-bb-plugin="superhuman"] > span[role="group"]:empty {
+  display: none;
+}

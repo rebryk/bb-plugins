@@ -33,7 +33,7 @@ it("registers every feature under an id of its own", async () => {
       "phone-layout",
     ],
     sidebarNavigations: ["dia-sidebar"],
-    threadHeaderActions: ["snooze"],
+    threadHeaderActions: ["snooze", "archive"],
     commands: ["open-plugins", "snooze-thread", "show-snoozed-threads"],
     sidebarFooterItems: ["change-server"],
   });

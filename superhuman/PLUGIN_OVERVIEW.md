@@ -3,12 +3,15 @@ Superhuman-style features for BB:
 - **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and
   number keys for a new thread's menus.
 - **Snooze.** Hide a thread until a set time or until its agent needs you.
+- **Archive Button.** Archive a thread from its header, next to Snooze.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Phone Layout.** BB's bars at the bottom of a phone's screen.
+- **Phone Layout.** BB's bars at the bottom of a phone's screen, with or
+  without the thread's title.
 - **Zoom Lock.** No zooming the page, off by default.
-- **UI Polish.** Even icons and menu rows.
+- **UI Polish.** Icons in one tone, including other plugins' in the thread
+  header, and even menu rows.
 
 ## More San Francisco Plugins
 
