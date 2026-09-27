@@ -1678,8 +1678,8 @@ main:has([data-testid^="plugin-detail-"] .rounded-md.border > .space-y-4 > [data
 
 /* While it waits, its row takes the swatches' layout, so nothing below moves
    when they arrive: a 240 px label beside a 260 × 50 strip, or a 28 px strip
-   under it in rows under 520 px (keep in step with accent-picker.tsx). Phones
-   stack both alike. */
+   under it in rows under 520 px (accent-picker.tsx's PICKER_PLACE, which
+   npm test compares). Phones stack both alike. */
 @media (min-width: 640px) {
   [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) {
     container: sf-accent-wait / inline-size;

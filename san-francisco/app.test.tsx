@@ -11,7 +11,7 @@ import {
   renderSlot,
   type RenderSlotOptions,
 } from "@get-bb/plugin-sdk/testing/app";
-import { ACCENTS, ACCENT_ATTRIBUTE, ACCENT_STORAGE_KEY, DEFAULT_ACCENT } from "./accents";
+import { ACCENTS, ACCENT_ATTRIBUTE, ACCENT_SETTING, ACCENT_STORAGE_KEY, DEFAULT_ACCENT, PLUGIN_ID } from "./accents";
 
 // Node's own localStorage, which needs a backing file, hides jsdom's; the
 // tests get an in-memory one.
@@ -405,6 +405,41 @@ describe("accent picker", () => {
     expect(again.slot.getByRole("alert").textContent).toContain("Settings are read-only");
   });
 
+  it("still sends a newer pick when an older one fails to save", async () => {
+    const pending: { resolve: () => void; reject: (error: Error) => void }[] = [];
+    const save: UpdateSettings = ({ values }) =>
+      new Promise((resolve, reject) => pending.push({ resolve: () => resolve({ values }), reject }));
+    const { radio, checked, saved, slot } = await renderPicker({ save });
+    fireEvent.click(radio("Green"));
+    fireEvent.click(radio("Red"));
+    await act(async () => pending.shift()!.reject(new Error("Network error")));
+    expect(saved().map((args) => (args as { values: { accent: string } }).values.accent)).toEqual(["Green", "Red"]);
+    expect(checked()).toEqual(["Red"]);
+    expect(accentAttribute()).toBe("red");
+    await act(async () => pending.shift()!.resolve());
+    expect(checked()).toEqual(["Red"]);
+    expect(slot.queryByRole("alert")).toBeNull();
+  });
+
+  it("follows the setting when it moves to an accent this window didn't send", async () => {
+    const pending: (() => void)[] = [];
+    const save: UpdateSettings = ({ values }) => new Promise((resolve) => pending.push(() => resolve({ values })));
+    const first = await renderPicker({ save });
+    fireEvent.click(first.radio("Green"));
+    fireEvent.click(first.radio("Orange"));
+    await act(async () => pending.shift()!());
+    await act(async () => pending.shift()!());
+    cleanup();
+    // The setting passing through an accent sent before keeps the pick.
+    const passing = await renderPicker({ settings: { accent: "Green" }, save });
+    expect(passing.checked()).toEqual(["Orange"]);
+    cleanup();
+    // Another window's pick replaces it.
+    const moved = await renderPicker({ settings: { accent: "Purple" }, save });
+    expect(moved.checked()).toEqual(["Purple"]);
+    expect(accentAttribute()).toBe("purple");
+  });
+
   it("sends picks one at a time and ends on the last one", async () => {
     const pending: (() => void)[] = [];
     const save: UpdateSettings = ({ values }) => new Promise((resolve) => pending.push(() => resolve({ values })));
@@ -476,6 +511,9 @@ describe("accent picker keyboard", () => {
     fireEvent.keyDown(radio("Pink"), { key: "ArrowRight" });
     fireEvent.keyDown(radio("Red"), { key: "ArrowRight" });
     expect(document.activeElement).toBe(radio("Orange"));
+    // Red fails, then Orange, sent after it.
+    await act(async () => fail(new Error("Settings are read-only")));
+    expect(checked()).toEqual(["Orange"]);
     await act(async () => fail(new Error("Settings are read-only")));
     expect(checked()).toEqual(["Pink"]);
     expect(document.activeElement).toBe(radio("Pink"));
@@ -518,6 +556,26 @@ describe("theme stylesheet", () => {
     // Marks on the accent are white unless the accent says otherwise.
     if (accent.mark === DEFAULT_ACCENT.mark && accent !== DEFAULT_ACCENT) expect(body).not.toContain("--sf-on-accent:");
     else expect(body).toContain(`--sf-on-accent: ${accent.mark};`);
+  });
+
+  it("keeps the swatches' place while it waits for them", async () => {
+    // The picker's module binds bb's runtime, which loading the app installs.
+    await loadPluginApp(() => import("./app"));
+    const { PICKER_PLACE } = await import("./accent-picker");
+    const from = (name: string) => css.match(new RegExp(`@keyframes ${name} \\{\\s*from \\{([^}]*)\\}`))?.[1] ?? "";
+    expect(from("sf-await-label")).toContain(`flex-basis: ${PICKER_PLACE.label}px;`);
+    expect(from("sf-await-strip")).toContain(`width: ${PICKER_PLACE.beside.width}px;`);
+    expect(from("sf-await-strip")).toContain(`height: ${PICKER_PLACE.beside.height}px;`);
+    expect(from("sf-await-strip-under")).toContain(`width: ${PICKER_PLACE.under.width}px;`);
+    expect(from("sf-await-strip-under")).toContain(`height: ${PICKER_PLACE.under.height}px;`);
+    expect(css).toContain(`@container sf-accent-wait (width < ${PICKER_PLACE.rowMin}px)`);
+    // It finds the plugin's page and the select by the names bb gives them.
+    const lines = css.split("\n").filter((line) => line.includes('data-testid="plugin-detail-'));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      for (const [, id] of line.matchAll(/data-testid="plugin-detail-([^"]+)"/g)) expect(id).toBe(PLUGIN_ID);
+      for (const [, label] of line.matchAll(/aria-label="([^"]+)"/g)) expect(label).toBe(ACCENT_SETTING.label);
+    }
   });
 
   it("defines, in light and dark, every token the frontend reads", () => {

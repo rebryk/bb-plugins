@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DUPLICATE_ATTRIBUTE,
   PAGE_ATTRIBUTE,
@@ -161,6 +161,11 @@ describe("findSettingsPage", () => {
     threadPage();
     expect(findSettingsPage(document)).toBeNull();
   });
+
+  it("ignores the settings layout once the address leaves settings", () => {
+    settingsPage("General", undefined, "/");
+    expect(findSettingsPage(document)).toBeNull();
+  });
 });
 
 describe("repeatsTitle", () => {
@@ -265,6 +270,33 @@ describe("watchSettingsTitle", () => {
     expect(document.querySelector(`[${PAGE_ATTRIBUTE}]`)).toBeNull();
   });
 
+  it("does nothing when its signal is already aborted", async () => {
+    const style = theme(true);
+    const { header } = settingsPage();
+    const controller = new AbortController();
+    controller.abort();
+    watchSettingsTitle(document, controller.signal);
+    await frame();
+    style.textContent = ":root { --sf-accent: #62ba46; }";
+    await frame();
+    await frame();
+    expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
+  });
+
+  it("skips document title changes", async () => {
+    theme(true);
+    const title = document.createElement("title");
+    title.textContent = "bb";
+    document.head.append(title);
+    disposers.push(watchSettingsTitle(document));
+    const styles = vi.spyOn(window, "getComputedStyle");
+    title.textContent = "(1) bb";
+    title.firstChild!.nodeValue = "(2) bb";
+    await frame();
+    expect(styles).not.toHaveBeenCalled();
+    styles.mockRestore();
+  });
+
   it("pins open menus where they were while a palette preview swaps the theme", async () => {
     const style = theme(true);
     settingsPage("Appearance");
@@ -327,11 +359,16 @@ describe("watchSettingsTitle", () => {
     await frame();
     expect(column.style.translate).toBe("");
 
-    // Closing the menu during a preview lets the page take its layout.
-    shift = { x: 3, y: -53 };
+    // A narrower window moves the trigger, and Radix the menu with it; a
+    // preview then holds the trigger at its new place.
+    shift = { x: -100, y: 0 };
+    window.dispatchEvent(new Event("resize"));
+    shift = { x: -97, y: -53 };
     style.textContent = "";
     await frame();
     expect(column.style.translate).toBe("-3px 53px");
+
+    // Closing the menu during a preview lets the page take its layout.
     menu.remove();
     await frame();
     expect(column.style.translate).toBe("");

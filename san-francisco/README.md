@@ -31,7 +31,8 @@ The theme restyles:
 - **Controls and menus**: lighter buttons, inputs and badges, selects sized to
   their text, and checkboxes filled with the accent. Menus and popovers are
   compact, and the model picker's reasoning levels are a segmented control.
-  Surfaces stay flat; only menus, popovers and the command palette cast a soft
+  Surfaces stay flat; only the composer and what floats above the page, such
+  as menus, popovers, dialogs, toasts and the command palette, cast a soft
   shadow. Provider marks keep their shape but take the text color.
 
 Dark mode follows the same rules: a near-black frame, a slightly lighter card,

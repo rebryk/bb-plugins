@@ -6,9 +6,10 @@ browser.
 The content sits on the gray window frame as one white card with soft corners.
 Text uses the system font at 14 px, SF Pro on a Mac. Hierarchy comes from
 shades of gray rather than lines: primary text is near black, and secondary
-text a softer gray. Icons use a thinner stroke, and only menus, popovers and
-the command palette cast a soft shadow. Dark mode follows the same rules, with
-a near-black frame, a slightly lighter card and near-white text.
+text a softer gray. Icons use a thinner stroke. Only the composer and what
+floats above the page, such as menus, popovers, dialogs, toasts and the
+command palette, cast a soft shadow. Dark mode follows the same rules, with a
+near-black frame, a slightly lighter card and near-white text.
 
 Text is at least as easy to read as in BB's default palette. Dark mode's card
 is lighter than BB's, so its gray text, accent text and BB's terminal, diff,

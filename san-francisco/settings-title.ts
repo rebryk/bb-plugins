@@ -59,8 +59,9 @@ export function repeatsTitle(heading: string, title: string, only: boolean) {
  * repeats the title.
  */
 export function findSettingsPage(doc: Document) {
-  if (!doc.querySelector(SETTINGS_LAYOUT)) return null;
   const path = pathname(doc, doc.location.pathname);
+  if (path !== SETTINGS_ROOT && !path.startsWith(`${SETTINGS_ROOT}/`)) return null;
+  if (!doc.querySelector(SETTINGS_LAYOUT)) return null;
   // The sidebar lists only plugins with settings; the others' pages sit below
   // Installed plugins.
   const current = doc.querySelector(CURRENT_PAGE);
@@ -144,10 +145,14 @@ function sync(doc: Document, attribute: string, target: HTMLElement | null, valu
 export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => void {
   let frame = 0;
   let body: MutationObserver | null = null;
+  // Whether the last pass marked a page, so passes elsewhere skip the scans.
+  let marked = false;
 
   function apply() {
     frame = 0;
     const page = body ? findSettingsPage(doc) : null;
+    if (!page && !marked) return;
+    marked = page !== null;
     sync(doc, PAGE_ATTRIBUTE, page?.header ?? null, page?.name ?? null);
     sync(doc, PARENT_ATTRIBUTE, page?.header ?? null, page?.parent ?? null);
     sync(doc, TITLE_ATTRIBUTE, page?.column ?? null, page?.title ?? null);
@@ -170,6 +175,14 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
     for (const popper of doc.querySelectorAll(POPPER)) {
       const trigger = anchors.has(popper) ? null : findTrigger(doc, popper);
       if (trigger) anchors.set(popper, { trigger, rect: trigger.getBoundingClientRect() });
+    }
+  }
+
+  /** Takes the triggers' places again after the page moved without a theme change. */
+  function remeasure() {
+    for (const popper of doc.querySelectorAll(POPPER)) {
+      const anchor = anchors.get(popper);
+      if (anchor?.trigger.isConnected) anchor.rect = anchor.trigger.getBoundingClientRect();
     }
   }
 
@@ -225,6 +238,7 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
       body = null;
     }
     if (!changed) {
+      remeasure();
       schedule();
       return;
     }
@@ -232,13 +246,21 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
     // measure it before Radix follows the moved triggers.
     if (frame) cancelAnimationFrame(frame);
     apply();
-    pinPoppers(doc, new Set([...doc.querySelectorAll(POPPER)].filter(hold)));
+    const kept = new Set<Element>();
+    for (const popper of doc.querySelectorAll(POPPER)) if (hold(popper)) kept.add(popper);
+    pinPoppers(doc, kept);
     if (!pinStyle.isConnected && doc.querySelector(`[${PINNED_ATTRIBUTE}]`)) doc.head.append(pinStyle);
   }
 
-  const head = new MutationObserver(refreshActive);
+  // The document title changes often and never carries a theme.
+  const inTitle = (node: Node) => node.nodeName === "TITLE" || node.parentNode?.nodeName === "TITLE";
+  const head = new MutationObserver((records) => {
+    if (!records.every((record) => inTitle(record.target))) refreshActive();
+  });
   head.observe(doc.head, { childList: true, subtree: true, characterData: true });
   refreshActive();
+  const view = doc.defaultView;
+  view?.addEventListener("resize", remeasure);
 
   let disposed = false;
   function dispose() {
@@ -246,6 +268,7 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
     disposed = true;
     head.disconnect();
     poppers.disconnect();
+    view?.removeEventListener("resize", remeasure);
     body?.disconnect();
     body = null;
     if (frame) cancelAnimationFrame(frame);
@@ -260,6 +283,7 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
       sync(doc, attribute, null, null);
     }
   }
-  signal?.addEventListener("abort", dispose, { once: true });
+  if (signal?.aborted) dispose();
+  else signal?.addEventListener("abort", dispose, { once: true });
   return dispose;
 }

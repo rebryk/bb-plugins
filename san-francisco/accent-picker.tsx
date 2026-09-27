@@ -3,9 +3,10 @@ import { useEffect, useId, useRef, useSyncExternalStore, type CSSProperties, typ
 import { ACCENTS, ACCENT_ATTRIBUTE, ACCENT_SETTING, PLUGIN_ID, accentOf, rememberedAccent, type Accent } from "./accents";
 
 /*
- * A pick shows at once and stays until the saved setting catches up. Writes go
- * out one at a time, and only the latest pick is sent after a running one, so
- * the setting ends on the last swatch chosen and never flickers back.
+ * A pick shows at once and stays until the saved setting catches up, or moves
+ * to an accent this window didn't send, as when another window picks one.
+ * Writes go out one at a time, and only the latest pick is sent after a running
+ * one, so the setting ends on the last swatch chosen and never flickers back.
  */
 interface Pick {
   accent: Accent | null;
@@ -15,6 +16,10 @@ interface Pick {
 
 let pick: Pick = { accent: null, saving: false, error: null };
 let queued: Accent | null = null;
+// The accents sent since the last pick settled, which the setting passes through.
+const sent = new Set<Accent>();
+// The saved accent last seen, to tell when the setting moves.
+let lastSaved: Accent | null = null;
 const listeners = new Set<() => void>();
 
 function update(next: Partial<Pick>) {
@@ -33,22 +38,26 @@ const snapshot = () => pick;
 export const pickedAccent = () => pick.accent;
 
 async function choose(accent: Accent, save: (accent: Accent) => Promise<unknown>) {
+  if (!pick.accent) sent.clear();
   queued = accent;
   update({ accent, error: null });
   if (pick.saving) return;
   update({ saving: true });
-  try {
-    while (queued) {
-      const next = queued;
-      queued = null;
-      await save(next);
-    }
-    update({ saving: false });
-  } catch (cause) {
-    // Back to the saved accent.
+  let error: string | null = null;
+  while (queued) {
+    const next = queued;
     queued = null;
-    update({ accent: null, saving: false, error: cause instanceof Error ? cause.message : String(cause) });
+    sent.add(next);
+    try {
+      await save(next);
+      error = null;
+    } catch (cause) {
+      // A newer pick goes out anyway; only the last write's failure counts.
+      error = cause instanceof Error ? cause.message : String(cause);
+    }
   }
+  // After a failure, back to the saved accent.
+  update(error === null ? { saving: false } : { accent: null, saving: false, error });
 }
 
 /** The accent <html> shows before the setting loads, if that is known. */
@@ -67,7 +76,10 @@ export function useAccent(): Accent | null {
   const saved = values ? accentOf(values[ACCENT_SETTING.key]) : null;
 
   useEffect(() => {
-    if (current.accent && !current.saving && current.accent === saved) update({ accent: null });
+    if (!saved) return;
+    const moved = lastSaved !== null && saved !== lastSaved && !sent.has(saved);
+    lastSaved = saved;
+    if (current.accent && !current.saving && (current.accent === saved || moved)) update({ accent: null });
   }, [current, saved]);
 
   return current.accent ?? (values ? saved : shownAccent());
@@ -79,8 +91,9 @@ const GAP = 12;
 const MIN_GAP = 8;
 const STRIP = ACCENTS.length * SWATCH + (ACCENTS.length - 1) * GAP;
 const MIN_STRIP = ACCENTS.length * SWATCH + (ACCENTS.length - 1) * MIN_GAP;
-// Beside the label, the selected accent's name hangs 22px under its swatch,
-// clear of a focus ring.
+// Beside the label, the strip keeps a little room above the swatches, and the
+// selected accent's name hangs 22px under its swatch, clear of a focus ring.
+const STRIP_TOP = 4;
 const NAME_SPACE = 24;
 // Under the label, the strip is as tall as bb's select for the setting, so
 // nothing below moves when it takes the select's place, and the name follows
@@ -90,8 +103,17 @@ const NAME_WIDTH = 48;
 const LINE_NAME_ROOM = GAP + NAME_WIDTH;
 // The strip sits beside the label (sm:basis-60, sm:gap-x-5) from ROW_MIN on.
 // Below NAME_ROW_MIN the name no longer fits on the strip's line and is left out.
-const ROW_MIN = 240 + 20 + STRIP;
+const LABEL = 240;
+const ROW_MIN = LABEL + 20 + STRIP;
 const NAME_ROW_MIN = MIN_STRIP + LINE_NAME_ROOM;
+
+/** The swatches' place in the row, which the theme keeps while it waits for them. */
+export const PICKER_PLACE = {
+  label: LABEL,
+  beside: { width: STRIP, height: STRIP_TOP + SWATCH + NAME_SPACE },
+  under: { width: STRIP + LINE_NAME_ROOM, height: CONTROL },
+  rowMin: ROW_MIN,
+};
 // The selected swatch's ring, 2px out from it. The gap shows whatever is behind,
 // so the ring suits bb's white cards and gray wells alike.
 const RING = 2;
@@ -133,7 +155,7 @@ const PICKER_CSS = `
   gap: ${NAME_SPACE}px ${MIN_GAP}px;
   width: ${STRIP}px;
   max-width: 100%;
-  padding: 4px 0 ${NAME_SPACE}px;
+  padding: ${STRIP_TOP}px 0 ${NAME_SPACE}px;
 }
 
 [data-sf-accent-picker] > span {
