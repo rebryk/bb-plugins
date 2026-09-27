@@ -1,0 +1,212 @@
+/*
+ * Phones only: BB's compact layout on a touch screen, while the Phone layout
+ * setting is on. Every selector targets BB's own markup, which isn't a
+ * versioned API; when a BB update changes it, a bar stays where BB puts it.
+ */
+@media (width < 48rem) and (pointer: coarse) {
+  html[data-phone-layout] {
+    /*
+     * BB stacks a page's header and its content in one column: a thread,
+     * Settings, Plugins, Skills and every plugin page. The header keeps BB's
+     * look; only its hairline moves to the edge that faces the content.
+     */
+    header:has(> [data-testid="app-page-header-content-row"]) {
+      order: 1;
+      border-top-width: 1px;
+      border-bottom-width: 0;
+
+      > [data-testid="app-page-header-content-row"] {
+        anchor-name: --bottom-bar;
+      }
+    }
+
+    /*
+     * BB sets --bb-safe-area-bottom on <body> only while the on-screen keyboard
+     * is open. The bar gives its room to the page until the keyboard closes.
+     */
+    body[style*="--bb-safe-area-bottom"]
+      header:has(> [data-testid="app-page-header-content-row"]) {
+      display: none;
+    }
+
+    /*
+     * The sidebar button is a fixed overlay at the top left. It moves down with
+     * the bar.
+     */
+    [data-testid="app-layout-root"]:has(
+        > main header > [data-testid="app-page-header-content-row"]
+      )
+      > [data-testid="app-sidebar-trigger-overlay"] {
+      position-anchor: --bottom-bar;
+      top: anchor(top);
+
+      @supports not (anchor-name: --bottom-bar) {
+        top: auto;
+        /* The row overhangs the bar's bottom by the hairline's pixel. */
+        bottom: calc(env(safe-area-inset-bottom, 0px) - 1px);
+      }
+
+      body[style*="--bb-safe-area-bottom"] & {
+        display: none;
+      }
+    }
+
+    /*
+     * The home page has no header, only the sidebar and right panel buttons at
+     * its top corners. They move to a row of the header's height at the bottom,
+     * where a header's buttons would be.
+     */
+    main:has(> div > [aria-label*="right panel"]) {
+      padding-bottom: var(--bb-app-chrome-row-height);
+
+      > div:has(> [aria-label*="right panel"]) {
+        top: auto;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 5px);
+      }
+
+      body[style*="--bb-safe-area-bottom"] & {
+        padding-bottom: calc(var(--spacing, 0.25rem) * 4);
+
+        > div:has(> [aria-label*="right panel"]) {
+          display: none;
+        }
+      }
+    }
+
+    [data-testid="app-layout-root"]:has(
+        > main main > div > [aria-label*="right panel"]
+      )
+      > [data-testid="app-sidebar-trigger-overlay"] {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) - 1px);
+
+      body[style*="--bb-safe-area-bottom"] & {
+        display: none;
+      }
+    }
+
+    /*
+     * Down in the bar, the sidebar button stays on the page as the sidebar or
+     * the right panel pushes the page aside. layout.ts moves it with the page.
+     */
+    [data-testid="app-layout-root"]:has(
+        > main :is(header > [data-testid="app-page-header-content-row"], main > div > [aria-label*="right panel"])
+      )
+      > [data-testid="app-sidebar-trigger-overlay"] {
+      &[data-panel-shelf] {
+        visibility: visible;
+      }
+
+      body:not([style*="--bb-safe-area-bottom"])
+        [data-testid="app-layout-root"]:has(> main[data-sidebar-shelf="open"])
+        > & {
+        display: flex;
+      }
+
+      body[style*="--bb-safe-area-bottom"] & {
+        display: none;
+      }
+    }
+
+    /*
+     * The right panel's row of tabs and buttons moves below its content, and
+     * what BB shows under the row, such as a diff's summary, moves above it.
+     * The row takes the header's shape, so its button to hide the panel sits
+     * where the page's button to show it does: a hairline on top, a row that
+     * overhangs the bottom by the hairline's pixel, and the header's inset on
+     * the right.
+     */
+    [data-testid="secondary-panel-shelf"]
+      aside
+      > :has(> [data-testid="thread-secondary-panel-top-chrome"]) {
+      order: 1;
+      display: flex;
+      flex-direction: column-reverse;
+
+      > [data-testid="thread-secondary-panel-top-chrome"] {
+        flex-shrink: 0;
+        height: calc(var(--bb-app-chrome-row-height) + 1px);
+        margin-bottom: -1px;
+        border-top: 1px solid
+          color-mix(in oklab, var(--border-seam-vertical) 60%, transparent);
+        padding-right: calc(var(--spacing, 0.25rem) * 4);
+      }
+
+      body[style*="--bb-safe-area-bottom"] & {
+        display: none;
+      }
+    }
+
+    /*
+     * A new tab stacks its blocks up from that row: the search field, then the
+     * actions, then the recent files. It opens scrolled to the bottom.
+     */
+    [data-testid="secondary-panel-shelf"]
+      :has(> * > * > [data-testid="new-tab-actions"]) {
+      display: flex;
+      flex-direction: column-reverse;
+
+      > * {
+        justify-content: flex-end;
+      }
+
+      > * > :has(> [data-testid="new-tab-actions"]) {
+        flex-direction: column-reverse;
+      }
+    }
+
+    /*
+     * Phones turn the sidebar upside down: the footer goes to the top and the
+     * grid to the bottom, within reach of the thumb, in place of the row with
+     * the sidebar button and the back and forward buttons. Only the visual order
+     * changes; focus and screen readers keep BB's.
+     */
+    [data-testid="app-sidebar-body"]:has(> [data-testid="sidebar-navigation-region"] [data-dia-sidebar]) {
+      > [data-sidebar="footer"] {
+        order: -1;
+        /* A footer item's panel opens below the row instead of above it. */
+        flex-direction: column-reverse;
+
+        /* Items that don't fit wrap below the row instead of above it. */
+        > [data-sidebar="menu"] { flex-wrap: wrap; }
+      }
+      /*
+       * The divider and the grid's bottom row take the shape of BB's header, so
+       * they line up with a thread's header at the bottom of the page. The
+       * header's hairline is part of its height, and its buttons center in a
+       * full-height row below the hairline, overhanging the bottom by a pixel.
+       */
+      > [data-testid="app-sidebar-navigation-divider"] {
+        order: 1;
+        margin-bottom: 0;
+      }
+      > [data-testid="sidebar-navigation-region"] {
+        order: 2;
+
+        [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
+          --dia-sidebar-row-inset: calc((var(--bb-app-chrome-row-height) - var(--dia-sidebar-button-size)) / 2);
+          padding-top: var(--dia-sidebar-row-inset);
+          padding-bottom: calc(var(--dia-sidebar-row-inset) - 1px);
+        }
+      }
+
+      /* The thread list fades out under the footer, now at its top edge. */
+      > [data-sidebar="footer"] > [data-overflow-fade] {
+        top: 100%;
+        transform: scaleY(-1);
+      }
+    }
+
+    /*
+     * Phones drop the row with the back and forward buttons from every sidebar:
+     * the app's, Settings', Plugins' and Skills'.
+     */
+    [data-testid$="-sidebar-top-reserve-row"] { display: none; }
+
+    /* The sidebar button hides with its row; a tap outside the sidebar closes it. */
+    [data-testid="app-layout-root"]:has(> [data-sidebar="panel"][data-state="open"] [data-dia-sidebar])
+      > [data-testid="app-sidebar-trigger-overlay"] {
+      display: none;
+    }
+  }
+}

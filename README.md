@@ -8,6 +8,7 @@ them.
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
+bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
@@ -18,8 +19,20 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-Both suit any BB setup. With Account Pooler, Pool Usage counts every pooled
-account.
+All three suit any BB setup. With Account Pooler, Pool Usage counts every pooled
+account, and with more than one server on bb connect, Superhuman's Change Server
+button switches between them.
+
+### [Superhuman](./superhuman)
+
+Superhuman-style speed for BB: hints with the remaining keys of visible
+shortcuts, slash to search threads, and number keys that set up a new thread's
+project, model, machine, and branch; a moon button that snoozes a thread until a
+time you pick or until its agent needs you; a compact, wrapping grid of
+navigation icons; BB's bars at the bottom of a phone's screen; a Paste button
+for the terminal on phones and tablets; a Change Server button in the sidebar
+footer; a zoom lock; and one tone for BB's icons. The plugin's settings turn off
+the keyboard features and the phone layout, and turn on the zoom lock.
 
 ### [Bookmarks](./bookmarks)
 

@@ -1,0 +1,114 @@
+/* paste.ts puts the button among BB's own buttons in a pane's header, and
+   styles it the same way: 28px, and 36px on phones, where the right panel
+   opens as a drawer. */
+.terminal-paste-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: transparent;
+  color: var(--subtle-foreground);
+  color: color-mix(in oklab, var(--subtle-foreground) 75%, transparent);
+  cursor: pointer;
+  transition:
+    color 150ms,
+    background-color 150ms;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Touch screens would keep the hover look after a tap. */
+@media (hover: hover) {
+  .terminal-paste-button:hover {
+    background: var(--state-hover);
+    color: var(--muted-foreground);
+    transition-duration: 0s;
+  }
+}
+.terminal-paste-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--ring);
+}
+.terminal-paste-button svg {
+  width: 1rem;
+  height: 1rem;
+  pointer-events: none;
+}
+@media (width < 48rem) and (pointer: coarse) {
+  .terminal-paste-button {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+}
+
+/* The field for the system's own Paste, at the top of the screen. It looks like
+   BB's menus. */
+.terminal-paste-sheet {
+  position: fixed;
+  z-index: 2147483647;
+  top: calc(env(safe-area-inset-top) + 8px);
+  right: 8px;
+  left: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans, system-ui);
+  font-size: var(--text-xs, 0.75rem);
+  line-height: var(--text-xs--line-height, 1rem);
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-paste-sheet button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: calc(var(--radius, 0.5rem) - 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  touch-action: manipulation;
+}
+.terminal-paste-sheet button:active {
+  background: var(--state-active);
+}
+.terminal-paste-sheet textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 7rem;
+  padding: 8px;
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  outline: none;
+  background: transparent;
+  color: inherit;
+  /* Below 16px, iOS zooms the page into a focused field. */
+  font: 16px/1.4 var(--font-mono, monospace);
+  resize: none;
+}
+.terminal-paste-sheet textarea:focus {
+  border-color: var(--ring);
+}
+.terminal-paste-sheet div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.terminal-paste-sheet button:last-child {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.terminal-paste-sheet button:last-child:active {
+  opacity: 0.9;
+}
