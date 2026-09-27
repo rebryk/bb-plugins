@@ -100,6 +100,6 @@ request to [get-bb/marketplace](https://github.com/get-bb/marketplace) as well.
   zoom.
 - A feature's tests load it alone with
   `loadPluginApp(asPluginApp(() => import("./app")))`, from `testing.ts`.
-- In the README, `## Use` and `## How it works` have a `###` section per
-  feature, in the order of the intro's list. In the overview, each feature has
-  its own `##` sections.
+- The README and overview stay short: one intro line and a list of features,
+  each a bold name, a period, and one line. The README has no `## Use` or
+  `## How it works`.
