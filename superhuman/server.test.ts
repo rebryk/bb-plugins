@@ -16,6 +16,8 @@ it("defines the toggles and starts Snooze", async () => {
     ["shortcutHints", "boolean", true],
     ["zoomLock", "boolean", false],
     ["phoneLayout", "boolean", true],
+    ["threadTitle", "boolean", true],
+    ["archiveButton", "boolean", true],
   ]);
   expect(registrations.rpcMethods.sort()).toEqual([
     "listSnoozes",

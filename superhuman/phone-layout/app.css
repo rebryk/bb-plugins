@@ -210,3 +210,12 @@
     }
   }
 }
+
+/* With the Thread title setting off, a phone's thread bar has no title. */
+@media (width < 48rem) and (pointer: coarse) {
+  html[data-hide-thread-title]
+    [data-testid="app-page-header-content-row"]
+    div:has(> .bb-thread-title) {
+    display: none;
+  }
+}

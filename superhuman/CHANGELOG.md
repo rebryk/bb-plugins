@@ -3,6 +3,13 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.1 (2026-09-26)
+
+- New: Archive Button, an Archive button next to Snooze in the thread header.
+- New setting: Thread title, to hide the thread's title in a phone's bar.
+- Snooze's button, and other plugins' buttons in the thread header such as
+  Bookmarks', take the tone of BB's own icons.
+
 ## 0.1.0 (2026-09-26)
 
 - First release. It brings the Super Hotkeys, Snooze, Dia Sidebar, Terminal
