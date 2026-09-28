@@ -1,0 +1,13 @@
+/* The host reserves space for Archive and its menu on hover. Snooze adds one
+   more 28px control and a 2px gap; keep long titles clear of all three. */
+@media (width >= 48rem), (pointer: fine) {
+  :root
+    .bb-sidebar-hover-actions-row:has([data-superhuman-snooze-button]):is(
+      :hover,
+      :has(:focus-visible),
+      :has(.bb-sidebar-hover-actions[data-sidebar-hover-actions-open="true"])
+    )
+    > :has(> [data-sidebar-thread-id]) {
+    padding-right: calc(var(--spacing, 0.25rem) * 15);
+  }
+}
