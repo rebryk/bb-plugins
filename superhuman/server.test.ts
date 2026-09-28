@@ -19,6 +19,7 @@ it("defines the toggles and starts Snooze", async () => {
     ["threadTitle", "boolean", true],
     ["archiveButton", "boolean", true],
     ["codeCopy", "boolean", true],
+    ["threadPrefetch", "boolean", true],
   ]);
   expect(registrations.rpcMethods.sort()).toEqual([
     "listSnoozes",

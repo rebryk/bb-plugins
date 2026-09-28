@@ -7,6 +7,7 @@ import registerPhoneLayout from "./phone-layout/app";
 import registerServerSwitcher from "./server-switcher/app";
 import registerSnooze from "./snooze/app";
 import registerTerminalPaste from "./terminal-paste/app";
+import registerThreadPrefetch from "./thread-prefetch/app";
 import registerUiPolish from "./ui-polish/app";
 import registerZoomLock from "./zoom-lock/app";
 
@@ -22,4 +23,5 @@ export default definePluginApp((app) => {
   registerZoomLock(app);
   registerPhoneLayout(app);
   registerUiPolish(app);
+  registerThreadPrefetch(app);
 });

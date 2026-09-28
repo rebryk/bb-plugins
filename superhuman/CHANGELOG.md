@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.7 (2026-09-27)
+
+- Preload Threads loads up to four recent dialogue segments before navigation
+  and refreshes them when a background thread completes. Older history loads
+  normally when scrolling back. It uses BB 0.44.0's existing memory cache,
+  without marking threads read or changing BB's source. The setting is on by
+  default and pauses with a hidden page, offline connection, or Data Saver.
+- Speculative history has a bounded size and count. Foreground loading takes
+  priority, and obsolete responses cannot overwrite newer cached data. Newer
+  threads stay cached under memory pressure without repeatedly fetching evicted
+  history. An already-connected subscription preserves the existing cache.
+
 ## 0.1.6 (2026-09-27)
 
 - UI Polish hides BB's git action, such as Commit, and the external editor
