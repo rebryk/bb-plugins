@@ -6,8 +6,8 @@
 @media (width < 48rem) and (pointer: coarse) {
   html[data-phone-layout] {
     /*
-     * The bars' buttons are bigger than BB's, to suit a thumb: 44px with 24px
-     * icons, in bars 56px tall.
+     * Buttons bigger than BB's, to suit a thumb: 44px with 24px icons, in rows
+     * 56px tall, as in the sidebar's grid.
      */
     --phone-layout-bar-height: calc(var(--spacing, 0.25rem) * 14);
     --phone-layout-button-size: calc(var(--spacing, 0.25rem) * 11);
@@ -15,14 +15,40 @@
     --phone-layout-button-gap: calc(var(--spacing, 0.25rem) * 0.5);
 
     /*
+     * The bars float as cards in the shape of a thread's message box: as far
+     * from the screen's sides, as round, with its border and shadow, and as
+     * tall as the box is while it shows one line. Their buttons take the size
+     * of the box's own, 40px, and sit as far from a card's sides as from its
+     * top and bottom; a title starts where the box's text does. A card keeps
+     * the box's distance from the screen's bottom, or the room for the home
+     * indicator if that is more. A theme that shapes the message box its own
+     * way sets --phone-layout-card-radius and --phone-layout-card-text-inset
+     * to match, as San Francisco does.
+     */
+    --phone-layout-card-height: calc(var(--spacing, 0.25rem) * 12 + 2px);
+    --phone-layout-card-button-size: calc(var(--spacing, 0.25rem) * 10);
+    --phone-layout-card-inset: calc(var(--spacing, 0.25rem) * 4);
+    --phone-layout-card-bottom: max(var(--phone-layout-card-inset), env(safe-area-inset-bottom, 0px));
+    --phone-layout-card-padding: calc((var(--phone-layout-card-height) - var(--phone-layout-card-button-size)) / 2 - 1px);
+
+    /*
      * BB stacks a page's header and its content in one column: a thread,
-     * Settings, Plugins, Skills and every plugin page. The header keeps BB's
-     * look; only its hairline moves to the edge that faces the content.
+     * Settings, Plugins, Skills and every plugin page. The header moves below
+     * the content.
      */
     header:has(> [data-testid="app-page-header-content-row"]) {
       order: 1;
-      border-top-width: 1px;
-      border-bottom-width: 0;
+    }
+
+    /*
+     * BB keeps room for the home indicator below a page and below the right
+     * panel. A card, or the home page's button, takes that room into its own
+     * distance from the bottom, so that a card's shadow falls over the room
+     * instead of ending at its top.
+     */
+    [data-testid="app-layout-content-shell"],
+    [data-testid="secondary-panel-shelf"]:has(> div > aside > * > [data-testid="thread-secondary-panel-top-chrome"]) {
+      padding-bottom: var(--bb-safe-area-bottom, 0px);
     }
 
     /*
@@ -48,19 +74,18 @@
 
     /*
      * The home page has no header, only a button at each top corner. The right
-     * panel's moves to a row of the header's height at the bottom, where a
-     * header's would be: centered in a row that overhangs the bottom by the
-     * hairline's pixel.
+     * panel's moves to the bottom, where it sits in another page's card.
      */
     main:has(> div > [aria-label*="right panel"]) {
-      padding-bottom: var(--bb-app-chrome-row-height);
+      --phone-layout-button-size: var(--phone-layout-card-button-size);
+      padding-bottom: calc(var(--phone-layout-card-height) + var(--phone-layout-card-bottom));
 
       > div:has(> [aria-label*="right panel"]) {
         top: auto;
-        bottom: calc(
-          env(safe-area-inset-bottom, 0px) +
-            (var(--bb-app-chrome-row-height) - var(--phone-layout-button-size)) / 2 - 1px
+        right: calc(
+          env(safe-area-inset-right, 0px) + var(--phone-layout-card-inset) + 1px + var(--phone-layout-card-padding)
         );
+        bottom: calc(var(--phone-layout-card-bottom) + 1px + var(--phone-layout-card-padding));
       }
 
       body[style*="--bb-safe-area-bottom"] & {
@@ -70,18 +95,6 @@
           display: none;
         }
       }
-    }
-
-    /*
-     * The bars and their buttons take the sizes above: the page's header, the
-     * home page's row, and the right panel's row.
-     */
-    :is(
-      header:has(> [data-testid="app-page-header-content-row"]),
-      main:has(> div > [aria-label*="right panel"]),
-      [data-testid="secondary-panel-shelf"]
-    ) {
-      --bb-app-chrome-row-height: var(--phone-layout-bar-height);
     }
 
     /*
@@ -133,9 +146,9 @@
       }
 
       /*
-       * Buttons with text or an app's icon, such as Commit and the split
-       * button that opens the workspace in an app, take the buttons' height
-       * but keep BB's padding, which leaves Commit room in the bar.
+       * Buttons with text or an app's icon, such as the split button that
+       * opens the workspace in an app, take the buttons' height but keep BB's
+       * padding.
        */
       button[class*="pointer-coarse:h-9"] {
         height: var(--phone-layout-button-size);
@@ -154,6 +167,50 @@
       /* Other plugins' buttons sit in a box that BB caps at the desktop's height. */
       [data-bb-plugin-root] > span[class*="max-h-7"] {
         max-height: none;
+      }
+
+      /*
+       * A thread's bar drops BB's git action, such as Commit, which BB shows
+       * while the workspace has changes: a plain button, or a split one after
+       * the button that opens the workspace in an app.
+       */
+      > [data-app-page-header-actions] > [data-thread-header-workflow-actions] > :is(
+          [data-thread-header-responsive-action]:has(> button),
+          [data-thread-header-responsive-action] ~ [data-thread-header-responsive-action]
+        ) {
+        display: none;
+      }
+
+      /* A title, or the icon before a plugin page's, starts where the box's text does. */
+      > div:not([data-app-page-header-actions]) > div:has(p) {
+        padding-left: calc(
+          var(--phone-layout-card-text-inset, calc(var(--spacing, 0.25rem) * 4)) - var(--phone-layout-card-padding)
+        );
+      }
+    }
+
+    /*
+     * Without its title, a thread's bar holds only buttons, and they spread
+     * evenly across the card. The boxes BB groups them in give way, so the
+     * buttons share one row.
+     */
+    &[data-hide-thread-title]
+      header
+      > [data-testid="app-page-header-content-row"]:has(
+        > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
+      ) {
+      justify-content: space-between;
+
+      > div:not([data-app-page-header-actions]),
+      > div:not([data-app-page-header-actions]) > div,
+      > [data-app-page-header-actions],
+      > [data-app-page-header-actions] > * {
+        display: contents;
+      }
+
+      /* A plugin that shows nothing here leaves no gap. */
+      [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
+        display: none;
       }
     }
 
@@ -209,10 +266,6 @@
     /*
      * The right panel's row of tabs and buttons moves below its content, and
      * what BB shows under the row, such as a diff's summary, moves above it.
-     * The row takes the header's shape, so its button to hide the panel sits
-     * where the page's button to show it does: a hairline on top, a row that
-     * overhangs the bottom by the hairline's pixel, and the header's inset on
-     * the right.
      */
     [data-testid="secondary-panel-shelf"]
       aside
@@ -223,15 +276,32 @@
 
       > [data-testid="thread-secondary-panel-top-chrome"] {
         flex-shrink: 0;
-        height: calc(var(--bb-app-chrome-row-height) + 1px);
-        margin-bottom: -1px;
-        border-top: 1px solid
-          color-mix(in oklab, var(--border-seam-vertical) 60%, transparent);
-        padding-right: calc(var(--spacing, 0.25rem) * 4);
       }
 
       body[style*="--bb-safe-area-bottom"] & {
         display: none;
+      }
+    }
+
+    /*
+     * A page's bar is a card, and so is the right panel's row, so the button
+     * to hide the panel sits where the page's button to show it does.
+     */
+    :is(
+      header:has(> [data-testid="app-page-header-content-row"]),
+      [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
+    ) {
+      --phone-layout-button-size: var(--phone-layout-card-button-size);
+      height: var(--phone-layout-card-height);
+      margin: 0 var(--phone-layout-card-inset) var(--phone-layout-card-bottom);
+      padding: 0 var(--phone-layout-card-padding);
+      border: 1px solid var(--border);
+      border-radius: var(--phone-layout-card-radius, calc(var(--radius) + 4px));
+      background-color: var(--background);
+      box-shadow: var(--shadow-lift);
+
+      > [data-testid="app-page-header-content-row"] {
+        height: 100%;
       }
     }
 
@@ -269,10 +339,11 @@
         > [data-sidebar="menu"] { flex-wrap: wrap; }
       }
       /*
-       * The divider and the grid's bottom row take the shape of BB's header, so
-       * they line up with a thread's header at the bottom of the page. The
-       * header's hairline is part of its height, and its buttons center in a
-       * full-height row below the hairline, overhanging the bottom by a pixel.
+       * The divider and the grid's bottom row take the shape of BB's header: a
+       * hairline that is part of the row's height, and buttons centered in a
+       * full-height row below it, overhanging the bottom by a pixel.
+       * BB 0.43 draws the divider after the navigation, and later versions
+       * inside it after the grid; either way it goes above the grid.
        */
       > [data-testid="app-sidebar-navigation-divider"] {
         order: 1;
@@ -280,8 +351,15 @@
       }
       > [data-testid="sidebar-navigation-region"] {
         order: 2;
+        display: flex;
+        flex-direction: column;
 
-        /* The tiles take the size of the bars' buttons. */
+        [data-testid="navigation-divider"] {
+          order: -1;
+          margin-bottom: 0;
+        }
+
+        /* The tiles take the thumb-sized buttons' size, 44px. */
         [data-dia-sidebar] {
           --dia-sidebar-button-size: var(--phone-layout-button-size);
           --dia-sidebar-icon-size: var(--phone-layout-icon-size);
@@ -343,11 +421,15 @@
   }
 }
 
-/* With the Thread title setting off, a phone's thread bar has no title. */
+/*
+ * With the Thread title setting off, a phone's thread bar has no title. BB 0.43
+ * puts the title right in its box, and later versions in a paragraph there.
+ */
 @media (width < 48rem) and (pointer: coarse) {
   html[data-hide-thread-title]
-    [data-testid="app-page-header-content-row"]
-    div:has(> .bb-thread-title) {
+    header
+    > [data-testid="app-page-header-content-row"]
+    div:has(> .bb-thread-title, > p > .bb-thread-title) {
     display: none;
   }
 }
