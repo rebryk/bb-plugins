@@ -9,6 +9,8 @@ Superhuman-style features for BB:
 - **Archive Button.** Archive a thread from its header, next to Snooze.
 - **Code Copy.** Click or tap a code block or inline command in an agent's
   reply to copy it. On by default; text selection still works.
+- **Preload Threads.** Load the tail of recent and newly completed threads in
+  the background. On by default; uses BB 0.44.0's cache and pauses when hidden.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
@@ -23,6 +25,12 @@ Superhuman-style features for BB:
 
 Needs bb 0.43.4 or later. Install the plugin on every server you open, since a
 BB page loads only its own server's plugins.
+
+Preload Threads fetches up to four recent dialogue segments per thread, each
+starting with a user message. Older history loads normally when scrolling back.
+It keeps a bounded cache without marking threads read, uses BB's internal cache
+layout, and disables itself on unverified BB versions. Other features work on
+the versions listed above.
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main

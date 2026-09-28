@@ -7,6 +7,8 @@ Superhuman-style features for BB:
 - **Archive Button.** Archive a thread from its header, next to Snooze.
 - **Code Copy.** Click or tap a code block or inline command in an agent's
   reply to copy it. On by default; text selection still works.
+- **Preload Threads.** Load the tail of recent and newly completed threads in
+  the background. On by default; uses BB 0.44.0's cache and pauses when hidden.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.

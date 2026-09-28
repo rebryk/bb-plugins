@@ -47,6 +47,12 @@ export default async function plugin(bb: BbPluginApi) {
       description: "Click or tap code in an agent's reply to copy it.",
       default: true,
     },
+    threadPrefetch: {
+      type: "boolean",
+      label: "Preload threads",
+      description: "Preload the latest part of recent and newly completed threads.",
+      default: true,
+    },
   });
   await registerSnoozeServer(bb);
 }
