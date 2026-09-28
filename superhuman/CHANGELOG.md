@@ -3,6 +3,25 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.2 (2026-09-27)
+
+- Phone Layout makes the buttons in a phone's bars bigger, for the thumb: 44px
+  with 24px icons, in bars 56px tall. Every button there takes that size, BB's
+  or a plugin's, and so do the right panel's tabs. Dia Sidebar's icons take the
+  same size and narrow, down to BB's size, to stay in one row.
+- Phone Layout drops the sidebar button from a phone's bars and home page. The
+  sidebar opens with a swipe from the screen's left edge.
+- In Phone Layout, Dia Sidebar's **…** button, which opens the rest of the
+  navigation, is an arrow.
+- In Phone Layout, a swipe down a terminal hides the on-screen keyboard and
+  brings the bars back.
+- Phone Layout takes less of the browser's work each time a page restyles, as
+  when the keyboard opens or a message comes in.
+- Snooze's, Archive's, and Paste's buttons take the tone of BB's own icons with
+  any theme. Paste's was a shade off.
+- UI Polish no longer recolors other plugins' buttons in the thread header.
+  Bookmarks 0.1.1 takes BB's tone by itself.
+
 ## 0.1.1 (2026-09-26)
 
 - New: Archive Button, an Archive button next to Snooze in the thread header.

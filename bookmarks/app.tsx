@@ -510,13 +510,15 @@ function HeaderButton({ threadId }: PluginThreadHeaderActionProps) {
       aria-label="Bookmarks"
       title="Bookmarks"
       onClick={() => navigate.openThreadPanel({ actionId: PANEL_ACTION_ID })}
-      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)]/75 transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
+      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)] transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
     >
       <HugeiconsIcon
         icon={Bookmark02Icon}
         size={16}
         strokeWidth={1.5}
         className="max-md:pointer-coarse:size-5"
+        // How BB marks its own icons, so the styles for those color it too.
+        data-icon-root=""
       />
     </button>
   );

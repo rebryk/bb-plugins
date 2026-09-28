@@ -1,6 +1,6 @@
 /* paste.ts puts the button among BB's own buttons in a pane's header, and
    styles it the same way: 28px, and 36px on phones, where the right panel
-   opens as a drawer. */
+   opens as a drawer, in the tone UI Polish gives BB's icons. */
 .terminal-paste-button {
   display: inline-flex;
   flex-shrink: 0;
@@ -13,7 +13,6 @@
   border-radius: calc(var(--radius, 0.5rem) - 2px);
   background: transparent;
   color: var(--subtle-foreground);
-  color: color-mix(in oklab, var(--subtle-foreground) 75%, transparent);
   cursor: pointer;
   transition:
     color 150ms,

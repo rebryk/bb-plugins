@@ -12,6 +12,27 @@
   run Prettier on the docs or on `marketplace.json`; it formats them
   differently from the rest of the repository.
 
+## Trying a change
+
+Every change to a plugin runs in BB from the checkout before it goes up for
+review:
+
+1. In the plugin's directory, run `npm ci` and `bb plugin install .`. After
+   that, `bb plugin dev` rebuilds the plugin and reloads it in BB on every
+   save.
+2. Try the change in BB on every kind of device it touches, such as a phone,
+   and open the pull request only once it works there.
+3. After the merge, go back to `<id>@sf-plugins`, which follows `main`, before
+   the checkout goes away: BB loads a local install from its directory.
+
+Moving a plugin between `<id>@sf-plugins` and a local install takes
+`bb plugin remove <id>` first, which deletes the plugin's settings, secrets,
+and schedules but keeps its storage. Note the settings with
+`bb plugin config <id>` before the removal and set them again with
+`bb plugin config <id> set <key> <value>` after the install. To try a pushed
+branch on a server without the checkout, run
+`bb plugin install 'git:https://github.com/rebryk/bb-plugins.git@<branch>' --subdirectory <id> --yes`.
+
 ## Adding a plugin
 
 - Name the plugin in title case and derive the rest from the name: Pool Usage
@@ -47,10 +68,7 @@
   block of every other plugin's README and overview that has one. Copy each
   changed overview into `marketplace.json` as well.
 - `<id>@sf-plugins` resolves only after the merge, since the catalog follows
-  `main`. To try a pushed branch before that, run
-  `bb plugin install 'git:https://github.com/rebryk/bb-plugins.git@<branch>' --subdirectory <id> --yes`.
-  Moving an installed plugin to another source takes `bb plugin remove <id>`
-  first, which deletes its settings.
+  `main`, so a new plugin starts from its local install.
 - A plugin command's default key must use Command, Control, or Alt, or be one
   of F1–F24. When another command already uses the key, BB leaves the plugin's
   default unbound without an error, and Settings → Keyboard says why. Handle a

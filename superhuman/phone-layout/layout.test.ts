@@ -1,23 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
 import { startPanelSlide } from "./slide";
 
 // jsdom has no matchMedia; a test flips `matches` to leave the phone.
 const phone = Object.assign(new EventTarget(), { matches: true });
-let left = 0;
 
 beforeEach(() => {
   phone.matches = true;
-  left = 0;
   window.matchMedia = vi.fn(() => phone) as unknown as typeof window.matchMedia;
   document.body.innerHTML = `
-    <main data-sidebar="inset"></main>
-    <button data-testid="app-sidebar-trigger-overlay"></button>
-    <div data-testid="secondary-panel-shelf"></div>`;
-  const page = document.querySelector("main")!;
-  page.getBoundingClientRect = () => ({ left }) as DOMRect;
-  page.getAnimations = () => [];
+    <main data-sidebar="inset"><textarea aria-label="Message"></textarea></main>
+    <div data-testid="secondary-panel-shelf">
+      <section data-app-terminal>
+        <textarea class="xterm-helper-textarea"></textarea>
+      </section>
+    </div>`;
 });
 
 afterEach(() => {
@@ -25,40 +24,36 @@ afterEach(() => {
 });
 
 const page = () => document.querySelector<HTMLElement>("main")!;
-const button = () =>
-  document.querySelector<HTMLElement>(
-    '[data-testid="app-sidebar-trigger-overlay"]',
-  )!;
 const panel = () =>
   document.querySelector<HTMLElement>(
     '[data-testid="secondary-panel-shelf"]',
   )!;
 const settle = () => new Promise((resolve) => setTimeout(resolve));
+const terminal = () =>
+  document.querySelector<HTMLElement>(".xterm-helper-textarea")!;
+const message = () =>
+  document.querySelector<HTMLElement>('[aria-label="Message"]')!;
+
+/** A finger that lands on the element and slides by x and y. */
+function swipe(element: Element, x: number, y: number) {
+  const moves = [
+    ["touchstart", 0, 0],
+    ["touchmove", x, y],
+  ] as const;
+  for (const [type, dx, dy] of moves) {
+    const event = new Event(type, { bubbles: true });
+    Object.defineProperty(event, "touches", {
+      value: [{ identifier: 1, clientX: 100 + dx, clientY: 100 + dy }],
+    });
+    element.dispatchEvent(event);
+  }
+}
 
 it("marks the page for app.css until it stops", () => {
   const stop = startPhoneLayout(document);
   expect(document.documentElement.dataset.phoneLayout).toBe("");
   stop();
   expect(document.documentElement.dataset.phoneLayout).toBeUndefined();
-});
-
-it("keeps the sidebar button on the page as the page moves", async () => {
-  const stop = startPhoneLayout(document);
-  expect(button().style.translate).toBe("0px");
-
-  left = 240;
-  page().style.translate = "240px";
-  await settle();
-  expect(button().style.translate).toBe("240px");
-
-  phone.matches = false;
-  phone.dispatchEvent(new Event("change"));
-  expect(button().style.translate).toBe("");
-
-  phone.matches = true;
-  phone.dispatchEvent(new Event("change"));
-  stop();
-  expect(button().style.translate).toBe("");
 });
 
 it("slides the right panel out with the page on a phone only", async () => {
@@ -75,6 +70,39 @@ it("slides the right panel out with the page on a phone only", async () => {
   page().style.translate = "-60px";
   await settle();
   expect(panel().style.translate).toBe("");
+
+  stop();
+});
+
+it("hides the keyboard when a finger swipes down the terminal", () => {
+  const stop = startKeyboardSwipe(document);
+  terminal().focus();
+  swipe(terminal(), 0, 30);
+  expect(document.activeElement).toBe(terminal());
+  swipe(terminal(), 10, 60);
+  expect(document.activeElement).toBe(document.body);
+
+  stop();
+  terminal().focus();
+  swipe(terminal(), 0, 60);
+  expect(document.activeElement).toBe(terminal());
+});
+
+it("leaves the keyboard to other swipes, other fields and wider screens", () => {
+  const stop = startKeyboardSwipe(document);
+  terminal().focus();
+  swipe(terminal(), 80, 60);
+  swipe(terminal(), 0, -60);
+  expect(document.activeElement).toBe(terminal());
+
+  message().focus();
+  swipe(terminal(), 0, 60);
+  expect(document.activeElement).toBe(message());
+
+  terminal().focus();
+  phone.matches = false;
+  swipe(terminal(), 0, 60);
+  expect(document.activeElement).toBe(terminal());
 
   stop();
 });
