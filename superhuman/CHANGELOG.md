@@ -3,6 +3,13 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.10 (2026-09-28)
+
+- Haptics plays a light tap as the phone's sidebar or right panel opens or
+  closes, by a button, the backdrop, or a swipe. A swipe that springs back
+  doesn't tap. BB's app plays it natively; a browser that can vibrate vibrates.
+  The setting is on by default.
+
 ## 0.1.9 (2026-09-28)
 
 - Phone Layout spreads the buttons of a thread's bar without its title so that

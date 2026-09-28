@@ -37,6 +37,7 @@ it("registers every feature under an id of its own", async () => {
       "code-copy",
       "zoom-lock",
       "phone-layout",
+      "haptics",
       "thread-prefetch",
     ],
     sidebarNavigations: ["dia-sidebar"],
