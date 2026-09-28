@@ -12,9 +12,10 @@
     main > div:has(> [aria-label*="right panel"]),
     [data-testid="thread-secondary-panel-top-chrome"],
     [data-testid="app-sidebar-primary-actions"],
+    [data-testid="sidebar-navigation-region"],
     [data-sidebar="footer"]
   )
-  :is(button, a):not([aria-pressed="true"], [aria-current="page"], [data-active="true"])
+  :is(button, a):not([aria-pressed="true"], [aria-current="page"], [data-active="true"], [role="checkbox"])
   svg[data-icon-root] {
   color: var(--subtle-foreground);
   /* Over the fade of the sidebar's footer and of Superhuman's tiles. */

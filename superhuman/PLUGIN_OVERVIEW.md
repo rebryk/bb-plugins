@@ -10,7 +10,7 @@ Superhuman-style features for BB:
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Phone Layout.** BB's bars at the bottom of a phone's screen, with
+- **Phone Layout.** BB's bars as cards at the bottom of a phone's screen, with
   thumb-sized buttons, an optional thread title, and a swipe down a terminal to
   hide its keyboard.
 - **Zoom Lock.** No zooming the page, off by default.

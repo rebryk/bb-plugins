@@ -257,6 +257,12 @@
 
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   --radius: 0.625rem;
+  /* The composer's corners and text inset, which Superhuman's Phone layout
+     gives its bars. */
+  --sf-composer-radius: 18px;
+  --sf-composer-text-inset: 18px;
+  --phone-layout-card-radius: var(--sf-composer-radius);
+  --phone-layout-card-text-inset: var(--sf-composer-text-inset);
   --icon-stroke-width: 1.5;
 
   /* Flat surfaces; only floating layers cast a soft, wide shadow. A transparent
@@ -590,8 +596,8 @@
 
 /* Superhuman's Dia Sidebar grid keeps its own tile spacing; the theme adds
    2 px above its first row. Superhuman's Phone layout sets the grid in one row
-   at the foot of the sidebar drawer BB opens below 768 px, lined up with a
-   thread's bar, so the theme leaves that grid and its Search threads to it. */
+   at the foot of the sidebar drawer BB opens below 768 px, so the theme leaves
+   that grid and its Search threads to it. */
 [data-dia-sidebar] [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"], #san-francisco, [data-phone-layout] [role="dialog"] *) {
   padding-top: 2px;
 }
@@ -997,11 +1003,11 @@ main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\
 
 form[data-promptbox] {
   border-color: var(--border);
-  border-radius: 18px;
+  border-radius: var(--sf-composer-radius);
 }
 
 [data-promptbox-editor-scroll] {
-  padding-left: 18px;
+  padding-left: var(--sf-composer-text-inset);
 }
 
 /* The send control: one round button with an up arrow, gray while there is
@@ -1884,10 +1890,10 @@ span[data-category-option-checkbox][data-state="enabled"] svg *,
   stroke-width: 2.5;
 }
 
-/* The check takes the box's color. Superhuman grays icons in the sidebar's
-   top actions block ([data-testid=app-sidebar-primary-actions]), where
-   Customize sidebar's boxes sit, with an unlayered rule that loads later;
-   :not(#san-francisco) lifts this above it. */
+/* The check takes the box's color. Superhuman 0.1.4 and earlier gray icons in
+   the sidebar's top actions block ([data-testid=app-sidebar-primary-actions]),
+   where Customize sidebar's boxes sit in bb 0.43, with an unlayered rule that
+   loads later; :not(#san-francisco) lifts this above it. */
 button[role="checkbox"].border:not(#san-francisco) svg {
   color: inherit;
 }

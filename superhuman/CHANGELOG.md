@@ -3,6 +3,23 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.5 (2026-09-27)
+
+- Phone Layout floats a phone's bars as cards in the shape of the thread's
+  message box: as far from the screen's sides, as round, as tall as the box
+  while it shows one line, and with its border and shadow. Their buttons are
+  40px, as the box's own are, and a title starts where the box's text does.
+  The right panel's row is a card as well, and the home page's button sits
+  where a card's would. With San Francisco 0.1.1 the cards take its corners
+  and text inset.
+- Phone Layout drops BB's Commit button from a phone's thread bar. With the
+  Thread title setting off, the bar's buttons spread evenly across it.
+- Fixes for BB 0.44: the Thread title setting hides the title in a phone's
+  thread bar again, Phone Layout puts the sidebar's divider above the grid
+  again, and UI Polish gives Dia Sidebar's icons the tone of BB's other icons
+  again.
+- UI Polish leaves the check marks in Customize sidebar in their box's color.
+
 ## 0.1.4 (2026-09-27)
 
 - Code Copy copies an agent's code blocks and inline commands with a click or
