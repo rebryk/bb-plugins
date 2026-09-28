@@ -41,6 +41,14 @@
     }
 
     /*
+     * A thread's messages stop at their first and last line instead of
+     * stretching past them and springing back.
+     */
+    [data-thread-window] .thread-scrollbar {
+      overscroll-behavior-y: none;
+    }
+
+    /*
      * BB keeps room for the home indicator below a page and below the right
      * panel. A card, or the home page's button, takes that room into its own
      * distance from the bottom, so that a card's shadow falls over the room
@@ -178,16 +186,31 @@
     }
 
     /*
+     * A thread's buttons run in the reverse of BB's order, the last added
+     * first, up to the button that shows the right panel, which stays at the
+     * end. Only the visual order changes; focus and screen readers keep BB's.
+     */
+    header > [data-testid="app-page-header-content-row"] [data-thread-header-workflow-actions] {
+      flex-direction: row-reverse;
+    }
+
+    /*
      * Without its title, a thread's bar holds only buttons, and they spread
      * evenly across the card. The boxes BB groups them in give way, so the
-     * buttons share one row.
+     * buttons share one row, which runs from its end: the right panel's
+     * button, then the rest from the last, down to the thread's menu.
      */
     &[data-hide-thread-title]
       header
       > [data-testid="app-page-header-content-row"]:has(
         > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
       ) {
+      flex-direction: row-reverse;
       justify-content: space-between;
+
+      [data-thread-header-pane-actions] > * {
+        order: -1;
+      }
 
       > div:not([data-app-page-header-actions]),
       > div:not([data-app-page-header-actions]) > div,

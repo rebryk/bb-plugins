@@ -3,6 +3,20 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.8 (2026-09-28)
+
+- Phone Layout stops a thread's messages at their first and last line instead
+  of letting them stretch past and spring back.
+- Phone Layout opens the sidebar with Settings' list of sections on entering
+  Settings, instead of leaving the list closed behind a section.
+- Phone Layout adds New thread to a thread's bar, first in the row. It opens the
+  new-thread screen as the sidebar's New thread does, with the thread's project
+  selected and the prompt focused.
+- Phone Layout reverses a thread's buttons, up to the one that shows the right
+  panel, which stays last. Without the title the bar reads New thread,
+  Archive, Snooze, other plugins' buttons, the thread's menu, then the right
+  panel's button.
+
 ## 0.1.7 (2026-09-27)
 
 - Preload Threads loads up to four recent dialogue segments before navigation
