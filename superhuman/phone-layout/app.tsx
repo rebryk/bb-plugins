@@ -5,6 +5,7 @@ import { startPhoneLayout } from "./layout";
 import { NewThreadButton } from "./new-thread";
 import { startSettingsSidebar } from "./settings";
 import { startPanelSlide } from "./slide";
+import { startPanelSwipe } from "./swipe";
 import "./app.css";
 import "./slide.css";
 
@@ -18,6 +19,7 @@ function PhoneLayout() {
     const stops = [
       startPhoneLayout(document),
       startPanelSlide(document),
+      startPanelSwipe(document),
       startKeyboardSwipe(document),
       startSettingsSidebar(document),
     ];

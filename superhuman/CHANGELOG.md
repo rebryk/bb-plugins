@@ -3,6 +3,13 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.11 (2026-09-28)
+
+- Phone Layout opens the right panel with a swipe from the screen's right edge,
+  as a swipe from the left edge opens the sidebar. The page follows the finger;
+  a third of the way or a quick flick opens the panel, and a shorter swipe
+  springs back.
+
 ## 0.1.10 (2026-09-28)
 
 - Haptics plays a light tap as the phone's sidebar or right panel opens or

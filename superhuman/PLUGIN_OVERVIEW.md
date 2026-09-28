@@ -14,7 +14,8 @@ Superhuman-style features for BB:
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
 - **Phone Layout.** BB's bars as cards at the bottom of a phone's screen, with
   thumb-sized buttons, New thread in a thread's bar, an optional thread title,
-  and a swipe down a terminal to hide its keyboard.
+  a swipe from the right edge to open the right panel, and a swipe down a
+  terminal to hide its keyboard.
 - **Haptics.** A light tap as the phone's sidebar or right panel opens or
   closes, in BB's app or a browser that can vibrate.
 - **Zoom Lock.** No zooming the page, off by default.
