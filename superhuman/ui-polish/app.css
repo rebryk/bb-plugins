@@ -1,3 +1,8 @@
+/* BB's editor picker and git action (such as Commit), including their menus. */
+[data-thread-header-workflow-actions] > [data-thread-header-responsive-action] {
+  display: none;
+}
+
 /*
  * BB tints the icons in its bars in three tones, some near white and some
  * gray, even within one bar, and fades the sidebar's a little more. Here they

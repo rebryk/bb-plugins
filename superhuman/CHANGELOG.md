@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.6 (2026-09-27)
+
+- UI Polish hides BB's git action, such as Commit, and the external editor
+  picker from the thread bar on every screen size.
+
 ## 0.1.5 (2026-09-27)
 
 - Phone Layout floats a phone's bars as cards in the shape of the thread's
