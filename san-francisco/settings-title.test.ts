@@ -17,6 +17,7 @@ const disposers: (() => void)[] = [];
 
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
+  vi.restoreAllMocks();
   document.head.replaceChildren();
   document.body.replaceChildren();
 });
@@ -244,6 +245,70 @@ describe("watchSettingsTitle", () => {
     expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
   });
 
+  it("skips animation frames for thread updates and still notices Settings navigation", async () => {
+    theme(true);
+    history.replaceState(null, "", "/projects/project/threads/thread");
+    threadPage();
+    disposers.push(watchSettingsTitle(document));
+    const frames = vi.spyOn(window, "requestAnimationFrame");
+    const styles = vi.spyOn(window, "getComputedStyle");
+
+    document.querySelector("main main")!.append(document.createElement("p"));
+    await Promise.resolve();
+    expect(frames).not.toHaveBeenCalled();
+    expect(styles).not.toHaveBeenCalled();
+    frames.mockRestore();
+    styles.mockRestore();
+
+    const { header } = settingsPage("Appearance");
+    await frame();
+    await frame();
+    expect(header.getAttribute(PAGE_ATTRIBUTE)).toBe("Appearance");
+  });
+
+  it("clears a marked settings page when navigation leaves its DOM mounted", async () => {
+    theme(true);
+    const { header, column, heading } = settingsPage("Machines", "<section><h2>Machines</h2></section>");
+    disposers.push(watchSettingsTitle(document));
+    await frame();
+    expect(header.getAttribute(PAGE_ATTRIBUTE)).toBe("Machines");
+    expect(heading?.hasAttribute(DUPLICATE_ATTRIBUTE)).toBe(true);
+
+    history.replaceState(null, "", "/projects/project/threads/thread");
+    column.append(document.createElement("p"));
+    await frame();
+    await frame();
+    expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
+    expect(column.hasAttribute(TITLE_ATTRIBUTE)).toBe(false);
+    expect(heading?.hasAttribute(DUPLICATE_ATTRIBUTE)).toBe(false);
+  });
+
+  it("follows theme insertion, replacement, text edits and removal", async () => {
+    const { header } = settingsPage();
+    disposers.push(watchSettingsTitle(document));
+    await frame();
+    expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
+
+    const original = theme(true);
+    await frame();
+    expect(header.getAttribute(PAGE_ATTRIBUTE)).toBe("General");
+
+    const replacement = document.createElement("style");
+    replacement.id = "bb-app-theme";
+    replacement.append(document.createTextNode(":root { --other-theme: blue; }"));
+    original.replaceWith(replacement);
+    await frame();
+    expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
+
+    replacement.firstChild!.nodeValue = ":root { --sf-accent: #007aff; }";
+    await frame();
+    expect(header.getAttribute(PAGE_ATTRIBUTE)).toBe("General");
+
+    replacement.remove();
+    await frame();
+    expect(header.hasAttribute(PAGE_ATTRIBUTE)).toBe(false);
+  });
+
   it("removes every attribute on abort and disposes once", async () => {
     theme(true);
     const { header, column, heading } = settingsPage("Machines", "<section><h2>Machines</h2></section>");
@@ -295,6 +360,77 @@ describe("watchSettingsTitle", () => {
     await frame();
     expect(styles).not.toHaveBeenCalled();
     styles.mockRestore();
+  });
+
+  it("ignores unrelated head styles and preloads outside Settings without reading style or menu geometry", async () => {
+    theme(true);
+    history.replaceState(null, "", "/projects/project/threads/thread");
+    threadPage();
+    const column = document.querySelector("main main")!;
+    column.innerHTML = '<button aria-controls="palette">Palette</button>';
+    disposers.push(watchSettingsTitle(document));
+    const menu = document.createElement("div");
+    menu.setAttribute("data-radix-popper-content-wrapper", "");
+    menu.innerHTML = '<div id="palette"></div>';
+    document.body.append(menu);
+    await frame();
+    await frame();
+
+    const styles = vi.spyOn(window, "getComputedStyle");
+    const geometry = vi.spyOn(column.querySelector("button")!, "getBoundingClientRect");
+    const frames = vi.spyOn(window, "requestAnimationFrame");
+    const unrelated = document.createElement("style");
+    unrelated.textContent = ".other-plugin { color: red; }";
+    const preload = document.createElement("link");
+    preload.rel = "modulepreload";
+    preload.href = "/assets/another-route.js";
+    document.head.append(unrelated, preload);
+    await Promise.resolve();
+    unrelated.textContent = ".other-plugin { color: blue; }";
+    await Promise.resolve();
+    unrelated.remove();
+    preload.remove();
+    await Promise.resolve();
+
+    expect(styles).not.toHaveBeenCalled();
+    expect(geometry).not.toHaveBeenCalled();
+    expect(frames).not.toHaveBeenCalled();
+  });
+
+  it("tracks a menu trigger moved by another stylesheet before a palette preview", async () => {
+    const style = theme(true);
+    const { column } = settingsPage("Appearance", '<button aria-controls="palette">Palette</button>');
+    const trigger = column.querySelector("button")!;
+    let shift = { x: 0, y: 0 };
+    // jsdom has no layout; model the stylesheet's movement and our translation.
+    trigger.getBoundingClientRect = () => {
+      const [x, y] = [...column.style.translate.split(" "), ""].map((value) => parseFloat(value) || 0);
+      return new DOMRect(100 + shift.x + x, 100 + shift.y + y, 120, 28);
+    };
+    disposers.push(watchSettingsTitle(document));
+    const menu = document.createElement("div");
+    menu.setAttribute("data-radix-popper-content-wrapper", "");
+    menu.style.transform = "translate(100px, 128px)";
+    menu.innerHTML = '<div id="palette" data-side="bottom" data-align="end"></div>';
+    document.body.append(menu);
+    await frame();
+    await frame();
+
+    const styles = vi.spyOn(window, "getComputedStyle");
+    const unrelated = document.createElement("style");
+    unrelated.textContent = ".column { margin-left: 50px; margin-top: 20px; }";
+    shift = { x: 50, y: 20 };
+    document.head.append(unrelated);
+    await Promise.resolve();
+    expect(styles).not.toHaveBeenCalled();
+    styles.mockRestore();
+
+    // Previewing another palette moves the trigger by (3, -53). Hold it at
+    // the position after the stylesheet arrived, rather than its first position.
+    shift = { x: 53, y: -33 };
+    style.textContent = "";
+    await frame();
+    expect(column.style.translate).toBe("-3px 53px");
   });
 
   it("pins open menus where they were while a palette preview swaps the theme", async () => {

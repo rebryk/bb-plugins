@@ -17,6 +17,7 @@ export const DUPLICATE_ATTRIBUTE = "data-sf-duplicate";
 export const PINNED_ATTRIBUTE = "data-sf-pinned";
 
 const SETTINGS_ROOT = "/settings";
+const THEME_STYLE_ID = "bb-app-theme";
 const SETTINGS_LAYOUT = '[data-testid="settings-sidebar-top-reserve-row"]';
 const CURRENT_PAGE = '[data-sidebar="sidebar"] a[aria-current="page"]';
 const PLUGINS_PAGE = '[data-sidebar="sidebar"] a[href="/settings/plugins"]';
@@ -41,6 +42,10 @@ function pathname(doc: Document, href: string) {
   return new URL(href, doc.location.href).pathname.replace(/\/+$/, "");
 }
 
+function isSettingsPath(path: string) {
+  return path === SETTINGS_ROOT || path.startsWith(`${SETTINGS_ROOT}/`);
+}
+
 /**
  * Whether a first section heading only repeats the page title: "Machines" on
  * Machines, and as the page's only heading also a longer or plural form
@@ -60,7 +65,7 @@ export function repeatsTitle(heading: string, title: string, only: boolean) {
  */
 export function findSettingsPage(doc: Document) {
   const path = pathname(doc, doc.location.pathname);
-  if (path !== SETTINGS_ROOT && !path.startsWith(`${SETTINGS_ROOT}/`)) return null;
+  if (!isSettingsPath(path)) return null;
   if (!doc.querySelector(SETTINGS_LAYOUT)) return null;
   // The sidebar lists only plugins with settings; the others' pages sit below
   // Installed plugins.
@@ -160,6 +165,9 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
   }
 
   function schedule() {
+    // Thread updates need no settings pass. Still clear attributes when leaving
+    // a marked page, and keep observing so navigation into Settings is noticed.
+    if (!marked && !isSettingsPath(doc.location.pathname)) return;
     if (!frame) frame = requestAnimationFrame(apply);
   }
 
@@ -252,10 +260,20 @@ export function watchSettingsTitle(doc: Document, signal?: AbortSignal): () => v
     if (!pinStyle.isConnected && doc.querySelector(`[${PINNED_ATTRIBUTE}]`)) doc.head.append(pinStyle);
   }
 
-  // The document title changes often and never carries a theme.
+  // Other plugins mount styles and the app preloads route assets in <head>.
+  // Only the theme style can change its active palette; reading computed style
+  // for unrelated mutations can flush pending style work across the app.
+  const themeNode = (node: Node | null) =>
+    node?.nodeType === 1 && (node as Element).id === THEME_STYLE_ID;
   const inTitle = (node: Node) => node.nodeName === "TITLE" || node.parentNode?.nodeName === "TITLE";
   const head = new MutationObserver((records) => {
-    if (!records.every((record) => inTitle(record.target))) refreshActive();
+    if (records.some((record) =>
+      themeNode(record.target) || themeNode(record.target.parentNode)
+      || [...record.addedNodes, ...record.removedNodes].some(themeNode),
+    )) refreshActive();
+    // A settings stylesheet can move an open menu's trigger without changing
+    // the palette. Remember its new position before the next palette preview.
+    else if (isSettingsPath(doc.location.pathname) && !records.every((record) => inTitle(record.target))) remeasure();
   });
   head.observe(doc.head, { childList: true, subtree: true, characterData: true });
   refreshActive();

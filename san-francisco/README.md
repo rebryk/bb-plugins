@@ -76,6 +76,11 @@ and BB's terminal, diff, status and code colors are brighter to match.
   `--sf-accent` token. The same script holds an open menu in place while BB
   previews another palette under it, so the menu doesn't jump under the
   pointer.
+- On desktop, a content script tracks window and sidebar structure in data
+  attributes without reading geometry. It replaces the theme's matching CSS
+  conditions with those attributes so thread updates avoid broad style
+  recalculation. The original rules provide the first paint and return when
+  the script stops.
 - Palette, fonts, text sizes, radii, shadows and icon stroke are BB theme
   tokens, set in the `:root, .light` and `.dark` blocks. The other rules target
   BB 0.43.4's markup: data attributes and roles where BB has them, Tailwind
