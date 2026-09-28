@@ -1,5 +1,6 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import registerArchiveButton from "./archive-button/app";
+import registerCodeCopy from "./code-copy/app";
 import registerDiaSidebar from "./dia-sidebar/app";
 import registerHotkeys from "./hotkeys/app";
 import registerPhoneLayout from "./phone-layout/app";
@@ -15,6 +16,7 @@ export default definePluginApp((app) => {
   registerDiaSidebar(app);
   registerSnooze(app);
   registerArchiveButton(app);
+  registerCodeCopy(app);
   registerTerminalPaste(app);
   registerServerSwitcher(app);
   registerZoomLock(app);

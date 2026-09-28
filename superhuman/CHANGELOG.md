@@ -3,6 +3,13 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.4 (2026-09-27)
+
+- Code Copy copies an agent's code blocks and inline commands with a click or
+  tap, with a confirmation after copying. Inline code also supports Enter and
+  Space. Selection, scrolling, links, and existing code buttons keep working.
+  The Code copy setting is on by default.
+
 ## 0.1.3 (2026-09-27)
 
 - Snooze adds a moon button before Archive in the sidebar's thread rows. It

@@ -5,6 +5,8 @@ Superhuman-style features for BB:
 - **Snooze.** Hide a thread until a set time or until its agent needs you; use
   the moon in its header or before Archive in the sidebar row.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
+- **Code Copy.** Click or tap a code block or inline command in an agent's
+  reply to copy it. On by default; text selection still works.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
