@@ -196,9 +196,10 @@
 
     /*
      * Without its title, a thread's bar holds only buttons, and they spread
-     * evenly across the card. The boxes BB groups them in give way, so the
-     * buttons share one row, which runs from its end: the right panel's
-     * button, then the rest from the last, down to the thread's menu.
+     * evenly across the card: the icons sit as far from the card's sides as
+     * from each other. The boxes BB groups them in give way, so the buttons
+     * share one row, which runs from its end: the right panel's button, then
+     * the rest from the last, down to the thread's menu.
      */
     &[data-hide-thread-title]
       header
@@ -206,7 +207,11 @@
         > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
       ) {
       flex-direction: row-reverse;
-      justify-content: space-between;
+      justify-content: space-evenly;
+      /* With the card's padding, as wide as the room around an icon in its button. */
+      padding-inline: calc(
+        (var(--phone-layout-button-size) - var(--phone-layout-icon-size)) / 2 - var(--phone-layout-card-padding)
+      );
 
       [data-thread-header-pane-actions] > * {
         order: -1;
