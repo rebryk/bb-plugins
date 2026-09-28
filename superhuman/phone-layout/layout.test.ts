@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
+import { startSettingsSidebar } from "./settings";
 import { startPanelSlide } from "./slide";
 
 // jsdom has no matchMedia; a test flips `matches` to leave the phone.
@@ -21,6 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.replaceChildren();
+  history.replaceState(null, "", "/");
 });
 
 const page = () => document.querySelector<HTMLElement>("main")!;
@@ -105,4 +107,67 @@ it("leaves the keyboard to other swipes, other fields and wider screens", () => 
   expect(document.activeElement).toBe(terminal());
 
   stop();
+});
+
+/**
+ * BB's route change: the sidebar closes, and Settings puts its list of
+ * sections in it.
+ */
+function go(path: string) {
+  history.pushState(null, "", path);
+  document
+    .querySelector("[data-sidebar=panel]")!
+    .setAttribute("data-state", "closed");
+  const list = document.querySelector('[data-testid="settings-sidebar-body"]');
+  if (path.startsWith("/settings") && !list)
+    document
+      .querySelector("[data-sidebar=panel]")!
+      .insertAdjacentHTML(
+        "beforeend",
+        '<div data-testid="settings-sidebar-body"></div>',
+      );
+  if (!path.startsWith("/settings")) list?.remove();
+}
+
+it("opens the sidebar each time a phone enters Settings", async () => {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div data-sidebar="panel" data-state="closed"></div>
+     <button data-sidebar="trigger"></button>`,
+  );
+  const open = vi.fn();
+  document
+    .querySelector("[data-sidebar=trigger]")!
+    .addEventListener("click", open);
+  const stop = startSettingsSidebar(document);
+
+  go("/settings");
+  await settle();
+  expect(open).toHaveBeenCalledTimes(1);
+
+  // A section of Settings leaves the sidebar to BB.
+  go("/settings/providers");
+  await settle();
+  expect(open).toHaveBeenCalledTimes(1);
+
+  go("/");
+  await settle();
+  go("/settings/general");
+  await settle();
+  expect(open).toHaveBeenCalledTimes(2);
+
+  go("/");
+  await settle();
+  phone.matches = false;
+  go("/settings");
+  await settle();
+  expect(open).toHaveBeenCalledTimes(2);
+
+  stop();
+  phone.matches = true;
+  go("/");
+  await settle();
+  go("/settings");
+  await settle();
+  expect(open).toHaveBeenCalledTimes(2);
 });

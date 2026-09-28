@@ -40,7 +40,7 @@ it("registers every feature under an id of its own", async () => {
       "thread-prefetch",
     ],
     sidebarNavigations: ["dia-sidebar"],
-    threadHeaderActions: ["snooze", "archive"],
+    threadHeaderActions: ["snooze", "archive", "new-thread"],
     commands: ["open-plugins", "snooze-thread", "show-snoozed-threads"],
     sidebarFooterItems: ["change-server"],
   });

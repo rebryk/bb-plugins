@@ -13,8 +13,8 @@ Superhuman-style features for BB:
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
 - **Phone Layout.** BB's bars as cards at the bottom of a phone's screen, with
-  thumb-sized buttons, an optional thread title, and a swipe down a terminal to
-  hide its keyboard.
+  thumb-sized buttons, New thread in a thread's bar, an optional thread title,
+  and a swipe down a terminal to hide its keyboard.
 - **Zoom Lock.** No zooming the page, off by default.
 - **UI Polish.** Icons in one tone, even menu rows, and a thread bar without
   the git action or external editor picker.
