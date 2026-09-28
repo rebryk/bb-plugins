@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.4 (2026-09-27)
+
+- Codex Business Pro Lite accounts count as 5x Plus, matching Pro Lite, so
+  unused capacity on those accounts no longer inflates the pool's usage
+  percentage. Standard Business accounts still count as 1x.
+
 ## 0.2.3 (2026-09-26)
 
 - A provider's card opens below its button when the sidebar footer sits at the

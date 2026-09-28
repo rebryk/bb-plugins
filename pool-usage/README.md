@@ -39,8 +39,9 @@ bb plugin disable provider-usage
 
 - Each account counts in proportion to its plan, by the vendors' stated
   multipliers. Claude: Pro 1x, Max 5x or 20x, a standard Team seat 1.25x and a
-  premium seat 6.25x. Codex: Plus 1x, Pro $100 5x, Pro $200 20x. Other plans
-  count as 1x; disabled accounts and API keys don't count.
+  premium seat 6.25x. Codex: Plus and standard Business 1x, Pro $100 and
+  Business Pro Lite ($100) 5x, Pro $200 20x. Other plans count as 1x; disabled
+  accounts and API keys don't count.
 - An account's free capacity is what its tightest quota window leaves. A window
   past its reset is empty until the next reading replaces it. A weekly window
   limits an account that also has a five-hour window only once it runs low.

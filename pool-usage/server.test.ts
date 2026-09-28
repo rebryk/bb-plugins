@@ -7,6 +7,7 @@ import plugin, {
   type PoolAccount,
   type UsageSnapshot,
 } from "./server";
+import { formatPercent, summarizeUsage } from "./usage-model";
 
 function account(overrides: Partial<PoolAccount> = {}): PoolAccount {
   return {
@@ -98,7 +99,11 @@ describe("accountPlan", () => {
       accountPlan(
         codexAccount({ subscriptionType: "self_serve_business_prolite" }),
       ),
-    ).toEqual({ tier: "Biz Pro Lite", weight: 1 });
+    ).toEqual({ tier: "Biz Pro Lite", weight: 5 });
+    expect(accountPlan(codexAccount({ subscriptionType: "business" }))).toEqual({
+      tier: "Business",
+      weight: 1,
+    });
   });
 
   it("keeps API keys out of the subscription total", () => {
@@ -123,6 +128,39 @@ describe("accountPlan", () => {
 
 describe("normalizeAccount", () => {
   const options = { now: 123_000 };
+
+  it("includes Business Pro Lite capacity in a mixed Codex pool", () => {
+    const accounts = [
+      { subscriptionType: "self_serve_business_prolite", utilization: 0.06 },
+      { subscriptionType: "self_serve_business_prolite", utilization: 0 },
+      { subscriptionType: "pro", utilization: 0.49 },
+      { subscriptionType: "prolite", utilization: 0.67 },
+    ].map(({ subscriptionType, utilization }, index) =>
+      normalizeAccount(
+        codexAccount({
+          id: `codex-${index}`,
+          subscriptionType,
+          limitWindows: [
+            {
+              slot: "primary",
+              windowMinutes: 10_080,
+              utilization,
+              resetAt: 604_800_000,
+              status: "allowed",
+            },
+          ],
+        }),
+        options,
+      ),
+    );
+    const [usage] = summarizeUsage(
+      { providers: [{ id: "codex", switchThreshold: 0.98 }], accounts },
+      options.now,
+    );
+
+    expect(usage?.used).toBeCloseTo(0.3842857143);
+    expect(formatPercent(usage!.used!)).toBe("38%");
+  });
 
   it("keeps each window's reading", () => {
     expect(normalizeAccount(account(), options)).toEqual({
