@@ -34,6 +34,7 @@ it("registers every feature under an id of its own", async () => {
     appOverlays: [
       "hotkeys-bridge",
       "snooze-dialogs",
+      "code-copy",
       "zoom-lock",
       "phone-layout",
     ],

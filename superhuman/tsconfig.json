@@ -25,6 +25,7 @@
     "*.ts",
     "*.tsx",
     "components",
+    "code-copy",
     "dia-sidebar",
     "hooks",
     "hotkeys",

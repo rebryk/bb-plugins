@@ -1,0 +1,13 @@
+[data-superhuman-code-copy]
+  [data-timeline-row-id*=":assistant:"]
+  [data-message-column]
+  [data-markdown-preview]
+  pre,
+[data-superhuman-code-copy-inline] {
+  cursor: copy;
+}
+
+[data-superhuman-code-copy-inline]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

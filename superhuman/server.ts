@@ -41,6 +41,12 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
+    codeCopy: {
+      type: "boolean",
+      label: "Code copy",
+      description: "Click or tap code in an agent's reply to copy it.",
+      default: true,
+    },
   });
   await registerSnoozeServer(bb);
 }
