@@ -16,7 +16,8 @@ Superhuman-style features for BB:
   thumb-sized buttons, an optional thread title, and a swipe down a terminal to
   hide its keyboard.
 - **Zoom Lock.** No zooming the page, off by default.
-- **UI Polish.** Icons in one tone, and even menu rows.
+- **UI Polish.** Icons in one tone, even menu rows, and a thread bar without
+  the git action or external editor picker.
 
 ## Install
 

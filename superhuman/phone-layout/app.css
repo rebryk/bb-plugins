@@ -169,18 +169,6 @@
         max-height: none;
       }
 
-      /*
-       * A thread's bar drops BB's git action, such as Commit, which BB shows
-       * while the workspace has changes: a plain button, or a split one after
-       * the button that opens the workspace in an app.
-       */
-      > [data-app-page-header-actions] > [data-thread-header-workflow-actions] > :is(
-          [data-thread-header-responsive-action]:has(> button),
-          [data-thread-header-responsive-action] ~ [data-thread-header-responsive-action]
-        ) {
-        display: none;
-      }
-
       /* A title, or the icon before a plugin page's, starts where the box's text does. */
       > div:not([data-app-page-header-actions]) > div:has(p) {
         padding-left: calc(
