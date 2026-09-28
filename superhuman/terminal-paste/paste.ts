@@ -7,8 +7,10 @@ const TERMINAL = "[data-app-terminal] .xterm";
 
 // Hugeicons' clipboard-paste icon, from the set BB draws its own icons from.
 // MIT License, Copyright (c) 2025 Hugeicons.
+// data-icon-root is how BB marks its own icons, so the styles that color BB's
+// icons, a theme's among them, color this one the same.
 const ICON =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<svg data-icon-root="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M19.502 13.0005H10.502"/>' +
   '<path d="M17.502 10.0005C17.502 10.0005 20.5019 12.21 20.502 13.0005C20.502 13.7911 17.502 16.0005 17.502 16.0005"/>' +
   '<path d="M13.998 2.00049H8.99805C8.16962 2.00049 7.49805 2.67206 7.49805 3.50049C7.49805 4.32892 8.16962 5.00049 8.99805 5.00049H13.998C14.8265 5.00049 15.498 4.32892 15.498 3.50049C15.498 2.67206 14.8265 2.00049 13.998 2.00049Z"/>' +

@@ -1,8 +1,10 @@
 /*
  * BB tints the icons in its bars in three tones, some near white and some
  * gray, even within one bar, and fades the sidebar's a little more. Here they
- * share one, the subtle foreground; text such as the thread's title and the
- * selected tab stay brighter, and other plugins' images keep their colors.
+ * share one, the subtle foreground, and so do the icons of plugins that mark
+ * them as BB does, such as this plugin's buttons. Text such as the thread's
+ * title and the selected tab stay brighter, and other plugins' images keep
+ * their colors.
  */
 :is(
     [data-testid="app-page-header-content-row"],
@@ -17,13 +19,6 @@
   color: var(--subtle-foreground);
   /* Over the fade of the sidebar's footer and of Superhuman's tiles. */
   opacity: 1 !important;
-}
-
-/* Other plugins' buttons in the thread header, such as Bookmarks', too. */
-[data-thread-header-workflow-actions] [data-bb-plugin-root]
-  button:not([aria-pressed="true"])
-  > svg:not([data-icon-root]) {
-  color: var(--subtle-foreground);
 }
 
 /*

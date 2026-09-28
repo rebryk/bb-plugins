@@ -6,6 +6,15 @@
 @media (width < 48rem) and (pointer: coarse) {
   html[data-phone-layout] {
     /*
+     * The bars' buttons are bigger than BB's, to suit a thumb: 44px with 24px
+     * icons, in bars 56px tall.
+     */
+    --phone-layout-bar-height: calc(var(--spacing, 0.25rem) * 14);
+    --phone-layout-button-size: calc(var(--spacing, 0.25rem) * 11);
+    --phone-layout-icon-size: calc(var(--spacing, 0.25rem) * 6);
+    --phone-layout-button-gap: calc(var(--spacing, 0.25rem) * 0.5);
+
+    /*
      * BB stacks a page's header and its content in one column: a thread,
      * Settings, Plugins, Skills and every plugin page. The header keeps BB's
      * look; only its hairline moves to the edge that faces the content.
@@ -14,10 +23,6 @@
       order: 1;
       border-top-width: 1px;
       border-bottom-width: 0;
-
-      > [data-testid="app-page-header-content-row"] {
-        anchor-name: --bottom-bar;
-      }
     }
 
     /*
@@ -30,38 +35,32 @@
     }
 
     /*
-     * The sidebar button is a fixed overlay at the top left. It moves down with
-     * the bar.
+     * The sidebar opens with a swipe from the screen's left edge, so its
+     * button goes, and so does the room BB keeps for it at the bar's left.
      */
-    [data-testid="app-layout-root"]:has(
-        > main header > [data-testid="app-page-header-content-row"]
-      )
-      > [data-testid="app-sidebar-trigger-overlay"] {
-      position-anchor: --bottom-bar;
-      top: anchor(top);
+    [data-testid="app-sidebar-trigger-overlay"] {
+      display: none;
+    }
 
-      @supports not (anchor-name: --bottom-bar) {
-        top: auto;
-        /* The row overhangs the bar's bottom by the hairline's pixel. */
-        bottom: calc(env(safe-area-inset-bottom, 0px) - 1px);
-      }
-
-      body[style*="--bb-safe-area-bottom"] & {
-        display: none;
-      }
+    header > [data-testid="app-page-header-content-row"][class*="pointer-coarse:pl-[40px]"] {
+      padding-left: 0;
     }
 
     /*
-     * The home page has no header, only the sidebar and right panel buttons at
-     * its top corners. They move to a row of the header's height at the bottom,
-     * where a header's buttons would be.
+     * The home page has no header, only a button at each top corner. The right
+     * panel's moves to a row of the header's height at the bottom, where a
+     * header's would be: centered in a row that overhangs the bottom by the
+     * hairline's pixel.
      */
     main:has(> div > [aria-label*="right panel"]) {
       padding-bottom: var(--bb-app-chrome-row-height);
 
       > div:has(> [aria-label*="right panel"]) {
         top: auto;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 5px);
+        bottom: calc(
+          env(safe-area-inset-bottom, 0px) +
+            (var(--bb-app-chrome-row-height) - var(--phone-layout-button-size)) / 2 - 1px
+        );
       }
 
       body[style*="--bb-safe-area-bottom"] & {
@@ -73,38 +72,137 @@
       }
     }
 
-    [data-testid="app-layout-root"]:has(
-        > main main > div > [aria-label*="right panel"]
-      )
-      > [data-testid="app-sidebar-trigger-overlay"] {
-      top: auto;
-      bottom: calc(env(safe-area-inset-bottom, 0px) - 1px);
-
-      body[style*="--bb-safe-area-bottom"] & {
-        display: none;
-      }
+    /*
+     * The bars and their buttons take the sizes above: the page's header, the
+     * home page's row, and the right panel's row.
+     */
+    :is(
+      header:has(> [data-testid="app-page-header-content-row"]),
+      main:has(> div > [aria-label*="right panel"]),
+      [data-testid="secondary-panel-shelf"]
+    ) {
+      --bb-app-chrome-row-height: var(--phone-layout-bar-height);
     }
 
     /*
-     * Down in the bar, the sidebar button stays on the page as the sidebar or
-     * the right panel pushes the page aside. layout.ts moves it with the page.
+     * Every button, whoever adds it: BB, this plugin or another. BB's buttons
+     * with text and the tabs have their own rules below.
+     *
+     * The browser tries these rules on every button, link, icon and image of
+     * the page each time the page restyles, which happens often, as when the
+     * keyboard opens. So each bar has a rule of its own, which starts from a
+     * tag such as header or aside that rules out most of the page at once, and
+     * a tab's buttons are told apart by their parent alone.
      */
-    [data-testid="app-layout-root"]:has(
-        > main :is(header > [data-testid="app-page-header-content-row"], main > div > [aria-label*="right panel"])
-      )
-      > [data-testid="app-sidebar-trigger-overlay"] {
-      &[data-panel-shelf] {
-        visibility: visible;
+    header > [data-testid="app-page-header-content-row"]
+      :is(button, a):not([class*="pointer-coarse:h-9"]) {
+      min-width: var(--phone-layout-button-size);
+      min-height: var(--phone-layout-button-size);
+
+      :is(svg, img) {
+        width: var(--phone-layout-icon-size);
+        height: var(--phone-layout-icon-size);
+      }
+    }
+
+    main > div > [aria-label*="right panel"] {
+      min-width: var(--phone-layout-button-size);
+      min-height: var(--phone-layout-button-size);
+
+      :is(svg, img) {
+        width: var(--phone-layout-icon-size);
+        height: var(--phone-layout-icon-size);
+      }
+    }
+
+    aside [data-testid="thread-secondary-panel-top-chrome"]
+      :is(button, a):not([class*="pointer-coarse:h-9"], [class*="group/tab-pill"] > *) {
+      min-width: var(--phone-layout-button-size);
+      min-height: var(--phone-layout-button-size);
+
+      :is(svg, img) {
+        width: var(--phone-layout-icon-size);
+        height: var(--phone-layout-icon-size);
+      }
+    }
+
+    header > [data-testid="app-page-header-content-row"] {
+      &,
+      :is([data-app-page-header-actions], [data-thread-header-workflow-actions]) {
+        gap: var(--phone-layout-button-gap);
       }
 
-      body:not([style*="--bb-safe-area-bottom"])
-        [data-testid="app-layout-root"]:has(> main[data-sidebar-shelf="open"])
-        > & {
-        display: flex;
+      /*
+       * Buttons with text or an app's icon, such as Commit and the split
+       * button that opens the workspace in an app, take the buttons' height
+       * but keep BB's padding, which leaves Commit room in the bar.
+       */
+      button[class*="pointer-coarse:h-9"] {
+        height: var(--phone-layout-button-size);
+
+        img {
+          width: calc(var(--spacing, 0.25rem) * 5);
+          height: calc(var(--spacing, 0.25rem) * 5);
+        }
+
+        svg.size-3 {
+          width: calc(var(--spacing, 0.25rem) * 3.5);
+          height: calc(var(--spacing, 0.25rem) * 3.5);
+        }
       }
 
-      body[style*="--bb-safe-area-bottom"] & {
-        display: none;
+      /* Other plugins' buttons sit in a box that BB caps at the desktop's height. */
+      [data-bb-plugin-root] > span[class*="max-h-7"] {
+        max-height: none;
+      }
+    }
+
+    aside [data-testid="thread-secondary-panel-top-chrome"] {
+      /* The groups of buttons sit as close as the buttons, to leave the tabs room. */
+      &,
+      > :not([role="toolbar"]),
+      [data-testid="mobile-panel-tab-pager"],
+      [data-testid="mobile-panel-tab-pager"] > div {
+        gap: var(--phone-layout-button-gap);
+      }
+
+      /*
+       * A tab is a pill around a button with the tab's icon: a square button
+       * for a view, and one with a title for a terminal or a file. In the open
+       * tab, a button to close it covers the icon.
+       */
+      [class*="group/tab-pill"] {
+        height: var(--phone-layout-button-size);
+
+        > button:not([data-tab-pill-close]) {
+          height: 100%;
+
+          > span:first-child:has(> :is(svg, img)) {
+            &,
+            > :is(svg, img) {
+              width: var(--phone-layout-icon-size);
+              height: var(--phone-layout-icon-size);
+            }
+          }
+        }
+
+        > button[class*="pointer-coarse:w-9"] {
+          width: var(--phone-layout-button-size);
+        }
+
+        > button[class*="pointer-coarse:pl-9"] {
+          padding-left: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
+        }
+
+        > [data-tab-pill-close] {
+          min-width: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
+          min-height: var(--phone-layout-button-size);
+
+          svg {
+            width: calc(var(--spacing, 0.25rem) * 4);
+            height: calc(var(--spacing, 0.25rem) * 4);
+          }
+        }
       }
     }
 
@@ -142,16 +240,16 @@
      * actions, then the recent files. It opens scrolled to the bottom.
      */
     [data-testid="secondary-panel-shelf"]
-      :has(> * > * > [data-testid="new-tab-actions"]) {
+      :has(> [data-panel-new-tab-page] > * > [data-testid="new-tab-actions"]) {
       display: flex;
       flex-direction: column-reverse;
 
-      > * {
+      > [data-panel-new-tab-page] {
         justify-content: flex-end;
-      }
 
-      > * > :has(> [data-testid="new-tab-actions"]) {
-        flex-direction: column-reverse;
+        > * {
+          flex-direction: column-reverse;
+        }
       }
     }
 
@@ -183,10 +281,50 @@
       > [data-testid="sidebar-navigation-region"] {
         order: 2;
 
+        /* The tiles take the size of the bars' buttons. */
+        [data-dia-sidebar] {
+          --dia-sidebar-button-size: var(--phone-layout-button-size);
+          --dia-sidebar-icon-size: var(--phone-layout-icon-size);
+        }
+
         [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
-          --dia-sidebar-row-inset: calc((var(--bb-app-chrome-row-height) - var(--dia-sidebar-button-size)) / 2);
+          --dia-sidebar-row-inset: calc((var(--phone-layout-bar-height) - var(--dia-sidebar-button-size)) / 2);
+          gap: var(--phone-layout-button-gap);
           padding-top: var(--dia-sidebar-row-inset);
           padding-bottom: calc(var(--dia-sidebar-row-inset) - 1px);
+
+          /*
+           * Tiles that don't fit in one row at that size narrow, down to BB's
+           * size, so the arrow stays at the row's end.
+           */
+          > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
+            flex: 1 1 calc(var(--spacing, 0.25rem) * 9);
+            max-width: var(--dia-sidebar-button-size);
+          }
+
+          :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]) {
+            width: 100%;
+          }
+
+          /*
+           * The "…" at the end of the tiles becomes an arrow toward the rest of
+           * the navigation, in the tone UI Polish gives the other tiles' icons.
+           */
+          [data-testid="sidebar-navigation-more-trigger"] {
+            > svg {
+              display: none;
+            }
+
+            &::before {
+              content: "";
+              flex-shrink: 0;
+              width: var(--dia-sidebar-icon-size);
+              height: var(--dia-sidebar-icon-size);
+              background-color: var(--subtle-foreground);
+              mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18'/%3E%3C/svg%3E")
+                center / contain no-repeat;
+            }
+          }
         }
       }
 
@@ -202,12 +340,6 @@
      * the app's, Settings', Plugins' and Skills'.
      */
     [data-testid$="-sidebar-top-reserve-row"] { display: none; }
-
-    /* The sidebar button hides with its row; a tap outside the sidebar closes it. */
-    [data-testid="app-layout-root"]:has(> [data-sidebar="panel"][data-state="open"] [data-dia-sidebar])
-      > [data-testid="app-sidebar-trigger-overlay"] {
-      display: none;
-    }
   }
 }
 

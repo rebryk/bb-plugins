@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useSettings, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
+import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
 import { startPanelSlide } from "./slide";
 import "./app.css";
@@ -12,7 +13,11 @@ function PhoneLayout() {
   const title = values?.threadTitle !== false;
   useEffect(() => {
     if (!enabled) return;
-    const stops = [startPhoneLayout(document), startPanelSlide(document)];
+    const stops = [
+      startPhoneLayout(document),
+      startPanelSlide(document),
+      startKeyboardSwipe(document),
+    ];
     return () => stops.forEach((stop) => stop());
   }, [enabled]);
   useEffect(() => {

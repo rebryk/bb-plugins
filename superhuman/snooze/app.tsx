@@ -519,6 +519,8 @@ function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
         strokeWidth={1.5}
         fill={until === undefined ? "none" : "currentColor"}
         className="max-md:pointer-coarse:size-5"
+        // How BB marks its own icons, so the styles for those color it too.
+        data-icon-root=""
       />
     </button>
   );

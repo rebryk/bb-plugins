@@ -26,6 +26,8 @@ function ArchiveButton({ threadId }: PluginThreadHeaderActionProps) {
         size={16}
         strokeWidth={1.5}
         className="max-md:pointer-coarse:size-5"
+        // How BB marks its own icons, so the styles for those color it too.
+        data-icon-root=""
       />
     </button>
   );

@@ -9,11 +9,11 @@ Superhuman-style features for BB:
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Phone Layout.** BB's bars at the bottom of a phone's screen, with or
-  without the thread's title.
+- **Phone Layout.** BB's bars at the bottom of a phone's screen, with
+  thumb-sized buttons, an optional thread title, and a swipe down a terminal to
+  hide its keyboard.
 - **Zoom Lock.** No zooming the page, off by default.
-- **UI Polish.** Icons in one tone, including other plugins' in the thread
-  header, and even menu rows.
+- **UI Polish.** Icons in one tone, and even menu rows.
 
 ## Install
 
