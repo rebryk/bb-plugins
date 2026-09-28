@@ -392,6 +392,9 @@
      toggle, moved the same way; outside full screen, the row stays there as
      empty room for the window buttons, which BB's toggle starts 84 px in to
      clear. */
+  /* These structural selectors provide the first paint. shell-theme.ts
+     replaces their conditions with maintained attributes once the frontend
+     loads, preserving declarations and specificity. */
   @supports (anchor-name: --sf-card) {
     [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) > main[data-sidebar="inset"] {
       anchor-name: --sf-card;
