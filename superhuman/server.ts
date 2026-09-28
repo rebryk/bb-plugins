@@ -29,6 +29,12 @@ export default async function plugin(bb: BbPluginApi) {
       description: "On a phone, the bars move to the bottom.",
       default: true,
     },
+    haptics: {
+      type: "boolean",
+      label: "Haptics",
+      description: "On a phone, a light tap as the sidebar or right panel opens or closes.",
+      default: true,
+    },
     threadTitle: {
       type: "boolean",
       label: "Thread title",
