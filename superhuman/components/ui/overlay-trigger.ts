@@ -21,7 +21,9 @@ export const getOverlayTriggerClassName: OverlayTriggerClassNameResolver = (
   className,
 ) => cn(OVERLAY_TRIGGER_CLASS_NAME, className);
 
-function isKeyboardInputElement(element: Element): element is HTMLElement {
+export function isKeyboardInputElement(
+  element: Element,
+): element is HTMLElement {
   if (element instanceof HTMLTextAreaElement) return true;
   if (element instanceof HTMLInputElement) {
     return (
