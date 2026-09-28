@@ -4,7 +4,8 @@ Superhuman-style features for BB:
 
 - **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and
   number keys for a new thread's menus.
-- **Snooze.** Hide a thread until a set time or until its agent needs you.
+- **Snooze.** Hide a thread until a set time or until its agent needs you; use
+  the moon in its header or before Archive in the sidebar row.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.

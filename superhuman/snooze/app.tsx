@@ -35,6 +35,8 @@ import { cn } from "../lib/utils";
 import type { Snooze, rpcContract } from "./server";
 import { CHANGED_CHANNEL } from "./shared";
 import { nextThread, sidebarThreadIds } from "./sidebar";
+import { mountRowButtons } from "./row-button";
+import "./app.css";
 import {
   fmtUntil,
   fmtWhen,
@@ -527,6 +529,14 @@ function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
 }
 
 export default function registerSnooze(app: PluginAppBuilder) {
+  app.contentScripts.register({
+    id: "snooze-row-buttons",
+    mount: (context) =>
+      mountRowButtons(context, (threadId) =>
+        openDialog({ kind: "snooze", threadId }),
+      ),
+  });
+
   app.slots.experimental_threadHeaderAction({
     id: "snooze",
     title: "Snooze thread",

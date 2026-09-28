@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.3 (2026-09-27)
+
+- Snooze adds a moon button before Archive in the sidebar's thread rows. It
+  opens the picker for that row without switching the open thread.
+
 ## 0.1.2 (2026-09-27)
 
 - Phone Layout makes the buttons in a phone's bars bigger, for the thumb: 44px

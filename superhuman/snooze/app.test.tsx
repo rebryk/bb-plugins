@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import {
   loadPluginApp,
+  mountPluginContentScripts,
   renderSlot,
   type CapturedPluginApp,
 } from "@get-bb/plugin-sdk/testing/app";
@@ -152,6 +153,49 @@ describe("registrations", () => {
     expect(snooze?.isAvailable?.({ threadId: null })).toBe(false);
     expect(snooze?.isAvailable?.({ threadId: "t1" })).toBe(true);
   });
+});
+
+it("opens Snooze for a redrawn sidebar row without navigating, and cleans up", async () => {
+  const { app, slot } = await openDialog("snooze-thread", {
+    snoozes: [],
+    last: null,
+  });
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+  sidebar(`<div data-sidebar-rename-row>
+    <a data-sidebar-thread-id="t1" data-sidebar-thread-shortcut-target></a>
+    <span data-sidebar-row-controls><button aria-label="Archive thread"></button></span>
+  </div>`);
+  const scripts = await mountPluginContentScripts(app, {
+    pluginId: "superhuman",
+  });
+  try {
+    const archive = screen.getByRole("button", { name: "Archive thread" });
+    expect(archive.previousElementSibling).toBe(
+      screen.getByRole("button", { name: "Snooze thread" }),
+    );
+    // BB replaces the controls when a row leaves and re-enters the viewport.
+    archive.parentElement!.replaceChildren(archive.cloneNode());
+    const button = await screen.findByRole("button", { name: "Snooze thread" });
+    expect(
+      screen.getAllByRole("button", { name: "Snooze thread" }),
+    ).toHaveLength(1);
+    fireEvent.click(button);
+    fireEvent.click(await screen.findByText("Tomorrow"));
+    await vi.waitFor(() => {
+      expect(slot.inspection.rpcCalls).toContainEqual({
+        method: "snooze",
+        input: {
+          threadId: "t1",
+          until: new Date(2026, 8, 27, 9).getTime(),
+          choice: { kind: "preset", id: "tomorrow" },
+        },
+      });
+    });
+    expect(slot.inspection.navigateCalls).toEqual([]);
+  } finally {
+    await scripts.lifecycle.dispose();
+  }
+  expect(document.querySelector("[data-superhuman-snooze-button]")).toBeNull();
 });
 
 describe("sidebar order", () => {
