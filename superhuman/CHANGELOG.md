@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.9 (2026-09-28)
+
+- Phone Layout spreads the buttons of a thread's bar without its title so that
+  their icons sit as far from the card's sides as from each other.
+
 ## 0.1.8 (2026-09-28)
 
 - Phone Layout stops a thread's messages at their first and last line instead
