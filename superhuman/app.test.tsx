@@ -25,7 +25,7 @@ it("registers every feature under an id of its own", async () => {
     sidebarFooterItems: ids(app.experimentalSidebarFooterItems),
   };
   expect(registered).toEqual({
-    contentScripts: ["hotkeys", "terminal-paste"],
+    contentScripts: ["hotkeys", "terminal-paste", "ui-polish"],
     appOverlays: [
       "hotkeys-bridge",
       "snooze-dialogs",
