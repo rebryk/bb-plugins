@@ -182,13 +182,14 @@ interface Plan {
 }
 
 /**
- * Capacity relative to Plus, as OpenAI states it: Pro $100 is 5x, Pro $200 is
- * 20x. Plans without a stated multiplier count as 1x.
+ * Capacity relative to Plus: Pro $100 and Business $100 are 5x, Pro $200 is
+ * 20x. See https://learn.chatgpt.com/docs/pricing for the plan multipliers.
+ * Plans without a stated multiplier count as 1x.
  */
 const CODEX_PLANS = new Map<string, Plan>([
   ["pro", { tier: "Pro 20x", weight: 20 }],
   ["prolite", { tier: "Pro 5x", weight: 5 }],
-  ["self_serve_business_prolite", { tier: "Biz Pro Lite", weight: 1 }],
+  ["self_serve_business_prolite", { tier: "Biz Pro Lite", weight: 5 }],
   ["plus", { tier: "Plus", weight: 1 }],
   ["team", { tier: "Team", weight: 1 }],
   ["business", { tier: "Business", weight: 1 }],
