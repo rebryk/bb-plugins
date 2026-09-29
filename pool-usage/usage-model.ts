@@ -148,7 +148,8 @@ function resetSteps(
 /**
  * The reset worth spending: plan weight times what it frees, summed until
  * the account would free up on its own, within a week. Of resets worth about
- * the same, the one that expires first. Only a reset that lowers `used` now.
+ * the same, the one that expires first. Only a reset that lowers the
+ * percentage shown now.
  */
 function planReset(
   accounts: readonly UsageAccount[],
@@ -182,7 +183,7 @@ function planReset(
       other === account ? after : other,
     );
     const usedAfter = usageAt(swapped, now, switchThreshold)?.used ?? used;
-    if (used - usedAfter < VISIBLE_CHANGE) continue;
+    if (formatPercent(usedAfter) === formatPercent(used)) continue;
     const times = [account.heldUntil, ...account.windows.map((w) => w.resetAt)]
       .filter(
         (time): time is number => time !== null && time > now && time < end,

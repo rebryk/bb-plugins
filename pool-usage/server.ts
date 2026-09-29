@@ -181,7 +181,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ accountId: z.string().min(1), requestId: z.uuid() }),
     output: z.discriminatedUnion("outcome", [
       z.object({ outcome: z.literal("reset") }),
-      /** The provider kept the reset; the message says why. */
+      /** This try spent nothing; the message says why. */
       z.object({ outcome: z.literal("refused"), message: z.string() }),
     ]),
   },
@@ -761,6 +761,9 @@ async function fetchSwitchThreshold(bb: BbPluginApi): Promise<number> {
 
 /** Counts change only when a grant arrives or someone spends a reset. */
 const RESETS_TTL_MS = 10 * 60_000;
+/** How long a retry remembers the reset its request sent. */
+const SENT_RESET_TTL_MS = 24 * 60 * 60_000;
+const SENT_RESET_KEY = "sentReset:";
 const CODEX_API = "https://chatgpt.com/backend-api/wham";
 const CLAUDE_API = "https://api.anthropic.com/api";
 /** The Claude windows a grant clears, by their length in minutes. */
@@ -775,7 +778,10 @@ const REFUSALS = new Set([
   "not_limited",
   "ineligible",
   "already_used",
+  "already_redeemed",
 ]);
+/** Refusals that, to a retry, mean its first try used the reset. */
+const REPEATS = new Set(["already_used", "already_redeemed"]);
 
 interface AccountResets {
   count: number;
@@ -791,6 +797,11 @@ interface AccountResets {
 type SpendOutcome =
   { outcome: "reset" } | { outcome: "refused"; message: string };
 
+interface SentReset {
+  resetId: string;
+  sentAt: number;
+}
+
 // The providers' replies are undocumented, so they're read field by field.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
@@ -798,6 +809,10 @@ type Json = any;
 function parseTime(value: unknown): number | null {
   const time = Date.parse(String(value));
   return Number.isNaN(time) ? null : time;
+}
+
+function isCount(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0;
 }
 
 /** A reset without a readable end stays open, as Claude Code reads it. */
@@ -820,8 +835,14 @@ async function fetchJson(
     // A spend clears the limits before it answers.
     signal: AbortSignal.timeout(body === undefined ? 10_000 : 30_000),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  if (response.ok) return response.json();
+  // A spend the provider refuses may answer with an error status.
+  const reply: Json =
+    body === undefined ? null : await response.json().catch(() => null);
+  if ((reply?.code ?? reply?.result) === undefined) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return reply;
 }
 
 export default function plugin(bb: BbPluginApi): void {
@@ -848,8 +869,9 @@ export default function plugin(bb: BbPluginApi): void {
     string,
     { readAt: number; value: Promise<AccountResets | null> }
   >();
-  /** The credit or grant each request spends, so a retry names the same. */
-  const sentResets = new Map<string, string>();
+  /** Accounts with a spend on its way. */
+  const spending = new Set<string>();
+  let claudeAgent: { readAt: number; value: Promise<string> } | null = null;
   let codexPlanCache: { expiresAt: number; plans: Map<string, Plan> } | null =
     null;
   let snapshot: { readAt: number; value: UsageSnapshot } | null = null;
@@ -917,31 +939,51 @@ export default function plugin(bb: BbPluginApi): void {
         originator: "bb",
       };
     }
-    const { providers } = await bb.sdk.system
-      .providerStates({ signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS) })
-      .catch(() => ({ providers: [] }));
-    const version = /\d+\.\d+\.\d+/u.exec(
-      providers.find(({ providerId }) => providerId === POOL_PROVIDERS.claude)
-        ?.installedVersion ?? "",
-    )?.[0];
     return {
       ...auth,
       "anthropic-beta": "oauth-2025-04-20",
-      // Claude reports resets only to Claude Code, which it knows by this.
-      "user-agent": `claude-cli/${version ?? "2.1.284"} (external, cli)`,
+      "user-agent": await claudeUserAgent(),
     };
   }
 
-  async function readResets(account: PoolAccount): Promise<AccountResets> {
-    const headers = await authHeaders(account);
+  /** Claude reports resets only to Claude Code, which it knows by this. */
+  function claudeUserAgent(): Promise<string> {
+    if (
+      claudeAgent === null ||
+      Date.now() - claudeAgent.readAt >= RESETS_TTL_MS
+    ) {
+      const value = (async () => {
+        const { providers } = await bb.sdk.system.providerStates({
+          signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
+        });
+        return /\d+\.\d+\.\d+/u.exec(
+          providers.find(
+            ({ providerId }) => providerId === POOL_PROVIDERS.claude,
+          )?.installedVersion ?? "",
+        )?.[0];
+      })()
+        .catch(() => undefined)
+        .then(
+          (version) => `claude-cli/${version ?? "2.1.284"} (external, cli)`,
+        );
+      claudeAgent = { readAt: Date.now(), value };
+    }
+    return claudeAgent.value;
+  }
+
+  async function readResets(
+    account: PoolAccount,
+    headers: Record<string, string>,
+  ): Promise<AccountResets> {
     const now = Date.now();
     if (account.provider === "codex") {
       const [usage, list] = await Promise.all([
         fetchJson(`${CODEX_API}/usage`, headers),
         fetchJson(`${CODEX_API}/rate-limit-reset-credits`, headers),
       ]);
-      const count = usage.rate_limit_reset_credits?.available_count ?? 0;
-      if (typeof count !== "number") throw new Error("unreadable reset count");
+      const count: unknown =
+        usage.rate_limit_reset_credits?.available_count ?? 0;
+      if (!isCount(count)) throw new Error("unreadable reset count");
       // The credit that expires first; a Codex reset clears every window.
       const next = (list.credits as Json[])
         .filter(
@@ -973,7 +1015,7 @@ export default function plugin(bb: BbPluginApi): void {
     const open: Json[] = program.grants.filter(
       (grant: Json) =>
         grant?.paused !== true &&
-        Number.isInteger(grant.resets_left) &&
+        isCount(grant.resets_left) &&
         isOpen(grant.ends_at, now),
     );
     // The grant Claude Code would claim.
@@ -999,35 +1041,49 @@ export default function plugin(bb: BbPluginApi): void {
     };
   }
 
-  /** Read again after ten minutes; a failed read keeps the last one. */
+  /**
+   * Read again after ten minutes, showing the last read meanwhile. A failed
+   * read shows none, since the login may have ended.
+   */
   function cachedResets(account: PoolAccount): Promise<AccountResets | null> {
     const hit = resetCache.get(account.id);
     if (hit !== undefined && Date.now() - hit.readAt < RESETS_TTL_MS) {
       return hit.value;
     }
-    const value = readResets(account).catch((cause: unknown) => {
-      bb.log.debug(
-        `Could not read resets for ${account.provider} account ${account.id}: ${errorMessage(cause)}`,
-      );
-      return hit?.value ?? null;
-    });
+    const value = authHeaders(account)
+      .then((headers) => readResets(account, headers))
+      .catch((cause: unknown) => {
+        bb.log.debug(
+          `Could not read resets for ${account.provider} account ${account.id}: ${errorMessage(cause)}`,
+        );
+        return null;
+      });
     resetCache.set(account.id, { readAt: Date.now(), value });
-    return value;
+    return hit?.value ?? value;
   }
 
   /**
    * Spends the account's next reset as Claude Code and Codex do. A retry
    * sends the same request for the same reset, which the provider applies
-   * once.
+   * once, even after a reload.
    */
   async function spendReset(
     account: PoolAccount,
     requestId: string,
   ): Promise<SpendOutcome> {
-    const headers = await authHeaders(account);
-    const retry = sentResets.has(requestId);
+    let headers: Record<string, string>;
+    try {
+      headers = await authHeaders(account);
+    } catch (cause) {
+      return {
+        outcome: "refused",
+        message: `Pool Usage can't use the account's login: ${errorMessage(cause)}. Nothing was used.`,
+      };
+    }
+    const key = `${SENT_RESET_KEY}${account.id}:${requestId}`;
+    const sent = await bb.storage.kv.get<SentReset>(key);
     const resetId =
-      sentResets.get(requestId) ?? (await readResets(account)).next?.id;
+      sent?.resetId ?? (await readResets(account, headers)).next?.id;
     if (resetId === undefined) {
       return {
         outcome: "refused",
@@ -1047,23 +1103,40 @@ export default function plugin(bb: BbPluginApi): void {
         request_id: requestId,
       };
     }
-    sentResets.set(requestId, resetId);
+    await bb.storage.kv.set(key, { resetId, sentAt: Date.now() });
     const reply = await fetchJson(url, headers, body);
     const answer = String(reply?.code ?? reply?.result);
-    if (
-      answer === "reset" ||
-      answer === "already_redeemed" ||
-      (retry && answer === "already_used")
-    ) {
+    if (answer === "reset" || (sent !== undefined && REPEATS.has(answer))) {
       return { outcome: "reset" };
     }
     if (!REFUSALS.has(answer)) throw new Error(`the provider said ${answer}`);
     return {
       outcome: "refused",
-      message: retry
-        ? "The reset isn't available any more. The earlier try may have used it."
-        : `${account.provider === "claude" ? "Claude" : "Codex"} kept the reset (${answer}). Nothing was used.`,
+      message:
+        sent !== undefined
+          ? "The reset isn't available any more. The earlier try may have used it."
+          : `${account.provider === "claude" ? "Claude" : "Codex"} kept the reset (${answer}). Nothing was used.`,
     };
+  }
+
+  /** Forgets the resets that retries no longer need. */
+  async function pruneSentResets(): Promise<void> {
+    for (const key of await bb.storage.kv.list(SENT_RESET_KEY)) {
+      const sent = await bb.storage.kv.get<SentReset>(key);
+      if (!(Date.now() - (sent?.sentAt ?? 0) < SENT_RESET_TTL_MS)) {
+        await bb.storage.kv.delete(key);
+      }
+    }
+  }
+
+  async function readPoolStatus(): Promise<PoolStatus> {
+    return bb.sdk.plugins.callRpc({
+      pluginId: POOL_PLUGIN_ID,
+      method: "status.get",
+      input: null,
+      outputSchema: poolStatusSchema,
+      signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
+    });
   }
 
   /**
@@ -1074,12 +1147,7 @@ export default function plugin(bb: BbPluginApi): void {
   async function readPool(): Promise<UsageSnapshot & { served: Set<string> }> {
     let status: PoolStatus;
     try {
-      status = await bb.sdk.plugins.callRpc({
-        pluginId: POOL_PLUGIN_ID,
-        method: "status.get",
-        input: null,
-        outputSchema: poolStatusSchema,
-      });
+      status = await readPoolStatus();
     } catch (cause) {
       bb.log.debug(
         `Could not read Account Pooler status: ${errorMessage(cause)}`,
@@ -1101,12 +1169,21 @@ export default function plugin(bb: BbPluginApi): void {
     const accounts = status.accounts.filter((account) =>
       pooled.includes(account.provider),
     );
+    const spendable = accounts.filter(
+      ({ enabled, kind }) => enabled && kind === "oauth",
+    );
+    for (const id of resetCache.keys()) {
+      if (!spendable.some((account) => account.id === id)) {
+        resetCache.delete(id);
+      }
+    }
     if (accounts.length === 0) return { providers: [], accounts: [], served };
     // Resets come from the providers, so they load alongside the rest.
     const pendingResets = Promise.all(
-      accounts
-        .filter(({ enabled, kind }) => enabled && kind === "oauth")
-        .map(async (account) => [account.id, await cachedResets(account)]),
+      spendable.map(async (account) => [
+        account.id,
+        await cachedResets(account),
+      ]),
     ).then((entries) => new Map(entries as [string, AccountResets | null][]));
     const plans = await codexPlans(accounts);
     const switchThreshold = await fetchSwitchThreshold(bb);
@@ -1175,16 +1252,9 @@ export default function plugin(bb: BbPluginApi): void {
       return pending;
     },
     reset_use: async ({ accountId, requestId }): Promise<SpendOutcome> => {
-      const status = await bb.sdk.plugins
-        .callRpc({
-          pluginId: POOL_PLUGIN_ID,
-          method: "status.get",
-          input: null,
-          outputSchema: poolStatusSchema,
-        })
-        .catch(() => {
-          throw new Error("Couldn't reach Account Pooler. Nothing was used.");
-        });
+      const status = await readPoolStatus().catch(() => {
+        throw new Error("Couldn't reach Account Pooler. Nothing was used.");
+      });
       const account = status.accounts.find(
         ({ id, enabled, kind }) =>
           id === accountId && enabled && kind === "oauth",
@@ -1195,10 +1265,28 @@ export default function plugin(bb: BbPluginApi): void {
           message: "Account Pooler no longer serves that account.",
         };
       }
+      if (spending.has(accountId)) {
+        return {
+          outcome: "refused",
+          message: "A reset for this account is already on its way.",
+        };
+      }
+      spending.add(accountId);
+      let outcome: SpendOutcome | undefined;
       try {
-        const outcome = await spendReset(account, requestId);
-        if (outcome.outcome === "reset") {
-          // Account Pooler reads the cleared usage now, not at its next poll.
+        outcome = await spendReset(account, requestId);
+        return outcome;
+      } catch (cause) {
+        bb.log.debug(
+          `Could not spend a reset for account ${accountId}: ${errorMessage(cause)}`,
+        );
+        throw new Error(
+          "Couldn't use the reset. Trying again won't use a second one.",
+        );
+      } finally {
+        // Account Pooler reads what a spend that wasn't refused may have
+        // cleared now, not at its next poll.
+        if (outcome?.outcome !== "refused") {
           await bb.sdk.plugins
             .callRpc({
               pluginId: POOL_PLUGIN_ID,
@@ -1213,19 +1301,14 @@ export default function plugin(bb: BbPluginApi): void {
               ),
             );
         }
-        return outcome;
-      } catch (cause) {
-        bb.log.debug(
-          `Could not spend a reset for account ${accountId}: ${errorMessage(cause)}`,
-        );
-        throw new Error(
-          "Couldn't use the reset. Trying again won't use a second one.",
-        );
-      } finally {
+        spending.delete(accountId);
         // The next read shows what the spend changed.
-        resetCache.delete(account.id);
+        resetCache.delete(accountId);
         snapshot = null;
         pending = null;
+        await pruneSentResets().catch((cause: unknown) =>
+          bb.log.debug(`Could not prune sent resets: ${errorMessage(cause)}`),
+        );
       }
     },
   });

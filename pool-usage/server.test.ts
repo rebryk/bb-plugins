@@ -628,12 +628,20 @@ describe("plugin", () => {
     )) as UsageSnapshot;
     expect(before.accounts[0]).toMatchObject({ availableResets: 1 });
 
+    // A second spend on the account waits for none, and spends none.
     expect(
-      await harness.behavior.callRpc("reset_use", {
-        accountId,
-        requestId: REQUEST_ID,
-      }),
-    ).toEqual({ outcome: "reset" });
+      await Promise.all(
+        [REQUEST_ID, crypto.randomUUID()].map((requestId) =>
+          harness.behavior.callRpc("reset_use", { accountId, requestId }),
+        ),
+      ),
+    ).toEqual([
+      { outcome: "reset" },
+      {
+        outcome: "refused",
+        message: "A reset for this account is already on its way.",
+      },
+    ]);
     expect(JSON.parse(String(fetch.mock.lastCall?.[1]?.body))).toEqual({
       redeem_request_id: REQUEST_ID,
       credit_id: credit.id,
@@ -649,12 +657,13 @@ describe("plugin", () => {
       "status.get",
       "config.get",
       "status.get",
+      "status.get",
       "account.refreshUsage",
       "status.get",
       "config.get",
     ]);
     expect(
-      harness.inspection.sdk.callsTo("plugins.callRpc")[3]?.[0],
+      harness.inspection.sdk.callsTo("plugins.callRpc")[4]?.[0],
     ).toMatchObject({ pluginId: "account-pool", input: { accountId } });
     await harness.lifecycle.dispose();
   });
@@ -677,31 +686,34 @@ describe("plugin", () => {
       sdk: { plugins: { callRpc: poolerRpc(accounts) } },
     });
     await plugin(bb);
-
-    expect(
-      await harness.behavior.callRpc("reset_use", {
-        accountId,
-        requestId: crypto.randomUUID(),
-      }),
-    ).toEqual({
-      outcome: "refused",
-      message: "Codex kept the reset (nothing_to_reset). Nothing was used.",
-    });
-    consume = () => new Response(null, { status: 429 });
-    await expect(
+    const spend = () =>
       harness.behavior.callRpc("reset_use", {
         accountId,
         requestId: crypto.randomUUID(),
-      }),
-    ).rejects.toThrow(
+      });
+
+    expect(await spend()).toEqual({
+      outcome: "refused",
+      message: "Codex kept the reset (nothing_to_reset). Nothing was used.",
+    });
+    // A refusal may come with an error status.
+    consume = () => Response.json({ code: "no_credit" }, { status: 400 });
+    expect(await spend()).toEqual({
+      outcome: "refused",
+      message: "Codex kept the reset (no_credit). Nothing was used.",
+    });
+    // Nothing changed, so Account Pooler has nothing new to read.
+    expect(poolerMethods(harness)).toEqual(["status.get", "status.get"]);
+
+    consume = () => new Response(null, { status: 429 });
+    await expect(spend()).rejects.toThrow(
       "Couldn't use the reset. Trying again won't use a second one.",
     );
+    // The spend may have cleared the limits, so Account Pooler reads them.
+    expect(poolerMethods(harness).at(-1)).toBe("account.refreshUsage");
     await expect(
       harness.behavior.callRpc("reset_use", { accountId, requestId: "1" }),
     ).rejects.toThrow();
-
-    // Nothing changed, so Account Pooler has nothing new to read.
-    expect(poolerMethods(harness)).toEqual(["status.get", "status.get"]);
     await harness.lifecycle.dispose();
   });
 
@@ -786,6 +798,8 @@ describe("plugin", () => {
               },
               { id: "g2", resets_left: 5, paused: true },
               { id: "g3", resets_left: 1, ends_at: "2020-01-01T00:00:00Z" },
+              { id: "g4", resets_left: -1 },
+              { id: "g5", resets_left: 0.5 },
               "malformed",
             ],
           },
@@ -840,8 +854,10 @@ describe("plugin", () => {
     await harness.lifecycle.dispose();
   });
 
-  it("retries a Codex spend with the credit it sent first", async () => {
+  it("retries a Codex spend with the credit it sent first, even after a reload", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
     const accounts = [pooledCodex()];
+    const accountId = accounts[0]!.id;
     let consumed = 0;
     const fetch = vi.fn(
       async (input: string | URL | Request, _init?: RequestInit) => {
@@ -880,7 +896,7 @@ describe("plugin", () => {
     vi.stubGlobal("fetch", fetch);
     const { bb, harness } = createFakePluginHost({
       pluginId: "pool-usage",
-      dataDir: await storeLogins(accounts),
+      dataDir: await storeLogins(accounts, Date.now() + 48 * 60 * 60_000),
       sdk: { plugins: { callRpc: poolerRpc(accounts) } },
     });
     await plugin(bb);
@@ -892,12 +908,26 @@ describe("plugin", () => {
       availableResets: 2,
       reset: { expiresAt: Date.parse(credit.expires_at), clears: null },
     });
-    const spend = { accountId: accounts[0]!.id, requestId: REQUEST_ID };
+    const spend = { accountId, requestId: REQUEST_ID };
     await expect(
       harness.behavior.callRpc("reset_use", spend),
     ).rejects.toThrow();
-    expect(await harness.behavior.callRpc("reset_use", spend)).toEqual({
-      outcome: "reset",
+    const reloaded = await harness.lifecycle.reload(plugin);
+    expect(await reloaded.harness.behavior.callRpc("reset_use", spend)).toEqual(
+      { outcome: "reset" },
+    );
+
+    // To a first try, a redeemed credit is someone else's spend.
+    vi.setSystemTime(Date.now() + 24 * 60 * 60_000);
+    const requestId = crypto.randomUUID();
+    expect(
+      await reloaded.harness.behavior.callRpc("reset_use", {
+        accountId,
+        requestId,
+      }),
+    ).toEqual({
+      outcome: "refused",
+      message: "Codex kept the reset (already_redeemed). Nothing was used.",
     });
     const consumeBodies = fetch.mock.calls
       .filter(([input]) => String(input).endsWith("/consume"))
@@ -905,7 +935,40 @@ describe("plugin", () => {
     expect(consumeBodies).toEqual([
       { redeem_request_id: REQUEST_ID, credit_id: credit.id },
       { redeem_request_id: REQUEST_ID, credit_id: credit.id },
+      { redeem_request_id: requestId, credit_id: "later" },
     ]);
+    // A day on, the first request's retries are over.
+    expect(await reloaded.bb.storage.kv.list("sentReset:")).toEqual([
+      `sentReset:${accountId}:${requestId}`,
+    ]);
+    await reloaded.harness.lifecycle.dispose();
+  });
+
+  it("shows the last resets while it reads them again, and none it can't read", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const accounts = [pooledCodex()];
+    const fetch = codexWithReset();
+    vi.stubGlobal("fetch", fetch);
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: { plugins: { callRpc: poolerRpc(accounts) } },
+    });
+    await plugin(bb);
+    const read = async (after: number) => {
+      vi.setSystemTime(Date.now() + after);
+      const { accounts } = (await harness.behavior.callRpc(
+        "usage_get",
+      )) as UsageSnapshot;
+      return accounts[0]?.availableResets;
+    };
+
+    expect(await read(0)).toBe(1);
+    fetch.mockImplementation(async () =>
+      Response.json({ rate_limit_reset_credits: { available_count: -1 } }),
+    );
+    expect(await read(10 * 60_000)).toBe(1);
+    expect(await read(15_000)).toBeUndefined();
     await harness.lifecycle.dispose();
   });
 
@@ -926,12 +989,16 @@ describe("plugin", () => {
     expect(
       result.accounts.map(({ availableResets }) => availableResets),
     ).toEqual([undefined, undefined]);
-    await expect(
-      harness.behavior.callRpc("reset_use", {
+    expect(
+      await harness.behavior.callRpc("reset_use", {
         accountId: accounts[0]!.id,
         requestId: REQUEST_ID,
       }),
-    ).rejects.toThrow();
+    ).toEqual({
+      outcome: "refused",
+      message:
+        "Pool Usage can't use the account's login: no live OAuth login. Nothing was used.",
+    });
     expect(fetch).not.toHaveBeenCalled();
     const logs = harness.inspection.logEntries.map(({ message }) => message);
     expect(logs.join("\n")).not.toMatch(/access-token|refresh-token/u);

@@ -16,7 +16,8 @@ gets a new version. Each version is tagged `pool-usage/v<version>`.
   phone, naming the account, when the reset expires, and the total before and
   after. **Use reset** spends it, a toast confirms it, and the card reads
   usage again. A failed try offers **Try again**, which never uses a second
-  reset.
+  reset, even after the plugin restarts, and an account spends one reset at a
+  time.
 - The plugin's server reads the resets every 10 minutes with the access tokens
   Account Pooler stores and spends one only on **Use reset**. It never
   refreshes a token.

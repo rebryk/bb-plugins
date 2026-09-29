@@ -342,6 +342,13 @@ describe("resetPlan", () => {
     ]) {
       expect(summarize([other, account])[0]?.resetPlan).toBeNull();
     }
+    // Nor one that leaves the percentage shown as it is: 25% before and after.
+    const [codex] = summarize([
+      usageAccount({ id: "rest", windows: [quota(300, 0.492)] }),
+      usageAccount({ windows: [quota(300, 0.012)], reset }),
+    ]);
+    expect(codex?.used).toBeCloseTo(0.252);
+    expect(codex?.resetPlan).toBeNull();
   });
 });
 

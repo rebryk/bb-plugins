@@ -33,7 +33,8 @@ Reset to 12% (1 available)
   and after. **Use reset** spends it, a toast confirms it, and the card reads
   usage again. Closing it any other way spends nothing.
 - If a try fails, **Try again** repeats the same request, which never uses a
-  second reset. When the provider keeps the reset, the dialog says why.
+  second reset. When the provider keeps the reset, or the account's login
+  can't be used, the dialog says why.
 - Escape or a click elsewhere closes the card.
 
 **Red at, %** in the plugin's settings (80 by default) turns the numbers red at
@@ -76,17 +77,20 @@ bb plugin disable provider-usage
   the account's plan weight times the share of it the reset frees, for as long
   as the account would have stayed limited on its own. Of resets worth about
   the same, the one that expires first goes first. Only a reset that lowers the
-  total counts.
+  total as the card rounds it counts.
 - **Use reset** spends it as Claude Code and Codex do: Claude's
   `organizations/<id>/reset_rate_limits` with the grant Claude Code would
   claim, or Codex's `rate-limit-reset-credits/consume` with the credit that
   expires first. Every try from one dialog sends the same request id and the
-  same grant or credit, so the provider applies it once. Afterwards the plugin
-  asks Account Pooler to read the account's usage again.
+  same grant or credit, which the plugin keeps in its storage for a day, so the
+  provider applies it once, even after a restart. An account spends one reset
+  at a time. Unless the provider keeps the reset, the plugin then asks Account
+  Pooler to read the account's usage again.
 - The plugin spends a reset only on **Use reset**. It never refreshes a token
   or passes one to the frontend; an expired token waits for Account Pooler to
-  refresh it. Neither the token files nor these endpoints are public APIs: if
-  one changes, the reset line goes away and the rest of the card stays.
+  refresh it. A read that fails shows no resets until the next one. Neither the
+  token files nor these endpoints are public APIs: if one changes, the reset
+  line goes away and the rest of the card stays.
 - The confirmation uses the Radix dialog, the vaul drawer, and the toasts bb
   provides to plugins, with the classes of bb's own dialog and bottom sheet. If
   a bb update restyles those, the confirmation keeps working with its old look.

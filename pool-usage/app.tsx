@@ -644,7 +644,11 @@ function ResetButton({
       if (!spending) setOpen(next);
     };
     dialog = window.matchMedia?.(PHONE_QUERY).matches ? (
-      <Drawer.Root open={open} onOpenChange={onOpenChange}>
+      <Drawer.Root
+        open={open}
+        onOpenChange={onOpenChange}
+        dismissible={!spending}
+      >
         <Drawer.Portal>
           <Drawer.Overlay
             {...PORTAL_SCOPE}
