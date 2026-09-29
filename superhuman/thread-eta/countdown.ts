@@ -27,21 +27,28 @@ export function mountCountdowns(etas: Record<string, ThreadEta>) {
   }
 
   const timer = setInterval(sync, 1000);
-  // Rows re-render as threads change; ignore the chat and terminal output.
+  // Rows re-render as threads change; ignore the chat and terminal output,
+  // and sync once a frame however many changes it brings.
+  let frame = 0;
   const observer = new MutationObserver((records) => {
     if (
+      !frame &&
       records.some(
         ({ target }) =>
           target instanceof Element && !target.closest("main, .xterm"),
       )
     )
-      sync();
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        sync();
+      });
   });
   observer.observe(document.body, { childList: true, subtree: true });
   sync();
   return () => {
     clearInterval(timer);
     observer.disconnect();
+    cancelAnimationFrame(frame);
     for (const slot of document.querySelectorAll<HTMLElement>(
       "[data-superhuman-eta]",
     ))

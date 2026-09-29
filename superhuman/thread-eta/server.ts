@@ -15,19 +15,43 @@ type Etas = Record<string, ThreadEta>;
 export const rpcContract = defineRpcContract({
   listThreadEtas: {
     input: z.null(),
-    output: z.record(z.string(), etaSchema),
+    output: z.object({
+      /** The server's clock, so a browser with another time can adjust. */
+      now: z.number(),
+      etas: z.record(z.string(), etaSchema),
+    }),
   },
 });
 
-export default function registerThreadEtaServer(bb: BbPluginApi) {
+/** The part of the root settings handle that Thread ETA reads. */
+interface EtaSettings {
+  get(): Promise<{ threadEta?: boolean }>;
+  onChange(listener: (next: { threadEta?: boolean }) => void): void;
+}
+
+export default async function registerThreadEtaServer(
+  bb: BbPluginApi,
+  settings: EtaSettings,
+) {
   const { kv } = bb.storage;
 
-  // Every change to the ETAs runs in this queue, one at a time.
+  // With the setting off, agents don't get the tool or its instructions.
+  let on = (await settings.get()).threadEta !== false;
+  settings.onChange((next) => {
+    on = next.threadEta !== false;
+  });
+  bb.agents.configure(() => ({
+    tools: on ? ["set_thread_eta"] : [],
+    skills: [],
+  }));
+
+  // Every change to the ETAs runs in this queue, one at a time. A change that
+  // returns false leaves the stored ETAs as they are.
   let queue: Promise<unknown> = Promise.resolve();
-  function update(change: (etas: Etas) => void) {
+  function update(change: (etas: Etas) => boolean) {
     const result = queue.then(async () => {
       const etas = (await kv.get<Etas>("threadEtas")) ?? {};
-      change(etas);
+      if (!change(etas)) return;
       const now = Date.now();
       for (const [id, { until }] of Object.entries(etas))
         if (until <= now) delete etas[id];
@@ -62,12 +86,12 @@ export default function registerThreadEtaServer(bb: BbPluginApi) {
     }),
     async execute({ seconds, label }, { threadId }) {
       await update((etas) => {
-        if (seconds === 0) delete etas[threadId];
-        else
-          etas[threadId] = {
-            until: Date.now() + seconds * 1000,
-            label: label || null,
-          };
+        if (seconds === 0) return threadId in etas && delete etas[threadId];
+        etas[threadId] = {
+          until: Date.now() + seconds * 1000,
+          label: label || null,
+        };
+        return true;
       });
       return seconds === 0
         ? "Countdown removed."
@@ -77,13 +101,15 @@ export default function registerThreadEtaServer(bb: BbPluginApi) {
 
   bb.rpc.register(rpcContract, {
     async listThreadEtas() {
-      return (await kv.get<Etas>("threadEtas")) ?? {};
+      const etas = (await kv.get<Etas>("threadEtas")) ?? {};
+      return { now: Date.now(), etas };
     },
   });
 
   const drop = ({ thread }: { thread: { id: string } }) =>
-    update((etas) => delete etas[thread.id]).catch((error: unknown) =>
-      bb.log.warn(`Could not drop the ETA of ${thread.id}: ${String(error)}`),
+    update((etas) => thread.id in etas && delete etas[thread.id]).catch(
+      (error: unknown) =>
+        bb.log.warn(`Could not drop the ETA of ${thread.id}: ${String(error)}`),
     );
   bb.events.on("thread.archived", drop);
   bb.events.on("thread.deleted", drop);

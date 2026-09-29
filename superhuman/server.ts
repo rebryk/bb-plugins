@@ -4,8 +4,8 @@ import registerThreadEtaServer from "./thread-eta/server";
 
 export default async function plugin(bb: BbPluginApi) {
   // The browser reads these: the keyboard features in hotkeys/controller.ts,
-  // the rest in their features' app.tsx.
-  bb.settings.define({
+  // the rest in their features' app.tsx. Thread ETA's server reads its own.
+  const settings = bb.settings.define({
     threadShortcuts: {
       type: "boolean",
       label: "Thread shortcuts",
@@ -68,5 +68,5 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   await registerSnoozeServer(bb);
-  registerThreadEtaServer(bb);
+  await registerThreadEtaServer(bb, settings);
 }

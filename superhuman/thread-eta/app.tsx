@@ -12,12 +12,29 @@ import { ETA_CHANNEL } from "./shared";
 import "./app.css";
 
 function ThreadEtas() {
-  const { values } = useSettings();
+  const { values, isLoading } = useSettings();
   const rpc = useRpc<typeof rpcContract>();
   const [etas, setEtas] = useState<Record<string, ThreadEta>>({});
+  const latestRequest = useRef(0);
 
   const refetch = useCallback(() => {
-    rpc.call("listThreadEtas").then(setEtas, () => undefined);
+    const request = ++latestRequest.current;
+    rpc.call("listThreadEtas").then(
+      ({ now, etas }) => {
+        if (request !== latestRequest.current) return;
+        // Count down on this device's clock, however far off the server's is.
+        const offset = now - Date.now();
+        setEtas(
+          Object.fromEntries(
+            Object.entries(etas).map(([id, eta]) => [
+              id,
+              { ...eta, until: eta.until - offset },
+            ]),
+          ),
+        );
+      },
+      () => undefined,
+    );
   }, [rpc]);
   useEffect(refetch, [refetch]);
   useRealtime(ETA_CHANNEL, refetch);
@@ -30,7 +47,8 @@ function ThreadEtas() {
     previous.current = connection;
   }, [connection, refetch]);
 
-  const on = values?.threadEta !== false;
+  const on =
+    !isLoading && values?.threadEta !== false && Object.keys(etas).length > 0;
   useEffect(() => (on ? mountCountdowns(etas) : undefined), [on, etas]);
   return null;
 }

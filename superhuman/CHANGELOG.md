@@ -12,7 +12,8 @@ gets a new version. Each version is tagged `superhuman/v<version>`.
   working or not, until the time runs out or the agent clears it with 0
   seconds. Agents are told to set it only when the process's progress allows
   an estimate, never for their own coding, and to keep it current. The setting
-  is on by default and hides the countdown when turned off.
+  is on by default; turned off, it hides the countdown, and agents that start
+  or resume afterwards don't get the tool.
 
 ## 0.1.11 (2026-09-28)
 
