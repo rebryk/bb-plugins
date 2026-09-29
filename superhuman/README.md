@@ -7,6 +7,8 @@ Superhuman-style features for BB:
 - **Snooze.** Hide a thread until a set time or until its agent needs you; use
   the moon in its header or before Archive in the sidebar row.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
+- **Thread ETA.** The time left on an agent's background process counts down
+  at the end of its sidebar row until it runs out or the agent clears it.
 - **Code Copy.** Click or tap a code block or inline command in an agent's
   reply to copy it. On by default; text selection still works.
 - **Preload Threads.** Load the tail of recent and newly completed threads in

@@ -39,6 +39,7 @@ it("registers every feature under an id of its own", async () => {
       "phone-layout",
       "haptics",
       "thread-prefetch",
+      "thread-eta",
     ],
     sidebarNavigations: ["dia-sidebar"],
     threadHeaderActions: ["snooze", "archive", "new-thread"],
