@@ -1,0 +1,19 @@
+/* The countdown takes the place of whatever the row shows at its end, and the
+   28px box there grows to fit the digits. */
+:root .bb-sidebar-hover-actions-fade[data-superhuman-eta] {
+  position: static;
+  height: 100%;
+  padding-inline: 0.375rem;
+  color: var(--subtle-foreground);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+:root [data-superhuman-eta] > * {
+  display: none;
+}
+:root [data-superhuman-eta]::after {
+  content: attr(data-superhuman-eta);
+}
+:root .relative:has(> [data-superhuman-eta]) {
+  width: auto;
+}

@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin from "./server";
 
-it("defines the toggles and starts Snooze", async () => {
+it("defines the toggles and starts Snooze and Thread ETA", async () => {
   const { bb, harness } = createFakePluginHost({ pluginId: "superhuman" });
   await plugin(bb);
   const { registrations } = harness.inspection;
@@ -21,11 +21,16 @@ it("defines the toggles and starts Snooze", async () => {
     ["archiveButton", "boolean", true],
     ["codeCopy", "boolean", true],
     ["threadPrefetch", "boolean", true],
+    ["threadEta", "boolean", true],
   ]);
   expect(registrations.rpcMethods.sort()).toEqual([
     "listSnoozes",
+    "listThreadEtas",
     "snooze",
     "unsnooze",
+  ]);
+  expect(registrations.agentTools.map(({ name }) => name)).toEqual([
+    "set_thread_eta",
   ]);
   expect(registrations.services.map(({ name }) => name)).toEqual([
     "snooze-wake",

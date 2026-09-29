@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.12 (2026-09-29)
+
+- Thread ETA gives agents a `set_thread_eta` tool: the time left on a
+  background process they started, such as a training run or a long test
+  suite, with an optional label. The thread's sidebar row counts it down, as
+  `M:SS` or `H:MM:SS`, in place of its usual icon, whether the thread is
+  working or not, until the time runs out or the agent clears it with 0
+  seconds. Agents are told to set it only when the process's progress allows
+  an estimate, never for their own coding, and to keep it current. The setting
+  is on by default; turned off, it hides the countdown, and agents that start
+  or resume afterwards don't get the tool.
+
 ## 0.1.11 (2026-09-28)
 
 - Phone Layout opens the right panel with a swipe from the screen's right edge,
