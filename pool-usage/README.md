@@ -16,13 +16,24 @@ footer's `…` menu:
 
 ```text
 [Claude] Claude 2x     60%
-1h 25m                  9%
+1h 25m                 48%
 1d 6h                   0%
+Reset to 12% (1 available)
 ```
 
 - `2x` is the number of accounts that count, shown when there are several.
 - Up to four lines show when the total drops next, as quota windows reset or
   holds end, and what it drops to, assuming no new usage.
+- **Reset to** shows up when Account Pooler's accounts hold resets, which
+  Claude and Codex grant to clear an account's usage limits early. It gives the
+  total right after the reset worth spending first, and how many the accounts
+  hold. When none can lower the total right now, a gray line only counts them.
+- Clicking **Reset to** asks first, in bb's dialog or, on a phone, its bottom
+  sheet. It names the account, when the reset expires, and the total before
+  and after. **Use reset** spends it, a toast confirms it, and the card reads
+  usage again. Closing it any other way spends nothing.
+- If a try fails, **Try again** repeats the same request, which never uses a
+  second reset. When the provider keeps the reset, the dialog says why.
 - Escape or a click elsewhere closes the card.
 
 **Red at, %** in the plugin's settings (80 by default) turns the numbers red at
@@ -53,7 +64,32 @@ bb plugin disable provider-usage
   usage when the account emails match.
 - Other providers, or every provider without Account Pooler, are read from BB's
   provider usage sources; a window there is spent at 100%.
-- Credentials never enter the plugin. The numbers refresh every 30 seconds.
+- The numbers refresh every 30 seconds.
+- Resets come from the endpoints Claude Code and Codex use, every 10 minutes:
+  `api.anthropic.com/api/oauth/usage` for Claude, and
+  `chatgpt.com/backend-api/wham/usage` and its `rate-limit-reset-credits` for
+  Codex. The plugin's server calls them with the access tokens Account Pooler
+  stores for its enabled accounts, under `plugins/account-pool/secrets` in BB's
+  data directory. Claude reports resets only to Claude Code, so the Claude
+  request identifies itself as the installed Claude Code version.
+- The reset worth spending first frees the most capacity over the next week:
+  the account's plan weight times the share of it the reset frees, for as long
+  as the account would have stayed limited on its own. Of resets worth about
+  the same, the one that expires first goes first. Only a reset that lowers the
+  total counts.
+- **Use reset** spends it as Claude Code and Codex do: Claude's
+  `organizations/<id>/reset_rate_limits` with the grant Claude Code would
+  claim, or Codex's `rate-limit-reset-credits/consume` with the credit that
+  expires first. Every try from one dialog sends the same request id and the
+  same grant or credit, so the provider applies it once. Afterwards the plugin
+  asks Account Pooler to read the account's usage again.
+- The plugin spends a reset only on **Use reset**. It never refreshes a token
+  or passes one to the frontend; an expired token waits for Account Pooler to
+  refresh it. Neither the token files nor these endpoints are public APIs: if
+  one changes, the reset line goes away and the rest of the card stays.
+- The confirmation uses the Radix dialog, the vaul drawer, and the toasts bb
+  provides to plugins, with the classes of bb's own dialog and bottom sheet. If
+  a bb update restyles those, the confirmation keeps working with its old look.
 - The footer summary stands in for the plugin's own **Account usage** footer
   icon. bb's footer markup isn't a versioned plugin API, so if a bb update
   changes it, the summary steps aside and the icon comes back; clicking it

@@ -10,6 +10,9 @@ const RESET_HORIZON_MS = 7 * 24 * 60 * 60_000;
 /** Changes smaller than this round away on screen. */
 const VISIBLE_CHANGE = 0.005;
 
+/** Resets whose gains differ by less than this share are worth the same. */
+const GAIN_TIE = 0.01;
+
 export interface UsageStep {
   at: number;
   /** Share of capacity still used right after this reset. */
@@ -28,7 +31,23 @@ export interface ProviderUsage {
   spent: number;
   /** Resets that lower `used` within a week, soonest first. */
   steps: UsageStep[];
+  /** Resets the accounts can spend to clear their limits early. */
+  availableResets: number;
+  /** The reset worth spending first; null when none lowers `used`. */
+  resetPlan: ResetPlan | null;
   accounts: UsageAccount[];
+}
+
+export interface ResetPlan {
+  account: UsageAccount;
+  /** When the reset expires; null when the provider doesn't say. */
+  expiresAt: number | null;
+  /** The account's share that can't serve a request, now and after it. */
+  accountUsed: { before: number; after: number };
+  /** The provider's `used`, now and right after the reset. */
+  used: { before: number; after: number };
+  /** When the account would free up as much on its own; null past a week. */
+  freesAt: number | null;
 }
 
 function usedAt(window: UsageWindow, time: number): number | null {
@@ -126,6 +145,84 @@ function resetSteps(
   return steps;
 }
 
+/**
+ * The reset worth spending: plan weight times what it frees, summed until
+ * the account would free up on its own, within a week. Of resets worth about
+ * the same, the one that expires first. Only a reset that lowers `used` now.
+ */
+function planReset(
+  accounts: readonly UsageAccount[],
+  used: number,
+  switchThreshold: number,
+  now: number,
+): ResetPlan | null {
+  const end = now + RESET_HORIZON_MS;
+  const available = (account: UsageAccount, time: number) =>
+    availableAt(account, time, switchThreshold);
+  let best: ResetPlan | null = null;
+  let bestScore = 0;
+  for (const account of accounts) {
+    const { reset } = account;
+    if (!reset || !countsTowardCapacity(account) || account.offline !== null) {
+      continue;
+    }
+    const cleared = ({ minutes }: UsageWindow) =>
+      reset.clears === null || reset.clears.includes(minutes ?? 0);
+    // A hold stays: Account Pooler keeps it through a new reading.
+    const after = {
+      ...account,
+      blocked: account.blocked && !account.windows.some(cleared),
+      windows: account.windows.map((window) =>
+        cleared(window)
+          ? { ...window, utilization: 0, resetAt: null, rejected: false }
+          : window,
+      ),
+    };
+    const swapped = accounts.map((other) =>
+      other === account ? after : other,
+    );
+    const usedAfter = usageAt(swapped, now, switchThreshold)?.used ?? used;
+    if (used - usedAfter < VISIBLE_CHANGE) continue;
+    const times = [account.heldUntil, ...account.windows.map((w) => w.resetAt)]
+      .filter(
+        (time): time is number => time !== null && time > now && time < end,
+      )
+      .sort((a, b) => a - b);
+    let score = 0;
+    let start = now;
+    let freesAt: number | null = null;
+    for (const next of [...times, end]) {
+      const added = available(after, start) - available(account, start);
+      if (added < 1e-9) {
+        freesAt = start;
+        break;
+      }
+      score += account.weight * added * (next - start);
+      start = next;
+    }
+    if (
+      best !== null &&
+      (score < bestScore * (1 - GAIN_TIE) ||
+        (score <= bestScore * (1 + GAIN_TIE) &&
+          (reset.expiresAt ?? Infinity) >= (best.expiresAt ?? Infinity)))
+    ) {
+      continue;
+    }
+    best = {
+      account,
+      expiresAt: reset.expiresAt,
+      accountUsed: {
+        before: 1 - available(account, now),
+        after: 1 - available(after, now),
+      },
+      used: { before: used, after: usedAfter },
+      freesAt,
+    };
+    bestScore = score;
+  }
+  return best;
+}
+
 /** One entry per provider that has accounts, in the snapshot's order. */
 export function summarizeUsage(
   snapshot: UsageSnapshot,
@@ -146,6 +243,13 @@ export function summarizeUsage(
           current === null
             ? []
             : resetSteps(own, current.used, switchThreshold, now),
+        availableResets: own
+          .filter(countsTowardCapacity)
+          .reduce((sum, account) => sum + (account.availableResets ?? 0), 0),
+        resetPlan:
+          current === null
+            ? null
+            : planReset(own, current.used, switchThreshold, now),
         accounts: own,
       },
     ];

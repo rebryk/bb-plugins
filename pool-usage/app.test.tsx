@@ -6,7 +6,10 @@ import {
   renderSlot,
   type RenderedSlot,
 } from "@get-bb/plugin-sdk/testing/app";
+import { toast } from "sonner";
 import type { UsageSnapshot } from "./server";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 
 const NOW = Date.UTC(2026, 8, 25, 12);
 const MINUTE = 60_000;
@@ -73,6 +76,25 @@ const snapshot: UsageSnapshot = {
 
 const empty: UsageSnapshot = { providers: [], accounts: [] };
 
+/** Codex's account holds three resets, each clearing all of its limits. */
+const resettable: UsageSnapshot = {
+  ...snapshot,
+  accounts: snapshot.accounts.map((account) =>
+    account.id === "codex-pro"
+      ? {
+          ...account,
+          label: "Personal",
+          email: "codex@example.com",
+          plan: "Pro 20x",
+          availableResets: 3,
+          reset: { expiresAt: Date.UTC(2026, 9, 22, 12), clears: null },
+        }
+      : account,
+  ),
+};
+
+type ResetUse = () => unknown;
+
 /** bb's provider picker order: Claude before Codex. */
 const providers = {
   status: "ready" as const,
@@ -100,12 +122,13 @@ async function loadApp() {
 async function renderDisclosure(
   usage: () => UsageSnapshot | Promise<UsageSnapshot>,
   settings?: Record<string, number>,
+  resetUse: ResetUse = () => ({ outcome: "reset" }),
 ) {
   const { disclosure } = await loadApp();
   const slot = renderSlot(
     disclosure,
     { dismiss: () => undefined },
-    { rpc: { usage_get: usage }, settings, providers },
+    { rpc: { usage_get: usage, reset_use: resetUse }, settings, providers },
   );
   rendered.push(slot);
   return slot;
@@ -152,6 +175,8 @@ afterEach(() => {
   for (const slot of rendered.splice(0)) slot.lifecycle.unmount();
   document.body.replaceChildren();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe("registration", () => {
@@ -213,6 +238,18 @@ describe("usage panel", () => {
         .getAllByRole("listitem")
         .map((step) => step.textContent),
     ).toEqual(["1h72%", "2h54%", "3h36%", "4h18%"]);
+  });
+
+  it("says how many resets there are when none lowers usage", async () => {
+    const accounts = snapshot.accounts.map((account) => ({
+      ...account,
+      availableResets: account.id === "claude-max" ? 1 : 0,
+    }));
+    const slot = await renderDisclosure(() => ({ ...snapshot, accounts }));
+
+    const claude = await slot.findByRole("region", { name: "Claude usage" });
+    expect(claude.lastElementChild?.textContent).toBe("1 reset available");
+    expect(within(claude).queryByRole("button")).toBeNull();
   });
 
   it("turns usage red at the configured threshold", async () => {
@@ -377,5 +414,151 @@ describe("footer summary", () => {
 
     await slot.findByRole("button", { name: "Claude: 66% used" });
     expect(spacer.nextElementSibling?.className).toBe("pool-usage-footer");
+  });
+});
+
+describe("reset", () => {
+  /** Asks for the reset on the Codex card and returns its confirmation. */
+  async function openConfirmation(slot: RenderedSlot) {
+    const codex = await slot.findByRole("region", { name: "Codex usage" });
+    fireEvent.click(
+      within(codex).getByRole("button", { name: "Reset to 0% (3 available)" }),
+    );
+    return slot.getByRole("dialog", { name: "Use a Codex reset?" });
+  }
+
+  const buttons = (element: HTMLElement) =>
+    within(element)
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+
+  const resetCalls = (slot: RenderedSlot) =>
+    slot.inspection.rpcCalls.filter(({ method }) => method === "reset_use");
+
+  it("says what the reset changes before using it", async () => {
+    const slot = await renderDisclosure(() => resettable);
+
+    const confirmation = await openConfirmation(slot);
+
+    expect(confirmation.textContent).toContain(
+      "Are you sure you want to use a reset, valid until Oct 22, on Personal (codex@example.com, Pro 20x) to drop Codex from 90% to 0%?" +
+        "The account goes from 90% to 0% used. On its own, it frees up in 2d. 2 resets stay available.",
+    );
+    expect(buttons(confirmation)).toEqual(["Cancel", "Use reset"]);
+  });
+
+  it("uses no reset on Cancel or Escape and leaves the card open", async () => {
+    renderFooter();
+    const { slot } = await renderOverlay(() => resettable);
+    fireEvent.click(
+      await slot.findByRole("button", { name: "Codex: 90% used" }),
+    );
+
+    fireEvent.click(
+      within(await openConfirmation(slot)).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+    fireEvent.keyDown(await openConfirmation(slot), { key: "Escape" });
+
+    expect(
+      slot.queryByRole("dialog", { name: "Use a Codex reset?" }),
+    ).toBeNull();
+    expect(slot.getByRole("dialog", { name: "Codex usage" })).toBeTruthy();
+    expect(resetCalls(slot)).toEqual([]);
+  });
+
+  it("uses the reset once, then says so and reads usage again", async () => {
+    const slot = await renderDisclosure(() => resettable);
+
+    fireEvent.click(
+      within(await openConfirmation(slot)).getByRole("button", {
+        name: "Use reset",
+      }),
+    );
+
+    await waitFor(() => expect(slot.queryByRole("dialog")).toBeNull());
+    expect(resetCalls(slot)).toEqual([
+      {
+        method: "reset_use",
+        input: { accountId: "codex-pro", requestId: expect.any(String) },
+      },
+    ]);
+    expect(toast.success).toHaveBeenCalledWith("Used a Codex reset", {
+      description: "On Personal (codex@example.com, Pro 20x).",
+    });
+    await waitFor(() =>
+      expect(
+        slot.inspection.rpcCalls.filter(({ method }) => method === "usage_get"),
+      ).toHaveLength(2),
+    );
+  });
+
+  it("tries a failed reset again with the same request", async () => {
+    const outcomes = [
+      () => {
+        throw new Error(
+          "Couldn't use the reset. Trying again won't use a second one.",
+        );
+      },
+      () => ({ outcome: "reset" }),
+    ];
+    const slot = await renderDisclosure(
+      () => resettable,
+      undefined,
+      () => outcomes.shift()!(),
+    );
+    const confirmation = await openConfirmation(slot);
+
+    fireEvent.click(
+      within(confirmation).getByRole("button", { name: "Use reset" }),
+    );
+    expect((await within(confirmation).findByRole("alert")).textContent).toBe(
+      "Couldn't use the reset. Trying again won't use a second one.",
+    );
+    fireEvent.click(
+      within(confirmation).getByRole("button", { name: "Try again" }),
+    );
+
+    await waitFor(() => expect(slot.queryByRole("dialog")).toBeNull());
+    const [first, second] = resetCalls(slot);
+    expect(second).toEqual(first);
+  });
+
+  it("says why a reset was refused and offers only to close", async () => {
+    const slot = await renderDisclosure(
+      () => resettable,
+      undefined,
+      () => ({
+        outcome: "refused",
+        message: "Codex kept the reset (nothing_to_reset). Nothing was used.",
+      }),
+    );
+    const confirmation = await openConfirmation(slot);
+
+    fireEvent.click(
+      within(confirmation).getByRole("button", { name: "Use reset" }),
+    );
+
+    expect((await within(confirmation).findByRole("alert")).textContent).toBe(
+      "Codex kept the reset (nothing_to_reset). Nothing was used.",
+    );
+    expect(buttons(confirmation)).toEqual(["Close"]);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("opens as a bottom sheet on a phone", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(max-width: 767px)",
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    const slot = await renderDisclosure(() => resettable);
+
+    const sheet = await openConfirmation(slot);
+
+    expect(sheet.hasAttribute("data-vaul-drawer")).toBe(true);
+    expect(buttons(sheet)).toEqual(["Cancel", "Use reset"]);
   });
 });

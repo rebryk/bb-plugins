@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, {
   accountPlan,
@@ -166,6 +169,9 @@ describe("normalizeAccount", () => {
     expect(normalizeAccount(account(), options)).toEqual({
       id: "6d4a6287-16cb-42eb-9977-69132be5fddb",
       provider: "claude-code",
+      label: "Personal",
+      email: "account@example.com",
+      plan: "Max 20x",
       weight: 20,
       disabled: false,
       offline: null,
@@ -406,9 +412,98 @@ function hostWithSource(status: Record<string, unknown>) {
 }
 
 describe("plugin", () => {
-  afterEach(() => {
-    vi.useRealTimers();
+  const CODEX_CREDITS_URL =
+    "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
+  const REQUEST_ID = "9c1f4a2e-6b3d-4f8a-a7e5-2d9c8b1a0f3e";
+  const credit = {
+    id: "RateLimitResetCredit_1",
+    status: "available",
+    is_supported_by_plan: true,
+    expires_at: "2026-10-22T20:28:26Z",
+  };
+  const dataDirs: string[] = [];
+
+  beforeEach(() => {
+    // Resets come from the providers, which only a test's own fetch reaches.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    );
   });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    for (const dataDir of dataDirs.splice(0)) {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  /** A bb data directory where Account Pooler keeps each account's login. */
+  async function storeLogins(
+    accounts: readonly PoolAccount[],
+    expiresAt = Date.now() + 60 * 60_000,
+  ) {
+    const dataDir = await mkdtemp(path.join(tmpdir(), "pool-usage-"));
+    dataDirs.push(dataDir);
+    const secretsDir = path.join(
+      dataDir,
+      "plugins",
+      "account-pool",
+      "secrets",
+      "accounts",
+    );
+    await mkdir(secretsDir, { recursive: true });
+    for (const { id } of accounts) {
+      await writeFile(
+        path.join(secretsDir, `account-${id}.json`),
+        JSON.stringify({
+          kind: "oauth",
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          expiresAt,
+        }),
+      );
+    }
+    // bb's hub tokens, which aren't the plugin's to read.
+    await writeFile(path.join(secretsDir, "hub-token-host_1.json"), "{}");
+    return dataDir;
+  }
+
+  const pooledCodex = (overrides: Partial<PoolAccount> = {}) =>
+    codexAccount({
+      id: "0b9e3f4c-5d1a-4c7e-8f2b-3a6d9e1c7b50",
+      codexAccountId: "chatgpt-account",
+      observedAt: Date.now(),
+      ...overrides,
+    });
+
+  /** Codex, where the account has one reset until a spend takes it. */
+  function codexWithReset() {
+    let available = 1;
+    return vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+      const url = String(input);
+      if (url === `${CODEX_CREDITS_URL}/consume`) {
+        available = 0;
+        return Response.json({ code: "reset" });
+      }
+      return Response.json(
+        url === CODEX_CREDITS_URL
+          ? { credits: available > 0 ? [credit] : [] }
+          : { rate_limit_reset_credits: { available_count: available } },
+      );
+    });
+  }
+
+  /** The Account Pooler methods the plugin called, in order. */
+  const poolerMethods = (harness: {
+    inspection: { sdk: { callsTo(path: string): unknown[][] } };
+  }) =>
+    harness.inspection.sdk
+      .callsTo("plugins.callRpc")
+      .map(([request]) => (request as { method: string }).method);
 
   it("reads Account Pooler's status and switch threshold", async () => {
     const { bb, harness } = createFakePluginHost({
@@ -513,6 +608,333 @@ describe("plugin", () => {
     expect(harness.inspection.sdk.callsTo("system.usageLimits")).toHaveLength(
       1,
     );
+    await harness.lifecycle.dispose();
+  });
+
+  it("spends a reset, then reads the pool again", async () => {
+    const accounts = [pooledCodex()];
+    const accountId = accounts[0]!.id;
+    const fetch = codexWithReset();
+    vi.stubGlobal("fetch", fetch);
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: { plugins: { callRpc: poolerRpc(accounts) } },
+    });
+    await plugin(bb);
+
+    const before = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+    expect(before.accounts[0]).toMatchObject({ availableResets: 1 });
+
+    expect(
+      await harness.behavior.callRpc("reset_use", {
+        accountId,
+        requestId: REQUEST_ID,
+      }),
+    ).toEqual({ outcome: "reset" });
+    expect(JSON.parse(String(fetch.mock.lastCall?.[1]?.body))).toEqual({
+      redeem_request_id: REQUEST_ID,
+      credit_id: credit.id,
+    });
+
+    const after = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+    expect(after.accounts[0]).toMatchObject({ availableResets: 0 });
+    expect(after.accounts[0]?.reset).toBeUndefined();
+    // Account Pooler reads the cleared limits now, and the pool is read anew.
+    expect(poolerMethods(harness)).toEqual([
+      "status.get",
+      "config.get",
+      "status.get",
+      "account.refreshUsage",
+      "status.get",
+      "config.get",
+    ]);
+    expect(
+      harness.inspection.sdk.callsTo("plugins.callRpc")[3]?.[0],
+    ).toMatchObject({ pluginId: "account-pool", input: { accountId } });
+    await harness.lifecycle.dispose();
+  });
+
+  it("says why it spent no reset", async () => {
+    const accounts = [pooledCodex()];
+    const accountId = accounts[0]!.id;
+    let consume = () => Response.json({ code: "nothing_to_reset" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) =>
+        String(input).endsWith("/consume")
+          ? consume()
+          : Response.json({ credits: [credit] }),
+      ),
+    );
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: { plugins: { callRpc: poolerRpc(accounts) } },
+    });
+    await plugin(bb);
+
+    expect(
+      await harness.behavior.callRpc("reset_use", {
+        accountId,
+        requestId: crypto.randomUUID(),
+      }),
+    ).toEqual({
+      outcome: "refused",
+      message: "Codex kept the reset (nothing_to_reset). Nothing was used.",
+    });
+    consume = () => new Response(null, { status: 429 });
+    await expect(
+      harness.behavior.callRpc("reset_use", {
+        accountId,
+        requestId: crypto.randomUUID(),
+      }),
+    ).rejects.toThrow(
+      "Couldn't use the reset. Trying again won't use a second one.",
+    );
+    await expect(
+      harness.behavior.callRpc("reset_use", { accountId, requestId: "1" }),
+    ).rejects.toThrow();
+
+    // Nothing changed, so Account Pooler has nothing new to read.
+    expect(poolerMethods(harness)).toEqual(["status.get", "status.get"]);
+    await harness.lifecycle.dispose();
+  });
+
+  it("spends no reset on an account Account Pooler doesn't serve", async () => {
+    const accounts = [
+      pooledCodex({ enabled: false }),
+      pooledCodex({
+        id: "a1b2c3d4-0000-4000-8000-000000000001",
+        kind: "api-key",
+      }),
+    ];
+    const fetch = codexWithReset();
+    vi.stubGlobal("fetch", fetch);
+    let reachable = true;
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: {
+        plugins: {
+          callRpc: async (request: { method: string }) => {
+            if (!reachable) throw new Error("missing plugin");
+            return poolerRpc(accounts)(request);
+          },
+        },
+      },
+    });
+    await plugin(bb);
+
+    for (const accountId of [
+      ...accounts.map(({ id }) => id),
+      "a1b2c3d4-0000-4000-8000-000000000002",
+    ]) {
+      expect(
+        await harness.behavior.callRpc("reset_use", {
+          accountId,
+          requestId: crypto.randomUUID(),
+        }),
+      ).toEqual({
+        outcome: "refused",
+        message: "Account Pooler no longer serves that account.",
+      });
+    }
+    reachable = false;
+    await expect(
+      harness.behavior.callRpc("reset_use", {
+        accountId: accounts[0]!.id,
+        requestId: crypto.randomUUID(),
+      }),
+    ).rejects.toThrow("Couldn't reach Account Pooler. Nothing was used.");
+
+    expect(fetch).not.toHaveBeenCalled();
+    await harness.lifecycle.dispose();
+  });
+
+  it("claims Claude's next grant, and a retry the same one", async () => {
+    const accounts = [account({ observedAt: Date.now() })];
+    const organization = "11111111-2222-4333-8444-555555555555";
+    const endsAt = "2027-01-01T00:00:00Z";
+    let claims = 0;
+    const fetch = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/oauth/profile")) {
+          return Response.json({ organization: { uuid: organization } });
+        }
+        if (url.endsWith(`/${organization}/reset_rate_limits`)) {
+          // The first claim's answer is lost; the retry finds the grant used.
+          if (++claims === 1) throw new TypeError("fetch failed");
+          return Response.json({ result: "already_used" });
+        }
+        return Response.json({
+          cedar_ember: {
+            eligible: true,
+            next_grant_id: "g1",
+            grants: [
+              {
+                id: "g1",
+                resets_left: 2,
+                usable_now: true,
+                ends_at: endsAt,
+                clears: ["five_hour", "seven_day"],
+              },
+              { id: "g2", resets_left: 5, paused: true },
+              { id: "g3", resets_left: 1, ends_at: "2020-01-01T00:00:00Z" },
+              "malformed",
+            ],
+          },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetch);
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: {
+        plugins: { callRpc: poolerRpc(accounts) },
+        system: {
+          providerStates: async () =>
+            ({
+              providers: [
+                { providerId: "claude-code", installedVersion: "2.1.300" },
+              ],
+            }) as never,
+        },
+      },
+    });
+    await plugin(bb);
+
+    const result = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+    expect(result.accounts[0]).toMatchObject({
+      availableResets: 2,
+      reset: { expiresAt: Date.parse(endsAt), clears: [300, 10_080] },
+    });
+    const spend = { accountId: accounts[0]!.id, requestId: REQUEST_ID };
+    await expect(harness.behavior.callRpc("reset_use", spend)).rejects.toThrow(
+      "Trying again won't use a second one.",
+    );
+    expect(await harness.behavior.callRpc("reset_use", spend)).toEqual({
+      outcome: "reset",
+    });
+    const claimBodies = fetch.mock.calls
+      .filter(([input]) => String(input).endsWith("/reset_rate_limits"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(claimBodies).toEqual([
+      { program: "cedar_ember", grant_id: "g1", request_id: REQUEST_ID },
+      { program: "cedar_ember", grant_id: "g1", request_id: REQUEST_ID },
+    ]);
+    // Claude reports resets only to the Claude Code that bb runs.
+    expect(
+      (fetch.mock.calls[0]![1]?.headers as Record<string, string>)[
+        "user-agent"
+      ],
+    ).toBe("claude-cli/2.1.300 (external, cli)");
+    await harness.lifecycle.dispose();
+  });
+
+  it("retries a Codex spend with the credit it sent first", async () => {
+    const accounts = [pooledCodex()];
+    let consumed = 0;
+    const fetch = vi.fn(
+      async (input: string | URL | Request, _init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/consume")) {
+          return ++consumed === 1
+            ? new Response(null, { status: 502 })
+            : Response.json({ code: "already_redeemed" });
+        }
+        if (url !== CODEX_CREDITS_URL) {
+          return Response.json({
+            rate_limit_reset_credits: { available_count: 2 },
+          });
+        }
+        return Response.json({
+          credits:
+            consumed > 0
+              ? [{ ...credit, id: "later" }]
+              : [
+                  {
+                    ...credit,
+                    id: "later",
+                    expires_at: "2027-06-01T00:00:00Z",
+                  },
+                  credit,
+                  { ...credit, id: "unsupported", is_supported_by_plan: false },
+                  {
+                    ...credit,
+                    id: "expired",
+                    expires_at: "2020-01-01T00:00:00Z",
+                  },
+                ],
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetch);
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts),
+      sdk: { plugins: { callRpc: poolerRpc(accounts) } },
+    });
+    await plugin(bb);
+
+    const result = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+    expect(result.accounts[0]).toMatchObject({
+      availableResets: 2,
+      reset: { expiresAt: Date.parse(credit.expires_at), clears: null },
+    });
+    const spend = { accountId: accounts[0]!.id, requestId: REQUEST_ID };
+    await expect(
+      harness.behavior.callRpc("reset_use", spend),
+    ).rejects.toThrow();
+    expect(await harness.behavior.callRpc("reset_use", spend)).toEqual({
+      outcome: "reset",
+    });
+    const consumeBodies = fetch.mock.calls
+      .filter(([input]) => String(input).endsWith("/consume"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(consumeBodies).toEqual([
+      { redeem_request_id: REQUEST_ID, credit_id: credit.id },
+      { redeem_request_id: REQUEST_ID, credit_id: credit.id },
+    ]);
+    await harness.lifecycle.dispose();
+  });
+
+  it("skips logins it can't use, without refreshing or logging a token", async () => {
+    const accounts = [pooledCodex(), account({ observedAt: Date.now() })];
+    const fetch = vi.fn(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetch);
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      dataDir: await storeLogins(accounts, Date.now() - 1),
+      sdk: { plugins: { callRpc: poolerRpc(accounts) } },
+    });
+    await plugin(bb);
+
+    const result = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+    expect(
+      result.accounts.map(({ availableResets }) => availableResets),
+    ).toEqual([undefined, undefined]);
+    await expect(
+      harness.behavior.callRpc("reset_use", {
+        accountId: accounts[0]!.id,
+        requestId: REQUEST_ID,
+      }),
+    ).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    const logs = harness.inspection.logEntries.map(({ message }) => message);
+    expect(logs.join("\n")).not.toMatch(/access-token|refresh-token/u);
     await harness.lifecycle.dispose();
   });
 
