@@ -3,6 +3,25 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.5 (2026-09-28)
+
+- When Account Pooler's Claude or Codex accounts hold resets, which clear an
+  account's usage limits early, a provider's card ends with a line such as
+  "Reset to 27% (3 available)". It gives the total right after the reset that
+  frees the most capacity over the next week, by plan weight and how long the
+  account would stay limited; of resets worth about the same, the one that
+  expires first. When none can lower the total, a gray line only counts them,
+  such as "3 resets available".
+- Clicking that line asks first, in bb's dialog or its bottom sheet on a
+  phone, naming the account, when the reset expires, and the total before and
+  after. **Use reset** spends it, a toast confirms it, and the card reads
+  usage again. A failed try offers **Try again**, which never uses a second
+  reset, even after the plugin restarts, and an account spends one reset at a
+  time.
+- The plugin's server reads the resets every 10 minutes with the access tokens
+  Account Pooler stores and spends one only on **Use reset**. It never
+  refreshes a token.
+
 ## 0.2.4 (2026-09-27)
 
 - Codex Business Pro Lite accounts count as 5x Plus, matching Pro Lite, so

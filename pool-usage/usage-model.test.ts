@@ -229,6 +229,127 @@ describe("summarizeUsage", () => {
     expect(offline && hasSpentQuota(offline)).toBe(false);
     expect(spent && hasSpentQuota(spent)).toBe(true);
   });
+
+  it("adds up the resets of the accounts that count", () => {
+    const [claude] = summarize([
+      usageAccount({ id: "ready", availableResets: 2 }),
+      usageAccount({ id: "offline", offline: "error", availableResets: 1 }),
+      usageAccount({ id: "unknown" }),
+      usageAccount({ id: "disabled", disabled: true, availableResets: 4 }),
+      usageAccount({ id: "api", weight: 0, availableResets: 4 }),
+    ]);
+
+    expect(claude?.availableResets).toBe(3);
+  });
+});
+
+describe("resetPlan", () => {
+  /** A weekly-only Codex account with a reset that clears everything. */
+  function codexAccount(
+    id: string,
+    weight: number,
+    used: number,
+    resetsIn: number,
+    expiresIn: number | null = 30 * DAY,
+  ): UsageAccount {
+    return usageAccount({
+      id,
+      provider: "codex",
+      weight,
+      windows: [quota(10_080, used, NOW + resetsIn)],
+      reset: {
+        expiresAt: expiresIn === null ? null : NOW + expiresIn,
+        clears: null,
+      },
+    });
+  }
+
+  it("spends the reset that frees the most capacity until the limits reset", () => {
+    const [codex] = summarize([
+      codexAccount("soon", 20, 0.6, DAY),
+      codexAccount("small", 1, 0.9, 6 * DAY),
+      codexAccount("best", 5, 0.8, 5 * DAY),
+    ]);
+
+    // 5 x 80% for five days beats 20 x 60% for one and 1 x 90% for six.
+    expect(codex?.resetPlan).toEqual({
+      account: codex?.accounts[2],
+      expiresAt: NOW + 30 * DAY,
+      accountUsed: { before: expect.closeTo(0.8), after: 0 },
+      used: {
+        before: expect.closeTo(16.9 / 26),
+        after: expect.closeTo(12.9 / 26),
+      },
+      freesAt: NOW + 5 * DAY,
+    });
+  });
+
+  it("spends the reset that expires first of two worth about the same", () => {
+    const later = codexAccount("later", 5, 0.8, 5 * DAY, 20 * DAY);
+    const sooner = codexAccount("sooner", 5, 0.795, 5 * DAY, 10 * DAY);
+    const undated = codexAccount("undated", 5, 0.8, 5 * DAY, null);
+
+    for (const accounts of [
+      [later, sooner],
+      [sooner, later],
+      [undated, sooner],
+    ]) {
+      expect(summarize(accounts)[0]?.resetPlan?.account.id).toBe("sooner");
+    }
+    // A clearly bigger gain still wins.
+    const lighter = codexAccount("lighter", 5, 0.7, 5 * DAY, 10 * DAY);
+    expect(summarize([lighter, later])[0]?.resetPlan?.account.id).toBe("later");
+  });
+
+  it("clears only the windows a Claude reset clears", () => {
+    const account = usageAccount({
+      weight: 20,
+      windows: [
+        quota(300, 0.99, NOW + 2 * HOUR),
+        quota(10_080, 0.95, NOW + 3 * DAY),
+      ],
+      reset: { expiresAt: null, clears: [300] },
+    });
+    const [claude] = summarize([account]);
+
+    // The weekly window still binds, and the five-hour one clears in 2h.
+    expect(claude?.resetPlan).toEqual({
+      account,
+      expiresAt: null,
+      accountUsed: { before: 1, after: expect.closeTo(0.725) },
+      used: { before: 1, after: expect.closeTo(0.725) },
+      freesAt: NOW + 2 * HOUR,
+    });
+    expect(
+      summarize([
+        { ...account, reset: { expiresAt: null, clears: [10_080] } },
+      ])[0]?.resetPlan,
+    ).toBeNull();
+  });
+
+  it("plans no reset that wouldn't lower usage now", () => {
+    const reset = { expiresAt: null, clears: null };
+    const windows = [quota(300, 0.5, NOW + 2 * HOUR)];
+    const other = usageAccount({ id: "other", windows });
+
+    for (const account of [
+      // A hold outlasts the reset.
+      usageAccount({ windows, heldUntil: NOW + HOUR, reset }),
+      usageAccount({ windows, offline: "error", reset }),
+      usageAccount({ windows, disabled: true, reset }),
+      usageAccount({ windows: [quota(300, 0.004)], reset }),
+      usageAccount({ windows }),
+    ]) {
+      expect(summarize([other, account])[0]?.resetPlan).toBeNull();
+    }
+    // Nor one that leaves the percentage shown as it is: 25% before and after.
+    const [codex] = summarize([
+      usageAccount({ id: "rest", windows: [quota(300, 0.492)] }),
+      usageAccount({ windows: [quota(300, 0.012)], reset }),
+    ]);
+    expect(codex?.used).toBeCloseTo(0.252);
+    expect(codex?.resetPlan).toBeNull();
+  });
 });
 
 describe("formatting", () => {
