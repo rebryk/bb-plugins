@@ -58,6 +58,8 @@ others:
   a compact grid of navigation icons, and a phone layout.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **Canvas**: images, text, and drawing in each thread, with screenshots your
+  agent can read.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 
