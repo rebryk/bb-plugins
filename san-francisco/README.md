@@ -134,5 +134,7 @@ plugins. The others:
   hints, snooze, a compact grid of navigation icons, and a phone layout.
 - [Bookmarks](../bookmarks): save any chat message and jump back to it from the
   thread's right panel.
+- [Canvas](../canvas): images, text, and drawing in each thread, with
+  screenshots your agent can read.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use
   and when it frees up, in the sidebar footer.

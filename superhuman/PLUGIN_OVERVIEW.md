@@ -31,6 +31,8 @@ others:
 
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **Canvas**: images, text, and drawing in each thread, with screenshots your
+  agent can read.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with
   your pick of the eight macOS accent colors.
 - **Pool Usage**: how much of each provider's capacity is in use and when it

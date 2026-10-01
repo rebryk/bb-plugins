@@ -10,6 +10,7 @@ them.
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
+bb plugin install canvas@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
@@ -20,7 +21,7 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All four suit any BB setup. With Account Pooler, Pool Usage counts every pooled
+All five suit any BB setup. With Account Pooler, Pool Usage counts every pooled
 account, and with more than one server on bb connect, Superhuman's Change Server
 button switches between them.
 
@@ -40,6 +41,12 @@ the keyboard features and the phone layout, and turn on the zoom lock.
 A bookmark button on every chat message and a Bookmarks tab in the thread's
 right panel that lists the saved messages across threads; clicking one opens
 its thread scrolled to the message.
+
+### [Canvas](./canvas)
+
+A canvas in each thread’s right panel for pasted screenshots, movable images,
+text, and drawing. Capture a browser block in desktop BB, annotate it, and let
+your agent read the elements or see the entire board as a PNG.
 
 ### [San Francisco](./san-francisco)
 
