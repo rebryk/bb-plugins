@@ -9,13 +9,21 @@ export default async function plugin(bb: BbPluginApi) {
     threadShortcuts: {
       type: "boolean",
       label: "Thread shortcuts",
-      description: "/ searches threads; number keys open a new thread's menus.",
+      description:
+        "Outside inputs: / searches, H snoozes, E archives, in any keyboard layout. Number keys open a new thread's menus.",
       default: true,
     },
     shortcutHints: {
       type: "boolean",
       label: "Shortcut hints",
       description: "Hold a modifier to see the shortcuts.",
+      default: true,
+    },
+    universalSearch: {
+      type: "boolean",
+      label: "Universal Search",
+      description:
+        "Search commands, threads and snoozed threads in both English and Russian keyboard layouts.",
       default: true,
     },
     zoomLock: {

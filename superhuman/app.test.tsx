@@ -33,6 +33,7 @@ it("registers every feature under an id of its own", async () => {
     ],
     appOverlays: [
       "hotkeys-bridge",
+      "universal-search",
       "snooze-dialogs",
       "code-copy",
       "zoom-lock",

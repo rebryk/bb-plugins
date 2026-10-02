@@ -91,6 +91,7 @@ async function openDialog(
   command: "snooze-thread" | "show-snoozed-threads",
   list: { snoozes: Snooze[]; last: unknown },
   rpc: Record<string, (input: unknown) => unknown> = {},
+  settings: Record<string, boolean> = {},
 ) {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -99,6 +100,7 @@ async function openDialog(
     app.appOverlays[0]!,
     {},
     {
+      settings,
       context: { threadId: "t2", projectId: "p1" },
       rpc: {
         listSnoozes: () => list,
@@ -410,6 +412,24 @@ describe("snoozed threads", () => {
     ],
     last: null,
   };
+
+  it.each([true, false])("respects Universal Search = %s", async (enabled) => {
+    await openDialog(
+      "show-snoozed-threads",
+      list,
+      {},
+      { universalSearch: enabled },
+    );
+    const input = await screen.findByPlaceholderText<HTMLInputElement>(
+      "Search snoozed threads…",
+    );
+    fireEvent.change(input, { target: { value: "щту" } });
+    expect(input.value).toBe("щту");
+    expect(rows().length).toBe(enabled ? 1 : 0);
+    if (enabled) expect(rows()[0]).toContain("One");
+    fireEvent.change(input, { target: { value: "One" } });
+    expect(rows()).toHaveLength(1);
+  });
 
   it("lists the snoozes and opens one without waking it", async () => {
     const { slot } = await openDialog("show-snoozed-threads", list);

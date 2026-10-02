@@ -14,6 +14,7 @@ it("defines the toggles and starts Snooze and Thread ETA", async () => {
   expect(settings).toEqual([
     ["threadShortcuts", "boolean", true],
     ["shortcutHints", "boolean", true],
+    ["universalSearch", "boolean", true],
     ["zoomLock", "boolean", false],
     ["phoneLayout", "boolean", true],
     ["haptics", "boolean", true],

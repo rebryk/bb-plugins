@@ -1,4 +1,5 @@
 import type { useSdk } from "@get-bb/plugin-sdk/app";
+import { physicalKey } from "./key";
 
 type Bindings = Awaited<
   ReturnType<ReturnType<typeof useSdk>["system"]["config"]>
@@ -40,14 +41,17 @@ let mods: Record<Modifier, boolean> = NONE;
 let tagged: HTMLElement[] = [];
 let frame = 0;
 let dismissed: Element | null = null;
+let threadActions: { snooze(): void; archive(): void } | undefined;
 
 /** Receives the plugin settings and BB's resolved keybindings. */
 export function update(next: {
   settings?: typeof settings;
   bindings?: Bindings;
+  threadActions?: typeof threadActions;
 }) {
   settings = next.settings ?? settings;
   bindings = next.bindings ?? bindings;
+  if ("threadActions" in next) threadActions = next.threadActions;
   paint();
 }
 
@@ -112,20 +116,19 @@ function numbered(setup = composer()): HTMLElement[] {
 
 /** BB's current shortcut for a command on this platform and surface. */
 function binding(command: string): Chord | undefined {
+  return bindings.filter((item) => item.command === command).map(chordFor).find(Boolean);
+}
+
+function chordFor(item: Bindings[number]): Chord | undefined {
   const context: Record<string, boolean> = {
     macPlatform: mac,
     webSurface: !desktop,
     desktopSurface: desktop,
   };
-  const shortcut = bindings.find(
-    (item) =>
-      item.command === command &&
-      item.shortcut &&
-      (desktop || !item.desktopOnly) &&
-      item.when.all.every((key) => context[key] ?? true) &&
-      !item.when.none.some((key) => context[key]),
-  )?.shortcut;
-  if (!shortcut) return;
+  const shortcut = item.shortcut;
+  if (!shortcut || (!desktop && item.desktopOnly)
+    || !item.when.all.every((key) => context[key] ?? true)
+    || item.when.none.some((key) => context[key])) return;
   const { key, mod, control, alt, shift, meta } = shortcut;
   return {
     key,
@@ -241,26 +244,33 @@ function keydown(event: KeyboardEvent) {
   // Skip our own search shortcut.
   if (!event.isTrusted) return;
   mods = event;
-  if (!event.isComposing && !event.defaultPrevented && handle(event)) {
+  if (handle(event)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
   paint();
 }
 
-function handle(event: KeyboardEvent): boolean {
-  const { key } = event;
-  if (key === "/") {
-    const plain =
-      !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
-    const allowed =
-      settings.threadShortcuts !== false && !editable(event.target);
-    return plain && allowed && !panels().length && search();
+export function handle(event: KeyboardEvent): boolean {
+  if (event.isComposing || event.keyCode === 229 || event.defaultPrevented
+    || event.getModifierState("AltGraph")) return false;
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    normalizeShortcut(event);
+    return false;
   }
-  if (key !== "Escape" && !/^[0-9]$/.test(key)) return false;
+  const key = physicalKey(event);
+  if (key === "/" || key === "h" || key === "e") {
+    if (event.shiftKey || event.repeat || settings.threadShortcuts === false
+      || editable(event.target) || panels().length) return false;
+    if (key === "/") return search();
+    if (!threadActions) return false;
+    threadActions[key === "h" ? "snooze" : "archive"]();
+    return true;
+  }
+  if (key !== "escape" && !/^[0-9]$/.test(key)) return false;
   const setup = composer();
   const items = numbered(setup);
-  if (key === "Escape") {
+  if (key === "escape") {
     // Hide the numbers so the prompt can start with a digit.
     if (!items.length || setup?.open) return false;
     dismissed = document.activeElement ?? document.body;
@@ -273,6 +283,21 @@ function handle(event: KeyboardEvent): boolean {
     if (setup?.open?.matches(MODEL)) setup.open.click();
   }
   return !!target;
+}
+
+/** Let BB resolve scope, availability and user overrides on the original event. */
+function normalizeShortcut(event: KeyboardEvent) {
+  if (event.target instanceof Element
+    && event.target.closest("[data-app-terminal], [data-app-browser]")) return;
+  const keys = bindings.map(chordFor)
+    .filter((chord) => chord && MODIFIERS.every((mod) => chord[mod] === event[mod]))
+    .map((chord) => chord!.key.toLowerCase());
+  // An explicitly bound character takes precedence over a physical fallback.
+  if (keys.includes(event.key.toLowerCase())) return;
+  const key = physicalKey(event);
+  if (keys.includes(key)) {
+    Object.defineProperty(event, "key", { configurable: true, value: key });
+  }
 }
 
 /** Presses BB's Search threads shortcut, or picks it in the command palette. */

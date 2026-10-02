@@ -14,6 +14,7 @@ import {
   useRealtime,
   useRealtimeConnectionState,
   useRpc,
+  useSettings,
   type PluginAppBuilder,
   type PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk/app";
@@ -32,6 +33,7 @@ import { useIsCompactViewport } from "../components/ui/hooks/use-compact-viewpor
 import { Icon } from "../components/ui/icon";
 import { usePortalScopeProps } from "../lib/portal-scope";
 import { cn } from "../lib/utils";
+import { layoutFilter } from "../universal-search/layout";
 import type { Snooze, rpcContract } from "./server";
 import { CHANGED_CHANNEL } from "./shared";
 import { nextThread, sidebarThreadIds } from "./sidebar";
@@ -369,6 +371,10 @@ function SnoozedList(props: {
   );
 }
 
+export function openSnooze(threadId: string) {
+  openDialog({ kind: "snooze", threadId });
+}
+
 /**
  * A dialog that looks like BB's command palette: near the top, with no ✕, and
  * with the palette's classes set from the root, so the vendored `command`
@@ -380,6 +386,7 @@ function PaletteDialog(props: {
   children: ReactNode;
 }) {
   const { dialog, open, key } = useDialogState();
+  const { values } = useSettings();
   return (
     <Dialog
       open={open && dialog?.kind === props.kind}
@@ -399,6 +406,9 @@ function PaletteDialog(props: {
         <DialogTitle className="sr-only">{props.title}</DialogTitle>
         <Command
           key={key}
+          filter={
+            values?.universalSearch === false ? defaultFilter : layoutFilter
+          }
           className={cn(
             // Its own corners would cover the dialog's rounded border.
             "rounded-[inherit]",

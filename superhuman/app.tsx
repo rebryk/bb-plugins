@@ -12,10 +12,12 @@ import registerThreadEta from "./thread-eta/app";
 import registerThreadPrefetch from "./thread-prefetch/app";
 import registerUiPolish from "./ui-polish/app";
 import registerZoomLock from "./zoom-lock/app";
+import registerUniversalSearch from "./universal-search/app";
 
 // Each feature registers its own parts; ids stay unique across the plugin.
 export default definePluginApp((app) => {
   registerHotkeys(app);
+  registerUniversalSearch(app);
   registerDiaSidebar(app);
   registerSnooze(app);
   registerArchiveButton(app);
