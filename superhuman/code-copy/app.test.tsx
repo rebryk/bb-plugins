@@ -168,12 +168,8 @@ it("reports a clipboard denial without claiming success", async () => {
   expect(toast.success).not.toHaveBeenCalled();
 });
 
-it("can be disabled and removes listeners and pending feedback on unmount", async () => {
-  const disabled = await mount(false);
-  fireEvent.click(document.querySelector("code")!);
-  expect(writeText).not.toHaveBeenCalled();
-  disabled.lifecycle.unmount();
-  const mounted = await mount();
+it("ignores the removed toggle and cleans up listeners and pending feedback on unmount", async () => {
+  const mounted = await mount(false);
   let finish!: () => void;
   writeText.mockImplementationOnce(() => new Promise<void>((resolve) => {
     finish = resolve;

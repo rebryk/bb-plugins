@@ -164,7 +164,7 @@ function remaining(chord?: Chord) {
 
 /** Hints for the visible shortcuts while a modifier is held. */
 function hints(pills: Map<HTMLElement, string>) {
-  if (settings.shortcutHints === false) return;
+  if (settings.threadShortcuts === false) return;
   if (!MODIFIERS.some((key) => mods[key])) return;
   const top = panels().at(-1);
   const add = (element: HTMLElement, chords: (Chord | undefined)[]) => {
@@ -252,7 +252,7 @@ function keydown(event: KeyboardEvent) {
 }
 
 export function handle(event: KeyboardEvent): boolean {
-  if (event.isComposing || event.keyCode === 229 || event.defaultPrevented
+  if (settings.threadShortcuts === false || event.isComposing || event.keyCode === 229 || event.defaultPrevented
     || event.getModifierState("AltGraph")) return false;
   if (event.ctrlKey || event.metaKey || event.altKey) {
     normalizeShortcut(event);

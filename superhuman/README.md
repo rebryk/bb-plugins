@@ -2,7 +2,7 @@
 
 Superhuman-style features for BB:
 
-- **Hotkeys.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
+- **Shortcuts.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
   **E** archives, and numbers open a new thread's menus, in any keyboard layout.
 - **Universal Search.** Find commands, threads, and snoozed threads using both
   the typed query and its English/Russian keyboard equivalent. On by default.
@@ -12,21 +12,20 @@ Superhuman-style features for BB:
 - **Thread ETA.** The time left on an agent's background process counts down
   at the end of its sidebar row until it runs out or the agent clears it.
 - **Code Copy.** Click or tap a code block or inline command in an agent's
-  reply to copy it. On by default; text selection still works.
+  reply to copy it. Always on; text selection still works.
 - **Preload Threads.** Load the tail of recent and newly completed threads in
   the background. On by default; uses BB 0.44.0's cache and pauses when hidden.
 - **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
 - **Terminal Paste.** A Paste button for the terminal on phones and tablets.
 - **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Phone Layout.** BB's bars as cards at the bottom of a phone's screen, with
-  thumb-sized buttons, New thread in a thread's bar, an optional thread title,
-  a swipe from the right edge to open the right panel, and a swipe down a
-  terminal to hide its keyboard.
-- **Haptics.** A light tap as the phone's sidebar or right panel opens or
-  closes, in BB's app or a browser that can vibrate.
-- **Zoom Lock.** No zooming the page, off by default.
+- **Mobile Layout.** Bottom bars, gestures, and haptics on phones, with a fixed
+  interface scale and pinch-to-zoom images. Thread titles stay hidden on phones.
 - **UI Polish.** Icons in one tone, even menu rows, and a thread bar without
   the git action or external editor picker.
+
+Settings include four main switches: **Shortcuts**, **Universal Search**,
+**Mobile layout**, and **Archive button**. **Experimental** contains
+**Thread ETA** and **Preload threads**. All six are on by default.
 
 ## Install
 

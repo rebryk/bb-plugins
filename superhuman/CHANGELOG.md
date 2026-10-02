@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.14 (2026-10-01)
+
+- Settings include six switches: Shortcuts, Universal Search, Mobile layout,
+  Archive button, and an Experimental section for Thread ETA and Preload
+  threads. All six default to on. Shortcuts combines thread shortcuts and
+  hints; Mobile layout includes haptics and interface zoom locking.
+- Fullscreen images support pinch zoom and panning on phones while the
+  interface stays at 100%. Desktop zoom is unchanged. Closing an image leaves
+  no page zoom behind.
+- Code Copy is always on, and thread titles are always hidden on phones.
+  Their individual toggles, Haptics, and Zoom lock have been removed.
+
 ## 0.1.13 (2026-10-01)
 
 - Thread shortcuts use physical keys in every keyboard layout: H opens Snooze,

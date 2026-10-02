@@ -54,7 +54,7 @@ it("shows the remaining keys under a held modifier unless hints are off", () => 
     new KeyboardEvent("keyup", { key: "Shift", metaKey: true }),
   );
   expect(pills()).toEqual([["Switch model", "Shift + M"]]);
-  update({ settings: { shortcutHints: false } });
+  update({ settings: { threadShortcuts: false } });
   expect(pills()).toEqual([]);
 });
 
