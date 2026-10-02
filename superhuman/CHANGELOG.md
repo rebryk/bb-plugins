@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.17 (2026-10-01)
+
+- Match settings section spacing and heading alignment to BB's Interface
+  section, removing the extra gap before Experimental.
+
 ## 0.1.16 (2026-10-01)
 
 - Remove the divider between Configuration and Experimental in settings.
