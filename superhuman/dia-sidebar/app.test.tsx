@@ -56,10 +56,7 @@ describe("native navigation delegation", () => {
     const slot = renderSlot(
       app.experimentalSidebarNavigations[0]!,
       {
-        items: [],
-        activeItemId: null,
         isCompactViewport: false,
-        experimental_activate: vi.fn(),
         experimental_Original: () => (
           <div>
             <button onClick={activate}>Original destination</button>

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useSettings, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
+import { startDrawerHaptics } from "../haptics/drawers";
+import { lockZoom } from "../zoom-lock/lock";
 import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
 import { NewThreadButton } from "./new-thread";
@@ -13,11 +15,12 @@ import "./slide.css";
 function PhoneLayout() {
   const { values } = useSettings();
   const enabled = values?.phoneLayout !== false;
-  const title = values?.threadTitle !== false;
   useEffect(() => {
     if (!enabled) return;
     const stops = [
       startPhoneLayout(document),
+      startDrawerHaptics(document),
+      lockZoom(document),
       startPanelSlide(document),
       startPanelSwipe(document),
       startKeyboardSwipe(document),
@@ -25,14 +28,6 @@ function PhoneLayout() {
     ];
     return () => stops.forEach((stop) => stop());
   }, [enabled]);
-  useEffect(() => {
-    if (title) return;
-    const root = document.documentElement;
-    root.dataset.hideThreadTitle = "";
-    return () => {
-      delete root.dataset.hideThreadTitle;
-    };
-  }, [title]);
   return null;
 }
 

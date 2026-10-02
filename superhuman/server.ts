@@ -8,15 +8,9 @@ export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
     threadShortcuts: {
       type: "boolean",
-      label: "Thread shortcuts",
+      label: "Shortcuts",
       description:
-        "Outside inputs: / searches, H snoozes, E archives, in any keyboard layout. Number keys open a new thread's menus.",
-      default: true,
-    },
-    shortcutHints: {
-      type: "boolean",
-      label: "Shortcut hints",
-      description: "Hold a modifier to see the shortcuts.",
+        "Keyboard shortcuts in any layout, with hints while holding a modifier.",
       default: true,
     },
     universalSearch: {
@@ -26,28 +20,10 @@ export default async function plugin(bb: BbPluginApi) {
         "Search commands, threads and snoozed threads in both English and Russian keyboard layouts.",
       default: true,
     },
-    zoomLock: {
-      type: "boolean",
-      label: "Zoom lock",
-      description: "The page never zooms.",
-      default: false,
-    },
     phoneLayout: {
       type: "boolean",
-      label: "Phone layout",
-      description: "On a phone, the bars move to the bottom.",
-      default: true,
-    },
-    haptics: {
-      type: "boolean",
-      label: "Haptics",
-      description: "On a phone, a light tap as the sidebar or right panel opens or closes.",
-      default: true,
-    },
-    threadTitle: {
-      type: "boolean",
-      label: "Thread title",
-      description: "On a phone, the bar shows the thread's title.",
+      label: "Mobile layout",
+      description: "Mobile bars and gestures, haptics, and a fixed interface scale. Images still zoom.",
       default: true,
     },
     archiveButton: {
@@ -56,22 +32,16 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
-    codeCopy: {
+    threadEta: {
       type: "boolean",
-      label: "Code copy",
-      description: "Click or tap code in an agent's reply to copy it.",
+      label: "Thread ETA",
+      description: "An agent's estimate of the time left counts down on its thread in the sidebar.",
       default: true,
     },
     threadPrefetch: {
       type: "boolean",
       label: "Preload threads",
       description: "Preload the latest part of recent and newly completed threads.",
-      default: true,
-    },
-    threadEta: {
-      type: "boolean",
-      label: "Thread ETA",
-      description: "An agent's estimate of the time left counts down on its thread in the sidebar.",
       default: true,
     },
   });

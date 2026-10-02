@@ -1,5 +1,5 @@
 /*
- * Phones only: BB's compact layout on a touch screen, while the Phone layout
+ * Phones only: BB's compact layout on a touch screen, while the Mobile layout
  * setting is on. Every selector targets BB's own markup, which isn't a
  * versioned API; when a BB update changes it, a bar stays where BB puts it.
  */
@@ -201,8 +201,7 @@
      * share one row, which runs from its end: the right panel's button, then
      * the rest from the last, down to the thread's menu.
      */
-    &[data-hide-thread-title]
-      header
+    header
       > [data-testid="app-page-header-content-row"]:has(
         > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
       ) {
@@ -438,12 +437,11 @@
 }
 
 /*
- * With the Thread title setting off, a phone's thread bar has no title. BB 0.43
- * puts the title right in its box, and later versions in a paragraph there.
+ * A phone's thread bar always has no title. BB 0.43 puts the title right in
+ * its box, and later versions in a paragraph there.
  */
 @media (width < 48rem) and (pointer: coarse) {
-  html[data-hide-thread-title]
-    header
+  html header
     > [data-testid="app-page-header-content-row"]
     div:has(> .bb-thread-title, > p > .bb-thread-title) {
     display: none;

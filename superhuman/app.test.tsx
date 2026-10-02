@@ -26,6 +26,7 @@ it("registers every feature under an id of its own", async () => {
   };
   expect(registered).toEqual({
     contentScripts: [
+      "settings-sections",
       "hotkeys",
       "snooze-row-buttons",
       "terminal-paste",
@@ -36,9 +37,7 @@ it("registers every feature under an id of its own", async () => {
       "universal-search",
       "snooze-dialogs",
       "code-copy",
-      "zoom-lock",
       "phone-layout",
-      "haptics",
       "thread-prefetch",
       "thread-eta",
     ],

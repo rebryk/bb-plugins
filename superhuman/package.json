@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-superhuman",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -18,7 +18,7 @@
   },
   "bb": {
     "name": "Superhuman",
-    "description": "Superhuman-style speed for BB: shortcut hints and thread shortcuts, snoozed threads, a compact icon sidebar, bars within the thumb's reach on phones, terminal paste, and one-click server changes.",
+    "description": "Superhuman-style speed for BB: keyboard shortcuts, universal search, snoozed threads, a compact icon sidebar, a mobile layout with image zoom, terminal paste, and one-click server changes.",
     "branding": {
       "icon": "Zap"
     },
@@ -40,7 +40,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.5.9",
+    "@get-bb/plugin-sdk": "0.5.29",
     "@pierre/diffs": "^1.2.9",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-context-menu": "^2.3.3",

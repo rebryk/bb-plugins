@@ -1,12 +1,10 @@
 import { useEffect } from "react";
-import { useSettings, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
+import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { startCodeCopy } from "./copy";
 import "./app.css";
 
 function CodeCopy() {
-  const { values } = useSettings();
-  const enabled = values?.codeCopy !== false;
-  useEffect(() => (enabled ? startCodeCopy(document) : undefined), [enabled]);
+  useEffect(() => startCodeCopy(document), []);
   return null;
 }
 
