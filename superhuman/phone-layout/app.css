@@ -1,5 +1,5 @@
 /*
- * Phones only: BB's compact layout on a touch screen, while the Mobile layout
+ * Phones only: BB's compact layout on a touch screen, while the Mobile Layout
  * setting is on. Every selector targets BB's own markup, which isn't a
  * versioned API; when a BB update changes it, a bar stays where BB puts it.
  */

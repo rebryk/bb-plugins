@@ -23,13 +23,13 @@ export default async function plugin(bb: BbPluginApi) {
     },
     phoneLayout: {
       type: "boolean",
-      label: "Mobile layout",
+      label: "Mobile Layout",
       description: "Mobile bars and gestures, haptics, and a fixed interface scale. Images still zoom.",
       default: true,
     },
     archiveButton: {
       type: "boolean",
-      label: "Archive button",
+      label: "Archive Button",
       description: "An Archive button next to Snooze.",
       default: true,
     },
