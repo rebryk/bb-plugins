@@ -61,6 +61,23 @@ export function countsTowardCapacity(account: UsageAccount): boolean {
   return !account.disabled && account.weight > 0;
 }
 
+/** A window's size in five-hour windows, when the account has one. */
+function windowScale(account: UsageAccount, window: UsageWindow): number {
+  const hasFiveHour = account.windows.some(({ minutes }) => minutes === 300);
+  return hasFiveHour && window.minutes === 10_080
+    ? WEEK_IN_FIVE_HOUR_WINDOWS
+    : 1;
+}
+
+/** Whether Account Pooler routes to the account at `time`. */
+function servesAt(account: UsageAccount, time: number): boolean {
+  if (account.heldUntil !== null && account.heldUntil > time) return false;
+  const cleared =
+    (account.heldUntil !== null && account.heldUntil <= time) ||
+    account.windows.some(({ resetAt }) => resetAt !== null && resetAt <= time);
+  return !account.blocked || cleared;
+}
+
 /**
  * The share of one short window the account could serve at `time`, assuming
  * nobody uses it meanwhile. A weekly allowance holds several five-hour
@@ -71,21 +88,98 @@ function availableAt(
   time: number,
   switchThreshold: number,
 ): number {
-  if (account.heldUntil !== null && account.heldUntil > time) return 0;
-  const cleared =
-    (account.heldUntil !== null && account.heldUntil <= time) ||
-    account.windows.some(({ resetAt }) => resetAt !== null && resetAt <= time);
-  if (account.blocked && !cleared) return 0;
-  const hasFiveHour = account.windows.some(({ minutes }) => minutes === 300);
+  if (!servesAt(account, time)) return 0;
   let available = 1;
   for (const window of account.windows) {
     const used = usedAt(window, time) ?? 0;
     const remaining = used >= switchThreshold ? 0 : 1 - used;
-    const scale =
-      hasFiveHour && window.minutes === 10_080 ? WEEK_IN_FIVE_HOUR_WINDOWS : 1;
-    available = Math.min(available, remaining * scale);
+    available = Math.min(available, remaining * windowScale(account, window));
   }
   return available;
+}
+
+/** What an account has served by `at`, in five-hour windows. */
+interface Served {
+  at: number;
+  total: number;
+}
+
+/**
+ * What a busy account serves before `end`: the total after each time it
+ * grows. It takes all its windows allow as soon as they
+ * allow it, and each window starts again as soon as it resets.
+ */
+function servedUntil(
+  account: UsageAccount,
+  end: number,
+  switchThreshold: number,
+  now: number,
+): Served[] {
+  const budgets = account.windows.map((window) => {
+    const scale = windowScale(account, window);
+    const used = usedAt(window, now) ?? 0;
+    const length = window.minutes === null ? null : window.minutes * 60_000;
+    return {
+      full: switchThreshold * scale,
+      left: Math.max(0, switchThreshold - used) * scale,
+      length,
+      // An unused window starts with the first request.
+      resetAt:
+        window.resetAt !== null && window.resetAt > now
+          ? window.resetAt
+          : used === 0 && length !== null
+            ? now + length
+            : null,
+    };
+  });
+  const served: Served[] = [];
+  let total = 0;
+  let time = now;
+  while (budgets.length > 0) {
+    const amount = Math.min(...budgets.map(({ left }) => left));
+    if (amount > 0 && servesAt(account, time)) {
+      total += amount;
+      for (const budget of budgets) budget.left -= amount;
+      served.push({ at: time, total });
+    }
+    const next = Math.min(
+      ...budgets.map(({ resetAt }) => resetAt ?? Infinity),
+      account.heldUntil !== null && account.heldUntil > time
+        ? account.heldUntil
+        : Infinity,
+    );
+    if (next >= end) break;
+    time = next;
+    for (const budget of budgets) {
+      if (budget.resetAt !== time) continue;
+      budget.left = budget.full;
+      budget.resetAt = budget.length === null ? null : time + budget.length;
+    }
+  }
+  return served;
+}
+
+/** How much more `ahead` has served than `behind`, summed over time. */
+function lead(
+  ahead: readonly Served[],
+  behind: readonly Served[],
+  now: number,
+  end: number,
+): number {
+  const totalAt = (served: readonly Served[], time: number) => {
+    let total = 0;
+    for (const step of served) if (step.at <= time) total = step.total;
+    return total;
+  };
+  const times = [
+    ...new Set([now, ...[...ahead, ...behind].map(({ at }) => at)]),
+  ].sort((a, b) => a - b);
+  let sum = 0;
+  times.forEach((time, index) => {
+    const next = times[index + 1] ?? end;
+    sum += (totalAt(ahead, time) - totalAt(behind, time)) * (next - time);
+  });
+  return sum;
 }
 
 function share(part: number, total: number): number {
@@ -146,10 +240,11 @@ function resetSteps(
 }
 
 /**
- * The reset worth spending: plan weight times what it frees, summed until
- * the account would free up on its own, within a week. Of resets worth about
- * the same, the one that expires first. Only a reset that lowers the
- * percentage shown now.
+ * The reset worth spending: plan weight times how much more the account
+ * serves with it, through every window it clears, summed over time until the
+ * account would free up on its own, within a week. Of resets worth about the
+ * same, the one that expires first. Only a reset that lowers the percentage
+ * shown now.
  */
 function planReset(
   accounts: readonly UsageAccount[],
@@ -160,6 +255,8 @@ function planReset(
   const end = now + RESET_HORIZON_MS;
   const available = (account: UsageAccount, time: number) =>
     availableAt(account, time, switchThreshold);
+  const served = (account: UsageAccount, until: number) =>
+    servedUntil(account, until, switchThreshold, now);
   let best: ResetPlan | null = null;
   let bestScore = 0;
   for (const account of accounts) {
@@ -184,23 +281,22 @@ function planReset(
     );
     const usedAfter = usageAt(swapped, now, switchThreshold)?.used ?? used;
     if (formatPercent(usedAfter) === formatPercent(used)) continue;
-    const times = [account.heldUntil, ...account.windows.map((w) => w.resetAt)]
-      .filter(
-        (time): time is number => time !== null && time > now && time < end,
-      )
-      .sort((a, b) => a - b);
-    let score = 0;
-    let start = now;
-    let freesAt: number | null = null;
-    for (const next of [...times, end]) {
-      const added = available(after, start) - available(account, start);
-      if (added < 1e-9) {
-        freesAt = start;
-        break;
-      }
-      score += account.weight * added * (next - start);
-      start = next;
-    }
+    // On its own, the account frees up once every window the reset would
+    // empty resets; with nothing spent, once its first window resets.
+    const spent = account.windows.filter(
+      (window) => cleared(window) && (usedAt(window, now) ?? 0) > 0,
+    );
+    const resets = (spent.length > 0 ? spent : account.windows).map(
+      ({ resetAt }) => resetAt ?? Infinity,
+    );
+    const freesOn =
+      spent.length > 0 ? Math.max(...resets) : Math.min(...resets);
+    const freesAt = freesOn <= end ? freesOn : null;
+    const until = freesAt ?? end;
+    const score =
+      account.weight *
+      lead(served(after, until), served(account, until), now, until);
+    if (score <= 0) continue;
     if (
       best !== null &&
       (score < bestScore * (1 - GAIN_TIE) ||

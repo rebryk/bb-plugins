@@ -268,6 +268,27 @@ describe("normalizeAccount", () => {
       normalizeAccount(account({ observedAt: 0 }), { now: 31 * 60_000 })
         .offline,
     ).toBe("no data");
+    // Nothing reaches a held or exhausted account to change its reading.
+    for (const status of ["held", "exhausted"] as const) {
+      expect(
+        normalizeAccount(account({ status, observedAt: 0 }), {
+          now: 31 * 60_000,
+        }).offline,
+      ).toBeNull();
+    }
+    // A reset clears what an earlier reading shows.
+    expect(
+      normalizeAccount(account({ status: "exhausted", observedAt: 0 }), {
+        now: 60_000,
+        resetUsedAt: 1,
+      }).offline,
+    ).toBe("no data");
+    expect(
+      normalizeAccount(account({ observedAt: 2 }), {
+        now: 60_000,
+        resetUsedAt: 1,
+      }).offline,
+    ).toBeNull();
   });
 
   it("doesn't flag accounts that stay out of the total", () => {
@@ -612,7 +633,7 @@ describe("plugin", () => {
   });
 
   it("spends a reset, then reads the pool again", async () => {
-    const accounts = [pooledCodex()];
+    const accounts = [pooledCodex({ observedAt: Date.now() - 1_000 })];
     const accountId = accounts[0]!.id;
     const fetch = codexWithReset();
     vi.stubGlobal("fetch", fetch);
@@ -626,7 +647,10 @@ describe("plugin", () => {
     const before = (await harness.behavior.callRpc(
       "usage_get",
     )) as UsageSnapshot;
-    expect(before.accounts[0]).toMatchObject({ availableResets: 1 });
+    expect(before.accounts[0]).toMatchObject({
+      availableResets: 1,
+      offline: null,
+    });
 
     // A second spend on the account waits for none, and spends none.
     expect(
@@ -650,7 +674,11 @@ describe("plugin", () => {
     const after = (await harness.behavior.callRpc(
       "usage_get",
     )) as UsageSnapshot;
-    expect(after.accounts[0]).toMatchObject({ availableResets: 0 });
+    // Account Pooler hasn't read the account since, so its usage is unknown.
+    expect(after.accounts[0]).toMatchObject({
+      availableResets: 0,
+      offline: "no data",
+    });
     expect(after.accounts[0]?.reset).toBeUndefined();
     // Account Pooler reads the cleared limits now, and the pool is read anew.
     expect(poolerMethods(harness)).toEqual([
