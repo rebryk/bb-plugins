@@ -3,6 +3,19 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.13 (2026-10-01)
+
+- Thread shortcuts use physical keys in every keyboard layout: H opens Snooze,
+  E archives, / searches threads, and numbers choose new-thread options.
+  Modified BB shortcuts also accept their physical key when the typed
+  character has no binding. Text inputs, composition, and terminal keys keep
+  their normal behavior.
+- Universal Search combines the typed query with its English/Russian keyboard
+  equivalent in commands, thread search, and snoozed threads. Results keep
+  their actions and keyboard navigation, duplicates are removed, and the input
+  stays unchanged. The setting is on by default. Built-in search integration
+  is verified for BB 0.44.0; unsupported versions keep native search.
+
 ## 0.1.12 (2026-09-29)
 
 - Thread ETA gives agents a `set_thread_eta` tool: the time left on a

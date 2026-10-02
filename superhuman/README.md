@@ -2,8 +2,10 @@
 
 Superhuman-style features for BB:
 
-- **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and
-  number keys for a new thread's menus.
+- **Hotkeys.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
+  **E** archives, and numbers open a new thread's menus, in any keyboard layout.
+- **Universal Search.** Find commands, threads, and snoozed threads using both
+  the typed query and its English/Russian keyboard equivalent. On by default.
 - **Snooze.** Hide a thread until a set time or until its agent needs you; use
   the moon in its header or before Archive in the sidebar row.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
@@ -30,6 +32,16 @@ Superhuman-style features for BB:
 
 Needs bb 0.43.4 or later. Install the plugin on every server you open, since a
 BB page loads only its own server's plugins.
+
+Hotkeys use physical key positions outside text inputs; modified BB shortcuts
+also accept their physical key when the typed character has no binding.
+Universal Search supports US English and Russian ЙЦУКЕН in both directions,
+keeps the input unchanged, and combines matches without duplicate rows. Turn it
+off with **Universal Search** in Superhuman's settings. Built-in command and
+thread search support is verified for BB 0.44.0 and disables itself on other
+versions; the snoozed-thread filter works independently. The built-in adapters
+read the palette's React row handlers and wrap its thread-search requests, so
+BB updates require another compatibility check.
 
 Preload Threads fetches up to four recent dialogue segments per thread, each
 starting with a user message. Older history loads normally when scrolling back.

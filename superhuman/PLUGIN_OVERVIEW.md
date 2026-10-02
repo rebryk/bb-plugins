@@ -1,7 +1,10 @@
 Superhuman-style features for BB:
 
-- **Hotkeys.** Shortcut hints on a held modifier, **/** to search threads, and
-  number keys for a new thread's menus.
+- **Hotkeys.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
+  **E** archives, and numbers open a new thread's menus, in any keyboard layout.
+- **Universal Search.** Find commands, threads, and snoozed threads using both
+  the typed query and its English/Russian keyboard equivalent. On by default;
+  built-in command and thread search support requires BB 0.44.0.
 - **Snooze.** Hide a thread until a set time or until its agent needs you; use
   the moon in its header or before Archive in the sidebar row.
 - **Archive Button.** Archive a thread from its header, next to Snooze.

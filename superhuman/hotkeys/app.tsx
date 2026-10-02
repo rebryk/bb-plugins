@@ -2,15 +2,29 @@ import { useEffect } from "react";
 import {
   useSdk,
   useSettings,
+  useBbContext,
+  experimental_useSidebarThreadActions,
   type PluginAppBuilder,
 } from "@get-bb/plugin-sdk/app";
 import { start, update } from "./controller";
+import { openSnooze } from "../snooze/app";
 import "./app.css";
 
 // Settings and keybindings reach the page script through this React bridge.
 function Bridge() {
   const sdk = useSdk();
   const { values } = useSettings();
+  const { threadId } = useBbContext();
+  const actions = experimental_useSidebarThreadActions();
+  useEffect(() => {
+    update({
+      threadActions: threadId ? {
+        snooze: () => openSnooze(threadId),
+        archive: () => actions.archive(threadId),
+      } : undefined,
+    });
+    return () => update({ threadActions: undefined });
+  }, [threadId, actions]);
   useEffect(() => update({ settings: values ?? {} }), [values]);
   useEffect(() => {
     const refresh = () =>
