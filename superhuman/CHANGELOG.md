@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.15 (2026-10-01)
+
+- Experimental is a separate settings section beside Configuration, with
+  matching headings and its own card for Thread ETA and Preload threads.
+
 ## 0.1.14 (2026-10-01)
 
 - Settings include six switches: Shortcuts, Universal Search, Mobile layout,

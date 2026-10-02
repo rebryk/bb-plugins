@@ -23,10 +23,10 @@ it("registers every feature under an id of its own", async () => {
     threadHeaderActions: ids(app.threadHeaderActions),
     commands: ids(commands(app)),
     sidebarFooterItems: ids(app.experimentalSidebarFooterItems),
+    settingsSections: ids(app.settingsSections),
   };
   expect(registered).toEqual({
     contentScripts: [
-      "settings-sections",
       "hotkeys",
       "snooze-row-buttons",
       "terminal-paste",
@@ -45,6 +45,7 @@ it("registers every feature under an id of its own", async () => {
     threadHeaderActions: ["snooze", "archive", "new-thread"],
     commands: ["open-plugins", "snooze-thread", "show-snoozed-threads"],
     sidebarFooterItems: ["change-server"],
+    settingsSections: ["experimental-settings"],
   });
   const all = Object.values(registered).flat();
   expect(new Set(all).size).toBe(all.length);
