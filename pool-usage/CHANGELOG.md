@@ -3,6 +3,23 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.6 (2026-10-02)
+
+- **Reset to** now picks the reset that frees the most quota across all the
+  windows it clears, the weekly one included. It weighs how much more the
+  account can serve with the reset, by plan weight, for as long as it would
+  stay limited on its own. Before, weekly usage counted only once the weekly
+  window ran almost out, so a reset could go to an account whose five-hour
+  window was about to reset anyway instead of one with most of its week spent.
+  A reset that frees nothing a busy account wouldn't get back soon is no longer
+  offered.
+- A held or exhausted account keeps its last reading however old, since
+  Account Pooler sends it nothing that would renew it. Its usage now drops on
+  the card when its window resets, and its reset can be offered, where before
+  it counted as fully used with no data after 30 minutes.
+- After **Use reset**, the account counts as having no data until Account
+  Pooler reads it again, instead of showing the limits the reset cleared.
+
 ## 0.2.5 (2026-09-28)
 
 - When Account Pooler's Claude or Codex accounts hold resets, which clear an

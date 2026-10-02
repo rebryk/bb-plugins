@@ -348,16 +348,24 @@ function accountWindows(account: PoolAccount): UsageWindow[] {
 function offlineReason(
   account: PoolAccount,
   now: number,
+  resetUsedAt: number | undefined,
 ): UsageAccount["offline"] {
   if (account.status === "error") {
     return account.error !== null && LOGIN_ERROR.test(account.error)
       ? "login error"
       : "error";
   }
+  // A reading from before a reset shows limits the reset cleared.
   if (
     account.observedAt === null ||
-    now - account.observedAt > STALE_OBSERVATION_MS
+    (resetUsedAt !== undefined && account.observedAt < resetUsedAt)
   ) {
+    return "no data";
+  }
+  // Account Pooler sends a held or exhausted account nothing, so its last
+  // reading stays true until a window resets, though nothing renews it.
+  const blocked = account.status === "held" || account.status === "exhausted";
+  if (!blocked && now - account.observedAt > STALE_OBSERVATION_MS) {
     return "no data";
   }
   return null;
@@ -365,7 +373,12 @@ function offlineReason(
 
 export function normalizeAccount(
   account: PoolAccount,
-  options: { now: number; planFallback?: Plan | null },
+  options: {
+    now: number;
+    planFallback?: Plan | null;
+    /** When this plugin last reset the account's limits. */
+    resetUsedAt?: number;
+  },
 ): UsageAccount {
   const plan = accountPlan(account) ?? options.planFallback ?? null;
   const weight = plan?.weight ?? 1;
@@ -379,7 +392,9 @@ export function normalizeAccount(
     weight,
     disabled,
     offline:
-      disabled || weight === 0 ? null : offlineReason(account, options.now),
+      disabled || weight === 0
+        ? null
+        : offlineReason(account, options.now, options.resetUsedAt),
     heldUntil: account.heldUntil,
     blocked: account.status === "held" || account.status === "exhausted",
     windows: accountWindows(account),
@@ -800,6 +815,8 @@ type SpendOutcome =
 interface SentReset {
   resetId: string;
   sentAt: number;
+  /** When the provider confirmed the reset. */
+  usedAt?: number;
 }
 
 // The providers' replies are undocumented, so they're read field by field.
@@ -1107,6 +1124,8 @@ export default function plugin(bb: BbPluginApi): void {
     const reply = await fetchJson(url, headers, body);
     const answer = String(reply?.code ?? reply?.result);
     if (answer === "reset" || (sent !== undefined && REPEATS.has(answer))) {
+      const usedAt = Date.now();
+      await bb.storage.kv.set(key, { resetId, sentAt: usedAt, usedAt });
       return { outcome: "reset" };
     }
     if (!REFUSALS.has(answer)) throw new Error(`the provider said ${answer}`);
@@ -1117,6 +1136,19 @@ export default function plugin(bb: BbPluginApi): void {
           ? "The reset isn't available any more. The earlier try may have used it."
           : `${account.provider === "claude" ? "Claude" : "Codex"} kept the reset (${answer}). Nothing was used.`,
     };
+  }
+
+  /** When this plugin last reset each account, over the past day. */
+  async function resetsUsed(): Promise<Map<string, number>> {
+    const used = new Map<string, number>();
+    for (const key of await bb.storage.kv.list(SENT_RESET_KEY)) {
+      const usedAt = (await bb.storage.kv.get<SentReset>(key))?.usedAt;
+      const accountId = key.slice(SENT_RESET_KEY.length).split(":")[0];
+      if (usedAt !== undefined && accountId !== undefined) {
+        used.set(accountId, Math.max(used.get(accountId) ?? 0, usedAt));
+      }
+    }
+    return used;
   }
 
   /** Forgets the resets that retries no longer need. */
@@ -1188,6 +1220,7 @@ export default function plugin(bb: BbPluginApi): void {
     const plans = await codexPlans(accounts);
     const switchThreshold = await fetchSwitchThreshold(bb);
     const accountResets = await pendingResets;
+    const used = await resetsUsed();
     return {
       served,
       providers: pooled.map((provider) => ({
@@ -1201,6 +1234,7 @@ export default function plugin(bb: BbPluginApi): void {
             account.provider === "codex" && account.email !== null
               ? (plans.get(normalizedEmail(account.email)) ?? null)
               : null,
+          resetUsedAt: used.get(account.id),
         });
         const own = accountResets.get(account.id);
         if (own === undefined || own === null) return normalized;

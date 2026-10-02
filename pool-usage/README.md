@@ -60,9 +60,11 @@ bb plugin disable provider-usage
 - For providers Account Pooler serves, accounts come from its redacted
   `status.get` RPC, and a window at or past its `switchThreshold` (from
   `config.get`) is spent. A held account counts as fully used until its hold
-  ends, and so does one with an expired login, an error, or no reading from the
-  last 30 minutes. Codex plans missing there come from BB's official Codex
-  usage when the account emails match.
+  ends, and so does one with an expired login, an error, no reading from the
+  last 30 minutes, or none since the plugin reset its limits. A held or
+  exhausted account keeps its last reading however old, since Account Pooler
+  sends it nothing that could change it. Codex plans missing there come from
+  BB's official Codex usage when the account emails match.
 - Other providers, or every provider without Account Pooler, are read from BB's
   provider usage sources; a window there is spent at 100%.
 - The numbers refresh every 30 seconds.
@@ -73,11 +75,15 @@ bb plugin disable provider-usage
   stores for its enabled accounts, under `plugins/account-pool/secrets` in BB's
   data directory. Claude reports resets only to Claude Code, so the Claude
   request identifies itself as the installed Claude Code version.
-- The reset worth spending first frees the most capacity over the next week:
-  the account's plan weight times the share of it the reset frees, for as long
-  as the account would have stayed limited on its own. Of resets worth about
-  the same, the one that expires first goes first. Only a reset that lowers the
-  total as the card rounds it counts.
+- The reset worth spending first frees the most capacity over the next week.
+  The plugin plays out a busy account with and without the reset: it serves
+  all its windows allow as soon as they allow it, and each window starts again
+  once it resets. The reset is worth the account's plan weight times how much
+  more it serves with the reset, summed over time until every window the reset
+  would empty resets on its own. So a reset counts the weekly quota it frees as
+  well as the five-hour quota, and quota that would come back soon counts for
+  little. Of resets worth about the same, the one that expires first goes
+  first. Only a reset that lowers the total as the card rounds it counts.
 - **Use reset** spends it as Claude Code and Codex do: Claude's
   `organizations/<id>/reset_rate_limits` with the grant Claude Code would
   claim, or Codex's `rate-limit-reset-credits/consume` with the credit that

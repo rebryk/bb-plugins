@@ -301,6 +301,56 @@ describe("resetPlan", () => {
     expect(summarize([lighter, later])[0]?.resetPlan?.account.id).toBe("later");
   });
 
+  it("counts the weekly quota a reset frees along with the five-hour one", () => {
+    const account = (
+      id: string,
+      fiveHour: [number, number],
+      weekly: [number, number],
+    ) =>
+      usageAccount({
+        id,
+        provider: "codex",
+        windows: [
+          quota(300, fiveHour[0], NOW + fiveHour[1]),
+          quota(10_080, weekly[0], NOW + weekly[1]),
+        ],
+        reset: { expiresAt: null, clears: null },
+      });
+    const weeklySpent = account("weekly", [0.9, 4 * HOUR], [0.8, 6 * DAY]);
+    const [codex] = summarize([
+      account("five-hour", [0.95, 4 * HOUR], [0.1, 6 * DAY]),
+      weeklySpent,
+    ]);
+
+    // 80% of a week back for six days beats 5% more of five hours.
+    expect(codex?.resetPlan?.account.id).toBe("weekly");
+    expect(codex?.resetPlan?.freesAt).toBe(NOW + 6 * DAY);
+    // A weekly window about to reset frees little; one six days out, a lot.
+    expect(
+      summarize([
+        account("resetting", [0.5, 4 * HOUR], [0.95, 10 * MINUTE]),
+        account("lasting", [0.4, 4 * HOUR], [0.4, 6 * DAY]),
+      ])[0]?.resetPlan?.account.id,
+    ).toBe("lasting");
+  });
+
+  it("plans no reset that frees nothing a busy account wouldn't get anyway", () => {
+    const [codex] = summarize([
+      usageAccount({
+        provider: "codex",
+        windows: [
+          quota(300, 0.1, NOW + HOUR),
+          quota(10_080, 0.02, NOW + 6 * DAY),
+        ],
+        reset: { expiresAt: null, clears: null },
+      }),
+    ]);
+
+    // Its five-hour window starts over within the hour anyway.
+    expect(codex?.used).toBeCloseTo(0.1);
+    expect(codex?.resetPlan).toBeNull();
+  });
+
   it("clears only the windows a Claude reset clears", () => {
     const account = usageAccount({
       weight: 20,
