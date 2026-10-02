@@ -39,7 +39,7 @@ it("renders a peer section, saves only the toggled field, and rolls back a faile
   fireEvent.click(toggle);
   await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Save failed"));
   expect(toggle.getAttribute("aria-checked")).toBe("false");
-  expect(screen.getByRole("switch", { name: "Preload threads" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.getByRole("switch", { name: "Preload Threads" }).getAttribute("aria-checked")).toBe("true");
   mounted.lifecycle.unmount();
   expect(document.querySelector('[data-resource-detail-section="experimental"]')).toBeNull();
 });

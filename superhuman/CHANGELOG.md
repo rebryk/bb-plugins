@@ -3,6 +3,10 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.18 (2026-10-01)
+
+- Use title case for all settings toggle labels.
+
 ## 0.1.17 (2026-10-01)
 
 - Match settings section spacing and heading alignment to BB's Interface

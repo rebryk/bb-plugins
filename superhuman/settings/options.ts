@@ -7,7 +7,7 @@ export const experimentalSettings = {
   },
   threadPrefetch: {
     type: "boolean",
-    label: "Preload threads",
+    label: "Preload Threads",
     description: "Preload the latest part of recent and newly completed threads.",
     default: true,
   },

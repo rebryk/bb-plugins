@@ -2,7 +2,7 @@
 html:has([data-superhuman-experimental])
   [data-testid="plugin-detail-superhuman"]
   > .rounded-md.border > .space-y-4
-  > [data-control-placement]:has([role="switch"]:is([aria-label="Thread ETA"], [aria-label="Preload threads"])) {
+  > [data-control-placement]:has([role="switch"]:is([aria-label="Thread ETA"], [aria-label="Preload Threads"])) {
   display: none;
 }
 

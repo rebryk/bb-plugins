@@ -23,8 +23,8 @@ Superhuman-style features for BB:
   the git action or external editor picker.
 
 Settings include four main switches: **Shortcuts**, **Universal Search**,
-**Mobile layout**, and **Archive button**. **Experimental** contains
-**Thread ETA** and **Preload threads**. All six are on by default.
+**Mobile Layout**, and **Archive Button**. **Experimental** contains
+**Thread ETA** and **Preload Threads**. All six are on by default.
 
 ## More San Francisco Plugins
 
