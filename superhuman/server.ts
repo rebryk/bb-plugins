@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import registerSnoozeServer from "./snooze/server";
 import registerThreadEtaServer from "./thread-eta/server";
+import { experimentalSettings } from "./settings/options";
 
 export default async function plugin(bb: BbPluginApi) {
   // The browser reads these: the keyboard features in hotkeys/controller.ts,
@@ -32,18 +33,7 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
-    threadEta: {
-      type: "boolean",
-      label: "Thread ETA",
-      description: "An agent's estimate of the time left counts down on its thread in the sidebar.",
-      default: true,
-    },
-    threadPrefetch: {
-      type: "boolean",
-      label: "Preload threads",
-      description: "Preload the latest part of recent and newly completed threads.",
-      default: true,
-    },
+    ...experimentalSettings,
   });
   await registerSnoozeServer(bb);
   await registerThreadEtaServer(bb, settings);

@@ -1,0 +1,12 @@
+/* The settings section owns these controls; keep BB's form as a fallback. */
+html:has([data-superhuman-experimental])
+  [data-testid="plugin-detail-superhuman"]
+  > .rounded-md.border > .space-y-4
+  > [data-control-placement]:has([role="switch"]:is([aria-label="Thread ETA"], [aria-label="Preload threads"])) {
+  display: none;
+}
+
+/* The portal leaves only its hidden anchor in BB's settings slot. */
+[data-testid="plugin-detail-superhuman"] > [data-testid="plugin-settings-sections"] {
+  display: none;
+}
