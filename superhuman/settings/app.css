@@ -10,3 +10,10 @@ html:has([data-superhuman-experimental])
 [data-testid="plugin-detail-superhuman"] > [data-testid="plugin-settings-sections"] {
   display: none;
 }
+
+html [data-resource-detail-section]:has(
+  > [data-testid="plugin-detail-superhuman"],
+  > [data-testid="plugin-detail-superhuman-experimental"]
+) {
+  border-block-width: 0;
+}
