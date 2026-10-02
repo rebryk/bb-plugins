@@ -3,6 +3,10 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.16 (2026-10-01)
+
+- Remove the divider between Configuration and Experimental in settings.
+
 ## 0.1.15 (2026-10-01)
 
 - Experimental is a separate settings section beside Configuration, with
