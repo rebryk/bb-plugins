@@ -53,17 +53,40 @@ export function startCodeCopy(doc: Document) {
       decorated.set(code, attributes);
     }
   }
-  const observer = new win.MutationObserver((records) => {
-    for (const [code, attributes] of decorated) {
-      if (code.isConnected) continue;
-      restore(code, attributes);
-      decorated.delete(code);
-    }
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof win.Element) decorate(node);
+  // Each decoration restyles its code, so new code waits until the page is
+  // idle: a thread switch paints first. Clicks copy undecorated code as well.
+  let added: Element[] = [];
+  let removed = false;
+  let idle = 0;
+  function flush() {
+    idle = 0;
+    if (!active) return;
+    // Streaming replies mostly add nodes; check the decorated codes only when
+    // something left the page.
+    if (removed) {
+      removed = false;
+      for (const [code, attributes] of decorated) {
+        if (code.isConnected) continue;
+        restore(code, attributes);
+        decorated.delete(code);
       }
     }
+    const roots = added;
+    added = [];
+    for (const root of roots) if (root.isConnected) decorate(root);
+  }
+  const whenIdle = (run: () => void) =>
+    win.requestIdleCallback
+      ? win.requestIdleCallback(run, { timeout: 1000 })
+      : win.requestAnimationFrame(() => win.setTimeout(run));
+  const observer = new win.MutationObserver((records) => {
+    for (const record of records) {
+      if (record.removedNodes.length) removed = true;
+      for (const node of record.addedNodes) {
+        if (node instanceof win.Element) added.push(node);
+      }
+    }
+    if (!idle && (removed || added.length)) idle = whenIdle(flush);
   });
   decorate(doc.documentElement);
   observer.observe(doc.documentElement, { childList: true, subtree: true });

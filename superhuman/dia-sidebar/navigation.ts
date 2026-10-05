@@ -13,7 +13,8 @@ export function enhanceNavigation(root: HTMLElement): () => void {
   }
 
   function fitAccessories() {
-    for (const [content, viewport] of accessories) {
+    // Read every box before writing, so no write forces the next read to relayout.
+    const scales = [...accessories].map(([content, viewport]) => {
       // These dimensions are independent of our transform, including fractions.
       const style = getComputedStyle(content);
       const width = Math.max(parseFloat(style.width) || 0, content.scrollWidth);
@@ -21,12 +22,15 @@ export function enhanceNavigation(root: HTMLElement): () => void {
       const scale = width && height
         ? Math.min(1, viewport.clientWidth / width, viewport.clientHeight / height)
         : 0;
-      if (content.style.getPropertyValue(SCALE) !== String(scale)) {
-        content.style.setProperty(SCALE, String(scale));
-      }
+      return [content, String(scale)] as const;
+    });
+    for (const [content, scale] of scales) {
+      if (content.style.getPropertyValue(SCALE) !== scale) content.style.setProperty(SCALE, scale);
     }
   }
 
+  // The only place that measures: it runs after layout, so reads are free, and
+  // newly observed boxes get an initial callback. Zero-size ones keep CSS scale 0.
   const resize = new ResizeObserver(fitAccessories);
   function refresh() {
     const buttons = new Set(root.querySelectorAll<HTMLElement>(
@@ -43,7 +47,8 @@ export function enhanceNavigation(root: HTMLElement): () => void {
       const label = button.getAttribute("aria-label")?.trim()
         || button.querySelector("span.truncate")?.textContent?.trim();
       if (label) {
-        button.title = label;
+        // Titles are observed; rewriting an unchanged one would refresh forever.
+        if (button.title !== label) button.title = label;
         titles.set(button, label);
       }
     }
@@ -61,7 +66,6 @@ export function enhanceNavigation(root: HTMLElement): () => void {
       resize.observe(viewport);
     }
     accessories = next;
-    fitAccessories();
   }
 
   function tileButton(event: Event) {
@@ -87,11 +91,12 @@ export function enhanceNavigation(root: HTMLElement): () => void {
     if (tileButton(event)) event.stopPropagation();
   }
 
+  // Only what refresh reads; geometry is the ResizeObserver's, so our scale writes
+  // never come back here. A host dropping its own title frees the tile for ours.
   const mutations = new MutationObserver(refresh);
   mutations.observe(root, {
     childList: true, subtree: true, characterData: true, attributes: true,
-    attributeFilter: ["aria-label", "class", "style", "width", "height", "hidden",
-      "data-sidebar-navigation-customize-mode"],
+    attributeFilter: ["aria-label", "title", "data-sidebar-navigation-customize-mode"],
   });
   root.addEventListener("keydown", openMenu);
   root.addEventListener("mousedown", preventListDrag, true);

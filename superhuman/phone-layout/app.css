@@ -85,21 +85,30 @@
      * panel's moves to the bottom, where it sits in another page's card.
      */
     main:has(> div > [aria-label*="right panel"]) {
+      --phone-layout-home: 1;
       --phone-layout-button-size: var(--phone-layout-card-button-size);
       padding-bottom: calc(var(--phone-layout-card-height) + var(--phone-layout-card-bottom));
 
-      > div:has(> [aria-label*="right panel"]) {
+      body[style*="--bb-safe-area-bottom"] & {
+        padding-bottom: calc(var(--spacing, 0.25rem) * 4);
+      }
+    }
+
+    /*
+     * Rules that depend on what an element holds mark it with :has() and style
+     * its inside through a style query, since `A:has(B) C` would restyle much
+     * of the page on every change. `:is(*, …)` or a repeated compound keeps a
+     * rule's original specificity.
+     */
+    @container style(--phone-layout-home: 1) {
+      main > div:has(> [aria-label*="right panel"]):is(*, superhuman-pad.superhuman-pad) {
         top: auto;
         right: calc(
           env(safe-area-inset-right, 0px) + var(--phone-layout-card-inset) + 1px + var(--phone-layout-card-padding)
         );
         bottom: calc(var(--phone-layout-card-bottom) + 1px + var(--phone-layout-card-padding));
-      }
 
-      body[style*="--bb-safe-area-bottom"] & {
-        padding-bottom: calc(var(--spacing, 0.25rem) * 4);
-
-        > div:has(> [aria-label*="right panel"]) {
+        body[style*="--bb-safe-area-bottom"] & {
           display: none;
         }
       }
@@ -205,27 +214,33 @@
       > [data-testid="app-page-header-content-row"]:has(
         > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
       ) {
+      --phone-layout-thread-bar: 1;
       flex-direction: row-reverse;
       justify-content: space-evenly;
       /* With the card's padding, as wide as the room around an icon in its button. */
       padding-inline: calc(
         (var(--phone-layout-button-size) - var(--phone-layout-icon-size)) / 2 - var(--phone-layout-card-padding)
       );
+    }
 
-      [data-thread-header-pane-actions] > * {
-        order: -1;
-      }
+    @container style(--phone-layout-thread-bar: 1) {
+      header > [data-testid="app-page-header-content-row"]:is(*, .superhuman-pad.superhuman-pad) {
+        [data-thread-header-pane-actions] > span,
+        [data-thread-header-pane-actions] > button {
+          order: -1;
+        }
 
-      > div:not([data-app-page-header-actions]),
-      > div:not([data-app-page-header-actions]) > div,
-      > [data-app-page-header-actions],
-      > [data-app-page-header-actions] > * {
-        display: contents;
-      }
+        > div:not([data-app-page-header-actions]),
+        > div:not([data-app-page-header-actions]) > div,
+        > [data-app-page-header-actions],
+        > [data-app-page-header-actions] > div {
+          display: contents;
+        }
 
-      /* A plugin that shows nothing here leaves no gap. */
-      [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
-        display: none;
+        /* A plugin that shows nothing here leaves no gap. */
+        [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
+          display: none;
+        }
       }
     }
 
@@ -249,12 +264,10 @@
         > button:not([data-tab-pill-close]) {
           height: 100%;
 
-          > span:first-child:has(> :is(svg, img)) {
-            &,
-            > :is(svg, img) {
-              width: var(--phone-layout-icon-size);
-              height: var(--phone-layout-icon-size);
-            }
+          > span:first-child:has(> :is(svg, img)),
+          > span:first-child > :is(svg, img):is(svg, img) {
+            width: var(--phone-layout-icon-size);
+            height: var(--phone-layout-icon-size);
           }
         }
 
@@ -289,13 +302,16 @@
       display: flex;
       flex-direction: column-reverse;
 
-      > [data-testid="thread-secondary-panel-top-chrome"] {
-        flex-shrink: 0;
-      }
-
       body[style*="--bb-safe-area-bottom"] & {
         display: none;
       }
+    }
+
+    [data-testid="secondary-panel-shelf"]
+      aside
+      > *
+      > [data-testid="thread-secondary-panel-top-chrome"][data-testid="thread-secondary-panel-top-chrome"] {
+      flex-shrink: 0;
     }
 
     /*
@@ -314,10 +330,13 @@
       border-radius: var(--phone-layout-card-radius, calc(var(--radius) + 4px));
       background-color: var(--background);
       box-shadow: var(--shadow-lift);
+    }
 
-      > [data-testid="app-page-header-content-row"] {
-        height: 100%;
-      }
+    :is(
+      header,
+      [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
+    ) > [data-testid="app-page-header-content-row"] {
+      height: 100%;
     }
 
     /*
@@ -328,13 +347,17 @@
       :has(> [data-panel-new-tab-page] > * > [data-testid="new-tab-actions"]) {
       display: flex;
       flex-direction: column-reverse;
+    }
 
-      > [data-panel-new-tab-page] {
-        justify-content: flex-end;
+    [data-testid="secondary-panel-shelf"]
+      * > [data-panel-new-tab-page]:has(> * > [data-testid="new-tab-actions"])[data-panel-new-tab-page] {
+      --phone-layout-new-tab: 1;
+      justify-content: flex-end;
+    }
 
-        > * {
-          flex-direction: column-reverse;
-        }
+    @container style(--phone-layout-new-tab: 1) {
+      [data-testid="secondary-panel-shelf"] * > [data-panel-new-tab-page] > div:is(*, .superhuman-pad.superhuman-pad) {
+        flex-direction: column-reverse;
       }
     }
 
@@ -345,86 +368,92 @@
      * changes; focus and screen readers keep BB's.
      */
     [data-testid="app-sidebar-body"]:has(> [data-testid="sidebar-navigation-region"] [data-dia-sidebar]) {
-      > [data-sidebar="footer"] {
-        order: -1;
-        /* A footer item's panel opens below the row instead of above it. */
-        flex-direction: column-reverse;
+      --phone-layout-dia-sidebar: 1;
+    }
 
-        /* Items that don't fit wrap below the row instead of above it. */
-        > [data-sidebar="menu"] { flex-wrap: wrap; }
-      }
-      /*
-       * The divider and the grid's bottom row take the shape of BB's header: a
-       * hairline that is part of the row's height, and buttons centered in a
-       * full-height row below it, overhanging the bottom by a pixel.
-       * BB 0.43 draws the divider after the navigation, and later versions
-       * inside it after the grid; either way it goes above the grid.
-       */
-      > [data-testid="app-sidebar-navigation-divider"] {
-        order: 1;
-        margin-bottom: 0;
-      }
-      > [data-testid="sidebar-navigation-region"] {
-        order: 2;
-        display: flex;
-        flex-direction: column;
-
-        [data-testid="navigation-divider"] {
+    @container style(--phone-layout-dia-sidebar: 1) {
+      [data-testid="app-sidebar-body"]:is(*, .superhuman-pad.superhuman-pad) {
+        > [data-sidebar="footer"] {
           order: -1;
+          /* A footer item's panel opens below the row instead of above it. */
+          flex-direction: column-reverse;
+
+          /* Items that don't fit wrap below the row instead of above it. */
+          > [data-sidebar="menu"] { flex-wrap: wrap; }
+        }
+        /*
+         * The divider and the grid's bottom row take the shape of BB's header: a
+         * hairline that is part of the row's height, and buttons centered in a
+         * full-height row below it, overhanging the bottom by a pixel.
+         * BB 0.43 draws the divider after the navigation, and later versions
+         * inside it after the grid; either way it goes above the grid.
+         */
+        > [data-testid="app-sidebar-navigation-divider"] {
+          order: 1;
           margin-bottom: 0;
         }
+        > [data-testid="sidebar-navigation-region"] {
+          order: 2;
+          display: flex;
+          flex-direction: column;
 
-        /* The tiles take the thumb-sized buttons' size, 44px. */
-        [data-dia-sidebar] {
-          --dia-sidebar-button-size: var(--phone-layout-button-size);
-          --dia-sidebar-icon-size: var(--phone-layout-icon-size);
-        }
-
-        [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
-          --dia-sidebar-row-inset: calc((var(--phone-layout-bar-height) - var(--dia-sidebar-button-size)) / 2);
-          gap: var(--phone-layout-button-gap);
-          padding-top: var(--dia-sidebar-row-inset);
-          padding-bottom: calc(var(--dia-sidebar-row-inset) - 1px);
-
-          /*
-           * Tiles that don't fit in one row at that size narrow, down to BB's
-           * size, so the arrow stays at the row's end.
-           */
-          > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
-            flex: 1 1 calc(var(--spacing, 0.25rem) * 9);
-            max-width: var(--dia-sidebar-button-size);
+          [data-testid="navigation-divider"] {
+            order: -1;
+            margin-bottom: 0;
           }
 
-          :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]) {
-            width: 100%;
+          /* The tiles take the thumb-sized buttons' size, 44px. */
+          [data-dia-sidebar] {
+            --dia-sidebar-button-size: var(--phone-layout-button-size);
+            --dia-sidebar-icon-size: var(--phone-layout-icon-size);
           }
 
-          /*
-           * The "…" at the end of the tiles becomes an arrow toward the rest of
-           * the navigation, in the tone UI Polish gives the other tiles' icons.
-           */
-          [data-testid="sidebar-navigation-more-trigger"] {
-            > svg {
-              display: none;
+          [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
+            --dia-sidebar-row-inset: calc((var(--phone-layout-bar-height) - var(--dia-sidebar-button-size)) / 2);
+            gap: var(--phone-layout-button-gap);
+            padding-top: var(--dia-sidebar-row-inset);
+            padding-bottom: calc(var(--dia-sidebar-row-inset) - 1px);
+
+            /*
+             * Tiles that don't fit in one row at that size narrow, down to BB's
+             * size, so the arrow stays at the row's end.
+             */
+            > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
+              flex: 1 1 calc(var(--spacing, 0.25rem) * 9);
+              max-width: var(--dia-sidebar-button-size);
             }
 
-            &::before {
-              content: "";
-              flex-shrink: 0;
-              width: var(--dia-sidebar-icon-size);
-              height: var(--dia-sidebar-icon-size);
-              background-color: var(--subtle-foreground);
-              mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18'/%3E%3C/svg%3E")
-                center / contain no-repeat;
+            :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]) {
+              width: 100%;
+            }
+
+            /*
+             * The "…" at the end of the tiles becomes an arrow toward the rest of
+             * the navigation, in the tone UI Polish gives the other tiles' icons.
+             */
+            [data-testid="sidebar-navigation-more-trigger"] {
+              > svg {
+                display: none;
+              }
+
+              &::before {
+                content: "";
+                flex-shrink: 0;
+                width: var(--dia-sidebar-icon-size);
+                height: var(--dia-sidebar-icon-size);
+                background-color: var(--subtle-foreground);
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18'/%3E%3C/svg%3E")
+                  center / contain no-repeat;
+              }
             }
           }
         }
-      }
 
-      /* The thread list fades out under the footer, now at its top edge. */
-      > [data-sidebar="footer"] > [data-overflow-fade] {
-        top: 100%;
-        transform: scaleY(-1);
+        /* The thread list fades out under the footer, now at its top edge. */
+        > [data-sidebar="footer"] > [data-overflow-fade] {
+          top: 100%;
+          transform: scaleY(-1);
+        }
       }
     }
 

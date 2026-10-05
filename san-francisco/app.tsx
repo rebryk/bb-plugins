@@ -3,7 +3,6 @@ import { useLayoutEffect } from "react";
 import { AccentPicker, pickedAccent, useAccent } from "./accent-picker";
 import { ACCENT_ATTRIBUTE, ACCENT_STORAGE_KEY, DEFAULT_ACCENT, rememberedAccent, type Accent } from "./accents";
 import { watchSettingsTitle } from "./settings-title";
-import { watchShellTheme } from "./shell-theme";
 
 const HOLD_TRANSITIONS = "*, *::before, *::after { transition: none !important; }";
 
@@ -70,9 +69,5 @@ export default definePluginApp((app) => {
   app.contentScripts.register({
     id: "settings-title",
     mount: ({ signal }) => watchSettingsTitle(document, signal),
-  });
-  app.contentScripts.register({
-    id: "shell-layout",
-    mount: ({ signal }) => watchShellTheme(document, signal),
   });
 });

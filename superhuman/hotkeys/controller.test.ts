@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { handle, start, update } from "./controller";
+import { HOLD_MS, handle, start, update } from "./controller";
 
 // jsdom lays nothing out, and only phones and tablets match (pointer: coarse).
 vi.stubGlobal("matchMedia", () => ({ matches: false }));
@@ -50,12 +50,47 @@ it("numbers a new thread's setup controls unless thread shortcuts are off", () =
 });
 
 it("shows the remaining keys under a held modifier unless hints are off", () => {
+  vi.useFakeTimers();
   window.dispatchEvent(
     new KeyboardEvent("keyup", { key: "Shift", metaKey: true }),
   );
+  vi.advanceTimersByTime(HOLD_MS - 1);
+  expect(pills()).toEqual([]);
+  vi.advanceTimersByTime(1);
   expect(pills()).toEqual([["Switch model", "Shift + M"]]);
   update({ settings: { threadShortcuts: false } });
   expect(pills()).toEqual([]);
+  vi.useRealTimers();
+});
+
+it("waits for the modifier alone, so chords and typing skip the hints", () => {
+  vi.useFakeTimers();
+  const key = (init: KeyboardEventInit) =>
+    window.dispatchEvent(new KeyboardEvent("keyup", init));
+  key({ key: "Shift", metaKey: true });
+  vi.advanceTimersByTime(HOLD_MS - 100);
+  // Another key under the modifier, such as the 1 of ⌘1, starts the wait over.
+  key({ key: "1", metaKey: true });
+  vi.advanceTimersByTime(HOLD_MS - 100);
+  expect(pills()).toEqual([]);
+  vi.advanceTimersByTime(100);
+  expect(pills()).toEqual([["Switch model", "Shift + M"]]);
+  key({ key: "Meta" });
+  vi.advanceTimersByTime(HOLD_MS);
+  expect(pills()).toEqual([
+    ["Project", "1"],
+    ["Model", "2"],
+    ["Machine", "3"],
+    ["Branch", "4"],
+  ]);
+  vi.useRealTimers();
+});
+
+it("rewrites no pill that stays the same, since each write restyles", () => {
+  const write = vi.spyOn(Element.prototype, "setAttribute");
+  update({ settings: {} });
+  expect(write).not.toHaveBeenCalled();
+  write.mockRestore();
 });
 
 const press = (key: string, code: string, init: KeyboardEventInit = {}) =>

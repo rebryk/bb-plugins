@@ -10,6 +10,10 @@
  * them as BB does, such as this plugin's buttons. Text such as the thread's
  * title and the selected tab stay brighter, and other plugins' images keep
  * their colors.
+ *
+ * The bars mark themselves for a style query, since `bar:has(…) svg` would
+ * restyle much of the page on every change. `:is(*, …)` keeps the rule's
+ * original specificity against San Francisco's icon colors.
  */
 :is(
     [data-testid="app-page-header-content-row"],
@@ -19,12 +23,17 @@
     [data-testid="app-sidebar-primary-actions"],
     [data-testid="sidebar-navigation-region"],
     [data-sidebar="footer"]
-  )
+  ) {
+  --superhuman-icon-bar: 1;
+}
+
+@container style(--superhuman-icon-bar: 1) {
   :is(button, a):not([aria-pressed="true"], [aria-current="page"], [data-active="true"], [role="checkbox"])
-  svg[data-icon-root] {
-  color: var(--subtle-foreground);
-  /* Over the fade of the sidebar's footer and of Superhuman's tiles. */
-  opacity: 1 !important;
+    svg[data-icon-root]:is(*, superhuman-pad superhuman-pad.superhuman-pad) {
+    color: var(--subtle-foreground);
+    /* Over the fade of the sidebar's footer and of Superhuman's tiles. */
+    opacity: 1 !important;
+  }
 }
 
 /*

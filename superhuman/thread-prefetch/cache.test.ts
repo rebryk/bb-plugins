@@ -30,6 +30,7 @@ class Client {
     this.writes = [];
   }
   getQueryCache() { return this; }
+  get(hash: string) { return this.queries.get(hash); }
   find({ queryKey }: { queryKey?: Key }) { return this.queries.get(JSON.stringify(queryKey)); }
   findAll({ type, fetchStatus }: { type?: string; fetchStatus?: string }) {
     return [...this.queries.values()].filter((query) => (!type || query.observers > 0)
@@ -134,6 +135,36 @@ describe("private cache discovery", () => {
     const scans = vi.spyOn(document, "querySelectorAll");
     expect(createThreadCache(options)).toBeNull();
     expect(scans).not.toHaveBeenCalled();
+  });
+
+  it("looks up keys by hash instead of scanning the whole cache", async () => {
+    const { cache, client, reads } = fixture();
+    const find = vi.spyOn(client, "find");
+    const get = vi.spyOn(client, "get");
+    const read = deferred<ReturnType<typeof metadata>>();
+    reads.get.mockReturnValueOnce(read.promise);
+    const pending = warm(cache);
+    // Foreground activity during a request checks every job's keys.
+    client.notify("observerAdded", client.queries.get(JSON.stringify(["systemConfig"]))!);
+    read.resolve(metadata("thread"));
+    expect(await pending).toBe("stored");
+    expect(cache.hasData("thread")).toBe(true);
+    cache.invalidate("thread", true);
+    expect(cache.hasData("thread")).toBe(false);
+    expect(client.queries.has(JSON.stringify(["threadTimeline", "thread"]))).toBe(false);
+    expect(get).toHaveBeenCalled();
+    expect(find).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a custom key hash", () => Object.assign(new Client(), { get: () => undefined })],
+    ["no hash lookup", () => Object.assign(new Client(), { get: undefined })],
+  ])("falls back to exact finds for a host with %s", async (_, make) => {
+    const { cache, client } = fixture(make());
+    const find = vi.spyOn(client, "find");
+    expect(await warm(cache)).toBe("stored");
+    expect(cache.hasData("thread")).toBe(true);
+    expect(find).toHaveBeenCalled();
   });
 });
 

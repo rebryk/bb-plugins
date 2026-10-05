@@ -13,6 +13,7 @@ type Query = { state: QueryState; getObserversCount(): number };
 type Filters = { queryKey?: readonly unknown[]; exact?: boolean; type?: "active"; fetchStatus?: "fetching" };
 type CacheEvent = { type: string; query: Query };
 type QueryCache = {
+  get?(queryHash: string): Query | undefined;
   find(filters: Filters): Query | undefined;
   findAll(filters: Filters): Query[];
   subscribe(listener: (event: CacheEvent) => void): () => void;
@@ -125,7 +126,13 @@ export function createThreadCache({ document: doc, anchor, version, sdk }: {
   let disposed = false;
   let writing = false;
 
-  const find = (key: Key) => cache.find({ queryKey: key, exact: true });
+  // An exact find scans and re-hashes BB's whole cache. The default hash of a
+  // string key is its JSON, so a matching probe allows a direct map lookup.
+  const probe = cache.find({ queryKey: ["systemConfig"], exact: true });
+  const find: (key: Key) => Query | undefined = probe && typeof cache.get === "function"
+    && cache.get(JSON.stringify(["systemConfig"])) === probe
+    ? (key) => cache.get!(JSON.stringify(key))
+    : (key) => cache.find({ queryKey: key, exact: true });
   const idle = (query: Query | undefined) => !query || (isQuery(query)
     && query.getObserversCount() === 0 && query.state.fetchStatus === "idle");
   const remember = (map: Map<string, number>, id: string, value: number) => {
@@ -159,6 +166,8 @@ export function createThreadCache({ document: doc, anchor, version, sdk }: {
     }
     if (writing && event.type === "updated") return;
     for (const [id, page] of pages) {
+      // Most of BB's cache events concern queries no page owns.
+      if (!page.queries.some((owned) => owned.query === event.query)) continue;
       page.queries = page.queries.filter((owned) => owned.query !== event.query
         || (event.type !== "observerAdded" && event.type !== "removed" && stillOwned(owned)));
       if (page.queries.length === 0) pages.delete(id);

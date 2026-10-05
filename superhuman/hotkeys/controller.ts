@@ -1,4 +1,5 @@
 import type { useSdk } from "@get-bb/plugin-sdk/app";
+import { changedOutside, LIVE_OUTPUT } from "../lib/mutations";
 import { physicalKey } from "./key";
 
 type Bindings = Awaited<
@@ -13,7 +14,11 @@ const SYMBOLS: Record<Modifier, string> = mac
   ? { ctrlKey: "⌃", altKey: "⌥", shiftKey: "⇧", metaKey: "⌘" }
   : { ctrlKey: "Ctrl", altKey: "Alt", shiftKey: "Shift", metaKey: "Meta" };
 const MODIFIERS = Object.keys(SYMBOLS) as Modifier[];
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta", "OS"]);
 const NONE = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
+// Hints wait for a modifier held alone this long, so a chord such as ⌘1 or a
+// capital letter typed with Shift does no hint work at all.
+export const HOLD_MS = 300;
 const PANEL =
   ':is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"])';
 const HIDDEN = `[inert], [aria-hidden="true"], ${PANEL}[data-state="closed"]`;
@@ -29,6 +34,7 @@ const CONTROLS = [
   'button[aria-label="Environment"][data-promptbox-shrinkable-control], button[aria-label="Machine"]',
   'button[aria-label="Worktree"], button[aria-label="Branch"], button[aria-label="Environment"][data-promptbox-icon-only-control]',
 ];
+const CONTROL = CONTROLS.join(", ");
 const MODEL = CONTROLS[1];
 const [KEY, MODE, ANCHOR] = ["key", "mode", "anchor"].map(
   (name) => `data-superhuman-${name}`,
@@ -36,8 +42,11 @@ const [KEY, MODE, ANCHOR] = ["key", "mode", "anchor"].map(
 
 let settings: Record<string, unknown> = {};
 let bindings: Bindings = [];
+let boundChords: (Chord | undefined)[] = [];
 let running = false;
 let mods: Record<Modifier, boolean> = NONE;
+let held = false;
+let holding = 0;
 let tagged: HTMLElement[] = [];
 let frame = 0;
 let dismissed: Element | null = null;
@@ -49,13 +58,18 @@ export function update(next: {
   bindings?: Bindings;
   threadActions?: typeof threadActions;
 }) {
+  if ("threadActions" in next) threadActions = next.threadActions;
+  if (!next.settings && !next.bindings) return;
   settings = next.settings ?? settings;
   bindings = next.bindings ?? bindings;
-  if ("threadActions" in next) threadActions = next.threadActions;
+  boundChords = bindings.map(chordFor);
   paint();
 }
 
-const shown = (element: Element) => element.getClientRects().length > 0;
+// Whether the element has a box. checkVisibility needs style but, unlike
+// getClientRects, no layout.
+const shown = (element: Element) =>
+  element.checkVisibility?.() ?? element.getClientRects().length > 0;
 const usable = (element: Element) =>
   shown(element) &&
   !element.matches(':disabled, [aria-disabled="true"]') &&
@@ -94,8 +108,8 @@ function numbered(setup = composer()): HTMLElement[] {
   if (focus !== dismissed) dismissed = null;
   if (!setup || settings.threadShortcuts === false) return [];
   if (mods.ctrlKey || mods.altKey || mods.metaKey) return [];
-  const panel = panels().at(-1);
   if (setup.open) {
+    const panel = panels().at(-1);
     // Typed filters and forms such as New project keep their keys.
     const typed = focus instanceof HTMLInputElement && !!focus.value;
     if (!panel || typed || panel.querySelector("form")) return [];
@@ -109,14 +123,16 @@ function numbered(setup = composer()): HTMLElement[] {
     );
   }
   const { prompt } = setup;
-  const empty = prompt && !prompt.textContent && !prompt.querySelector("img");
-  const elsewhere = editable(focus) && !prompt?.contains(focus);
-  return empty && !panel && !dismissed && !elsewhere ? setup.controls : [];
+  // A typed prompt ends it here, before the look for open panels.
+  if (!prompt || prompt.textContent || prompt.querySelector("img") || dismissed)
+    return [];
+  const elsewhere = editable(focus) && !prompt.contains(focus);
+  return !elsewhere && !panels().length ? setup.controls : [];
 }
 
 /** BB's current shortcut for a command on this platform and surface. */
 function binding(command: string): Chord | undefined {
-  return bindings.filter((item) => item.command === command).map(chordFor).find(Boolean);
+  return boundChords.find((chord, i) => chord && bindings[i]!.command === command);
 }
 
 function chordFor(item: Bindings[number]): Chord | undefined {
@@ -165,7 +181,7 @@ function remaining(chord?: Chord) {
 /** Hints for the visible shortcuts while a modifier is held. */
 function hints(pills: Map<HTMLElement, string>) {
   if (settings.threadShortcuts === false) return;
-  if (!MODIFIERS.some((key) => mods[key])) return;
+  if (!held || !MODIFIERS.some((key) => mods[key])) return;
   const top = panels().at(-1);
   const add = (element: HTMLElement, chords: (Chord | undefined)[]) => {
     const keys = [...new Set(chords.map(remaining).filter(Boolean))];
@@ -203,7 +219,8 @@ function paint() {
   const tabs = items.length > 0 && !!setup?.open?.matches(MODEL);
   const pills = new Map(items.map((item, i) => [item, `${(i + 1) % 10}`]));
   if (!pills.size) hints(pills);
-  const hosts = [...pills].map(([element, key]) => {
+  // Measure every host before marking any, so one layout serves them all.
+  const marks = [...pills].map(([element, key]) => {
     const host =
       (element.matches(ROW) &&
         element.closest<HTMLElement>("[data-sidebar-rename-row]")) ||
@@ -220,13 +237,21 @@ function paint() {
     // A pill laid over its control needs a positioned host.
     const anchor =
       host.hasAttribute(ANCHOR) || getComputedStyle(host).position === "static";
-    host.setAttribute(KEY, key);
-    host.setAttribute(MODE, mode);
-    host.toggleAttribute(ANCHOR, anchor && (mode === "icon" || mode === "end"));
-    return host;
+    return { host, key, mode, anchor: anchor && (mode === "icon" || mode === "end") };
   });
+  const hosts = marks.map(({ host }) => host);
   for (const element of tagged) if (!hosts.includes(element)) clear(element);
+  for (const { host, key, mode, anchor } of marks) {
+    mark(host, KEY, key);
+    mark(host, MODE, mode);
+    host.toggleAttribute(ANCHOR, anchor);
+  }
   tagged = hosts;
+}
+
+/** Sets an attribute only when it changes, since each write restyles. */
+function mark(element: Element, name: string, value: string) {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
 }
 
 function clear(element: Element) {
@@ -240,6 +265,17 @@ function schedule() {
   });
 }
 
+/** Hints show once the modifiers stay down, with no other key, for HOLD_MS. */
+function wait() {
+  clearTimeout(holding);
+  held = false;
+  if (MODIFIERS.some((key) => mods[key]))
+    holding = window.setTimeout(() => {
+      held = true;
+      paint();
+    }, HOLD_MS);
+}
+
 function keydown(event: KeyboardEvent) {
   // Skip our own search shortcut.
   if (!event.isTrusted) return;
@@ -248,7 +284,11 @@ function keydown(event: KeyboardEvent) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
-  paint();
+  // Windows repeats a held modifier, which changes nothing.
+  if (event.repeat && MODIFIER_KEYS.has(event.key)) return;
+  wait();
+  // Typing changes no pill before the next frame, so paint at most once a frame.
+  schedule();
 }
 
 export function handle(event: KeyboardEvent): boolean {
@@ -289,7 +329,7 @@ export function handle(event: KeyboardEvent): boolean {
 function normalizeShortcut(event: KeyboardEvent) {
   if (event.target instanceof Element
     && event.target.closest("[data-app-terminal], [data-app-browser]")) return;
-  const keys = bindings.map(chordFor)
+  const keys = boundChords
     .filter((chord) => chord && MODIFIERS.every((mod) => chord[mod] === event[mod]))
     .map((chord) => chord!.key.toLowerCase());
   // An explicitly bound character takes precedence over a physical fallback.
@@ -326,16 +366,25 @@ function search() {
 
 function release(event: Event) {
   mods = event instanceof KeyboardEvent ? event : NONE;
-  paint();
+  wait();
+  schedule();
 }
 
 function focusin(event: FocusEvent) {
   // Closed menus return focus to their control, but typing continues in the prompt.
-  const setup = composer();
-  const control = setup?.controls.includes(event.target as HTMLElement);
-  if (control && !event.relatedTarget && !setup?.open) setup?.prompt?.focus();
+  const { target } = event;
+  if (!event.relatedTarget && target instanceof HTMLElement && target.matches(CONTROL)) {
+    const setup = composer();
+    if (setup?.controls.includes(target) && !setup.open) setup.prompt?.focus();
+  }
   schedule();
 }
+
+// Changes to the chat and terminals, many a second while agents work, matter
+// only to the hints of a held modifier.
+const observed = (records: MutationRecord[]) => {
+  if (held || changedOutside(records, LIVE_OUTPUT)) schedule();
+};
 
 export function start({ signal }: { signal: AbortSignal }) {
   // Phones and tablets have no keys to show or press.
@@ -348,7 +397,7 @@ export function start({ signal }: { signal: AbortSignal }) {
   document.addEventListener("focusin", focusin, options);
   document.addEventListener("focusout", schedule, options);
   document.addEventListener("input", schedule, options);
-  const observer = new MutationObserver(schedule);
+  const observer = new MutationObserver(observed);
   const attributeFilter = ["aria-expanded", "aria-keyshortcuts", "data-state"];
   observer.observe(document.body, {
     subtree: true,
@@ -362,6 +411,8 @@ export function start({ signal }: { signal: AbortSignal }) {
     observer.disconnect();
     cancelAnimationFrame(frame);
     frame = 0;
+    clearTimeout(holding);
+    held = false;
     tagged.forEach(clear);
     tagged = [];
     mods = NONE;

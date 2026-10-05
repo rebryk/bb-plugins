@@ -51,6 +51,20 @@ it("counts down on working and idle rows until the time runs out", () => {
   dispose();
 });
 
+it("widens the row's box for the digits while it counts down", () => {
+  vi.useFakeTimers({ now: NOW });
+  const slot = row("a");
+  const box = document.createElement("div");
+  box.className = "relative";
+  slot.replaceWith(box);
+  box.append(slot);
+  const dispose = mountCountdowns({ a: { until: NOW + 5_000, label: null } });
+  expect(box.hasAttribute("data-superhuman-eta-box")).toBe(true);
+  vi.advanceTimersByTime(5_000);
+  expect(box.hasAttribute("data-superhuman-eta-box")).toBe(false);
+  dispose();
+});
+
 it("puts the rows back when it unmounts", () => {
   vi.useFakeTimers({ now: NOW });
   const idle = row("a");

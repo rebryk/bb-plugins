@@ -26,11 +26,9 @@ function fixture({ cached = [] as string[], honorAbort = true, cacheLimit = Infi
       if (!signal.aborted) remember(id);
     }).finally(() => { state.running--; });
   });
-  const queue = createPrefetchQueue({
-    hasData: (id) => data.has(id), warm,
-    isForegroundBusy: () => state.foreground,
-    canRun: () => state.allowed,
-  });
+  const isForegroundBusy = vi.fn(() => state.foreground);
+  const canRun = vi.fn(() => state.allowed);
+  const queue = createPrefetchQueue({ hasData: (id) => data.has(id), warm, isForegroundBusy, canRun });
   queues.push(queue);
   let finished = 0;
   const drain = async () => {
@@ -41,7 +39,7 @@ function fixture({ cached = [] as string[], honorAbort = true, cacheLimit = Infi
       await tick();
     }
   };
-  return { queue, warm, data, state, requests, remember, drain };
+  return { queue, warm, data, state, requests, remember, drain, isForegroundBusy, canRun };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -246,6 +244,20 @@ describe("thread prefetch queue", () => {
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(f.warm).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks foreground work only when a request could start or yield", async () => {
+    const f = fixture({ cached: ["b"] });
+    f.queue.updateThreads([thread("a", 2), thread("b")]);
+    await f.drain();
+    expect(f.warm).toHaveBeenCalledTimes(1);
+    // Only the pump that started "a" needed it; the idle pump after it did not.
+    expect(f.isForegroundBusy).toHaveBeenCalledOnce();
+    f.canRun.mockClear();
+    f.queue.changed("b", ["title-changed"]);
+    await tick();
+    expect(f.canRun).toHaveBeenCalledOnce();
+    expect(f.isForegroundBusy).toHaveBeenCalledOnce();
   });
 
   it("does not retry failures until an explicit resume or new content", async () => {
