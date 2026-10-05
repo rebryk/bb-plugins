@@ -94,6 +94,8 @@ export function createPrefetchQueue(options: PrefetchOptions) {
     for (const [id, refresh] of pending) {
       if (!eligible(id) || failed.has(id) || (!refresh && options.hasData(id))) pending.delete(id);
     }
+    // Idle wakes are frequent; the foreground check scans BB's whole cache.
+    if (!active && !pending.size) return;
     const allowed = options.canRun();
     const foreground = allowed && options.isForegroundBusy();
     if (active && (!eligible(active.id) || !allowed || foreground

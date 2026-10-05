@@ -1,9 +1,16 @@
-/* The settings section owns these controls; keep BB's form as a fallback. */
-html:has([data-superhuman-experimental])
+/* The settings section owns these controls; keep BB's form as a fallback.
+   Rules here mark an element with :has() and style its inside through a style
+   query: `A:has(B) C` would restyle much of the page on every change. */
+html:has([data-superhuman-experimental]) {
+  --superhuman-experimental: 1;
+}
+
+@container style(--superhuman-experimental: 1) {
   [data-testid="plugin-detail-superhuman"]
-  > .rounded-md.border > .space-y-4
-  > [data-control-placement]:has([role="switch"]:is([aria-label="Thread ETA"], [aria-label="Preload Threads"])) {
-  display: none;
+    > .rounded-md.border > .space-y-4
+    > [data-control-placement]:has([role="switch"]:is([aria-label="Thread ETA"], [aria-label="Preload Threads"])) {
+    display: none;
+  }
 }
 
 /* The portal leaves only its hidden anchor in BB's settings slot. */
@@ -15,16 +22,19 @@ html [data-resource-detail-section]:has(
   > [data-testid="plugin-detail-superhuman"],
   > [data-testid="plugin-detail-superhuman-experimental"]
 ) {
+  --superhuman-section: 1;
   border-block-width: 0;
   padding-block: 0;
 
-  > :first-child {
-    min-height: 0;
-    padding-inline: 16px;
-  }
-
   + [data-resource-detail-section="experimental"] {
     margin-block-start: 24px;
+  }
+}
+
+@container style(--superhuman-section: 1) {
+  html [data-resource-detail-section] > div:first-child {
+    min-height: 0;
+    padding-inline: 16px;
   }
 }
 

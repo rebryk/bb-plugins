@@ -175,6 +175,10 @@ it("opens Snooze for a redrawn sidebar row without navigating, and cleans up", a
     expect(archive.previousElementSibling).toBe(
       screen.getByRole("button", { name: "Snooze thread" }),
     );
+    // app.css makes room for the button in the box that holds the title.
+    expect(document.querySelector("[data-superhuman-snooze-title]")).toBe(
+      document.querySelector("[data-sidebar-thread-id]")!.parentElement,
+    );
     // BB replaces the controls when a row leaves and re-enters the viewport.
     archive.parentElement!.replaceChildren(archive.cloneNode());
     const button = await screen.findByRole("button", { name: "Snooze thread" });
@@ -198,6 +202,7 @@ it("opens Snooze for a redrawn sidebar row without navigating, and cleans up", a
     await scripts.lifecycle.dispose();
   }
   expect(document.querySelector("[data-superhuman-snooze-button]")).toBeNull();
+  expect(document.querySelector("[data-superhuman-snooze-title]")).toBeNull();
 });
 
 describe("sidebar order", () => {

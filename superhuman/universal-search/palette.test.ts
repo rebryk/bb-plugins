@@ -111,3 +111,11 @@ it("restores selection on close and recaptures commands when the drawer reopens"
   key("Enter");
   expect(choose).toHaveBeenCalledWith("new");
 });
+
+it("leaves typing outside the palette alone", () => {
+  const prompt = document.createElement("textarea");
+  document.body.append(prompt);
+  const search = vi.spyOn(document, "querySelectorAll");
+  prompt.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(search).not.toHaveBeenCalled();
+});

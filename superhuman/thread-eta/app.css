@@ -14,6 +14,6 @@
 :root [data-superhuman-eta]::after {
   content: attr(data-superhuman-eta);
 }
-:root .relative:has(> [data-superhuman-eta]) {
+:root .relative[data-superhuman-eta-box] {
   width: auto;
 }

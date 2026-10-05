@@ -1,4 +1,5 @@
 import { defaultFilter } from "cmdk";
+import { changedOutside, LIVE_OUTPUT } from "../lib/mutations";
 import { alternateQuery } from "./layout";
 import { commandRow } from "./host";
 
@@ -38,7 +39,8 @@ export function installPaletteSearch(doc: Document) {
   }
   function refresh() {
     const next = [...doc.querySelectorAll<HTMLElement>(ROOT)].find((node) =>
-      node.getClientRects().length && !node.closest('[data-state="closed"], [inert], [aria-hidden="true"]'),
+      (node.checkVisibility?.() ?? node.getClientRects().length > 0)
+      && !node.closest('[data-state="closed"], [inert], [aria-hidden="true"]'),
     ) ?? null;
     if (next !== root) {
       clear();
@@ -106,7 +108,9 @@ export function installPaletteSearch(doc: Document) {
     });
   }
   const options = { capture: true, signal: lifetime.signal };
-  doc.addEventListener("input", () => {
+  doc.addEventListener("input", (event) => {
+    // Typing anywhere else, such as in the prompt, leaves the palette alone.
+    if (!(event.target instanceof Element && event.target.closest(ROOT))) return;
     clear();
     refresh(); // Capture unfiltered commands before React handles the first character.
     schedule();
@@ -136,7 +140,9 @@ export function installPaletteSearch(doc: Document) {
       select(row);
     }
   }, options);
-  const observer = new MutationObserver(schedule);
+  const observer = new MutationObserver((records) => {
+    if (!frame && changedOutside(records, LIVE_OUTPUT)) schedule();
+  });
   observer.observe(doc.body, { subtree: true, childList: true, attributeFilter: ["data-state"] });
   refresh();
   return () => {

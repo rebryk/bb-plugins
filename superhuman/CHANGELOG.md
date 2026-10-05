@@ -3,6 +3,20 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.19 (2026-10-05)
+
+- Typing and switching threads no longer slow down. No rule styles an
+  element's inside by what the element holds any more, which made Chrome
+  restyle much of the page on every change; such rules read a marker through
+  a style query instead, with the same look, and a test keeps it that way.
+- Shortcut hints wait until a modifier is held alone for a moment, so chords
+  such as ⌘1 and capitals typed with Shift do no hint work.
+- Inline code gets its keyboard access and tooltip once the page is idle,
+  after a thread switch has painted. Preload Threads looks entries up in BB's query cache
+  directly, and Snooze, Thread ETA and Universal Search update at most once a
+  frame, skipping chat and terminal output. Dia Sidebar sizes its badges only
+  after layout.
+
 ## 0.1.18 (2026-10-01)
 
 - Use title case for all settings toggle labels.

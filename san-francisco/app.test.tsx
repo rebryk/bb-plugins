@@ -74,11 +74,11 @@ async function renderPicker(options: { settings?: Record<string, string>; save?:
 }
 
 describe("registrations", () => {
-  it("adds the accent overlay, the accent picker and theme content scripts", async () => {
+  it("adds the accent overlay, the accent picker and the settings title script", async () => {
     const app = await loadPluginApp(() => import("./app"));
     expect(app.appOverlays.map((overlay) => overlay.id)).toEqual(["accent"]);
     expect(app.settingsSections.map((section) => section.id)).toEqual(["accent-picker"]);
-    expect(app.contentScripts.map((script) => script.id)).toEqual(["settings-title", "shell-layout"]);
+    expect(app.contentScripts.map((script) => script.id)).toEqual(["settings-title"]);
   });
 
   it("mounts and disposes the content script cleanly", async () => {

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { ACCENTS, ACCENT_ATTRIBUTE, DEFAULT_ACCENT, PLUGIN_ID, THEME_ID, accentOf } from "./accents";
+import { insideHasSelectors } from "./has-selectors";
 import plugin from "./server";
 
 const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
@@ -103,9 +104,14 @@ describe("stylesheet", () => {
     expect(css).not.toMatch(/@import/);
   });
 
+  it("never styles an element's inside by what the element holds", () => {
+    expect(insideHasSelectors(css)).toEqual([]);
+  });
+
   it("defines every token it uses and uses every token it defines", () => {
     const defined = new Set([...css.matchAll(/(--sf-[\w-]+)\s*:/g)].map((match) => match[1]));
-    const used = new Set([...css.matchAll(/var\((--sf-[\w-]+)/g)].map((match) => match[1]));
+    // Markers for style queries are read by @container style(), not var().
+    const used = new Set([...css.matchAll(/(?:var|style)\((--sf-[\w-]+)/g)].map((match) => match[1]));
     expect([...used].filter((token) => !defined.has(token))).toEqual([]);
     expect([...defined].filter((token) => !used.has(token))).toEqual([]);
   });

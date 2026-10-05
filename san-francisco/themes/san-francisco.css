@@ -16,6 +16,14 @@
  * layers, so these unlayered rules win without !important. The exceptions are
  * inline styles, bb's layered !important utilities and other plugins'
  * unlayered CSS; the rules that meet them say how.
+ *
+ * A rule never styles the inside of an element by what that element contains,
+ * as in `A:has(B) C`: while an A exists, Chrome then restyles much of the page
+ * on every change to it, and typing and switching threads crawl. Such a rule
+ * marks A with a custom property instead (`A:has(B) { --sf-has-1: 1; }`) and
+ * styles C under `@container style(--sf-has-1: 1)`. `:is(*, .sf-pad)` gives
+ * the rewritten selector its original specificity back. A rule's last compound
+ * also always names a tag, class or attribute once a :has() precedes it.
  */
 
 /* ───────────────────────── accent ───────────────────────── */
@@ -392,12 +400,13 @@
      toggle, moved the same way; outside full screen, the row stays there as
      empty room for the window buttons, which BB's toggle starts 84 px in to
      clear. */
-  /* These structural selectors provide the first paint. shell-theme.ts
-     replaces their conditions with maintained attributes once the frontend
-     loads, preserving declarations and specificity. */
   @supports (anchor-name: --sf-card) {
-    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) > main[data-sidebar="inset"] {
-      anchor-name: --sf-card;
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) { --sf-shell-1: 1; }
+
+    @container style(--sf-shell-1: 1) {
+      [data-testid="app-layout-root"] > main[data-sidebar="inset"]:is(*, .sf-pad) {
+        anchor-name: --sf-card;
+      }
     }
 
     :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]) {
@@ -413,8 +422,12 @@
 
     /* The Mac app shifts its header controls 2 px down, but not the home
        page's right panel button, so there the toggle stays on its line. */
-    [data-testid="app-layout-root"]:has([data-testid="root-compose-main-window-drag-strip"]) > [data-testid="app-desktop-sidebar-trigger"] > [data-sidebar="trigger"] {
-      --bb-macos-chrome-control-y: 0px;
+    [data-testid="app-layout-root"]:has([data-testid="root-compose-main-window-drag-strip"]) { --sf-shell-2: 1; }
+
+    @container style(--sf-shell-2: 1) {
+      [data-testid="app-layout-root"] > [data-testid="app-desktop-sidebar-trigger"] > [data-sidebar="trigger"]:is(*, .sf-pad) {
+        --bb-macos-chrome-control-y: 0px;
+      }
     }
 
     /* BB's shortcut hint beside the toggle would cover the title, so it hangs
@@ -425,34 +438,50 @@
       margin-left: 0;
     }
 
-    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-testid$="-sidebar-top-reserve-row"] {
-      display: none;
+    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) { --sf-shell-3: 1; }
+
+    @container style(--sf-shell-3: 1) {
+      [data-testid="app-layout-root"] [data-testid$="-sidebar-top-reserve-row"]:is(*, .sf-pad.sf-pad) {
+        display: none;
+      }
     }
 
-    [data-testid="app-layout-root"]:has(> [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"]) [data-testid$="-sidebar-top-reserve-row"] > * {
-      display: none;
+    [data-testid="app-layout-root"]:has(> [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"]) { --sf-shell-4: 1; }
+
+    @container style(--sf-shell-4: 1) {
+      [data-testid="app-layout-root"] [data-testid$="-sidebar-top-reserve-row"] > div:is(*, .sf-pad.sf-pad) {
+        display: none;
+      }
     }
 
-    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-sidebar="sidebar"]:has(> [data-testid="app-sidebar-top-reserve-row"]) {
-      padding-top: calc(env(safe-area-inset-top) + 14px);
+    @container style(--sf-shell-3: 1) {
+      [data-testid="app-layout-root"] [data-sidebar="sidebar"]:has(> [data-testid="app-sidebar-top-reserve-row"]):is(*, .sf-pad.sf-pad) {
+        padding-top: calc(env(safe-area-inset-top) + 14px);
+      }
     }
 
-    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"]:not([class*="left-[84px]"]))) [data-sidebar="sidebar"]:has(> [data-testid="settings-sidebar-top-reserve-row"]) {
-      padding-top: calc(env(safe-area-inset-top) + 8px);
+    @container style(--sf-shell-3: 1) {
+      [data-testid="app-layout-root"] [data-sidebar="sidebar"]:has(> [data-testid="settings-sidebar-top-reserve-row"]):is(*, .sf-pad.sf-pad) {
+        padding-top: calc(env(safe-area-inset-top) + 8px);
+      }
     }
 
     /* BB reserves 32 px for the collapsed toggle; the toggle and an 8 px gap
        take 36 px, open or collapsed. Of split panes, the first at each level
        holds the window's top-left corner, or the maximized one. */
-    [data-testid="app-layout-root"]:has(> :is([data-testid="app-sidebar-trigger-overlay"], [data-testid="app-desktop-sidebar-trigger"])) [data-testid="app-page-header-content-row"]:is([data-maximized] *, :not([data-split-resize-grid-root] > :not(:first-child) *)) {
-      padding-left: 36px;
+    @container style(--sf-shell-1: 1) {
+      [data-testid="app-layout-root"] [data-testid="app-page-header-content-row"]:is([data-maximized] *, :not([data-split-resize-grid-root] > :not(:first-child) *)):is(*, .sf-pad) {
+        padding-left: 36px;
+      }
     }
 
     /* Past the window buttons, where BB reserves 104 px, the title starts 8 px
        after the toggle: 84 + 28 + 8 px from the window's edge, less the card's
        7 px and the header's 16 px. */
-    [data-testid="app-layout-root"]:has(> [data-testid="app-desktop-sidebar-trigger"][class*="left-[84px]"]) [data-testid="app-page-header-content-row"][class*="pl-[104px]"] {
-      padding-left: 97px;
+    @container style(--sf-shell-4: 1) {
+      [data-testid="app-layout-root"] [data-testid="app-page-header-content-row"][class*="pl-[104px]"]:is(*, .sf-pad.sf-pad) {
+        padding-left: 97px;
+      }
     }
   }
 
@@ -789,8 +818,12 @@ main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\
     margin: 0 4px;
   }
 
-  [data-thread-header-workflow-actions] div:has(> button.border.rounded-r-none) button.border {
-    height: 32px;
+  [data-thread-header-workflow-actions] div:has(> button.border.rounded-r-none) { --sf-has-1: 1; }
+
+  @container style(--sf-has-1: 1) {
+    [data-thread-header-workflow-actions] div button.border:is(*, sfpad.sf-pad.sf-pad) {
+      height: 32px;
+    }
   }
 }
 
@@ -1153,8 +1186,12 @@ form[data-promptbox-compact] [data-promptbox-action-row] {
   }
 }
 
-[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label])) > :not([data-icon="Loading"]) {
-  display: none;
+[data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label])) { --sf-has-2: 1; }
+
+@container style(--sf-has-2: 1) {
+  [data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i]) > svg:not([data-icon="Loading"]) {
+    display: none;
+  }
 }
 
 [data-promptbox-submit-action]:not([aria-label^="Create new thread"], [aria-label*="voice" i], :has(> [data-promptbox-submit-label], > [data-icon="Loading"]))::before {
@@ -1179,18 +1216,26 @@ form[data-promptbox-compact] [data-promptbox-action-row] {
   reading-flow: flex-visual;
 }
 
-[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"] {
-  order: -1;
-  border-radius: 8px;
+[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) { --sf-has-3: 1; }
+
+@container style(--sf-has-3: 1) {
+  [data-promptbox-send-menu] button[aria-label="Send options"]:is(*, .sf-pad) {
+    order: -1;
+    border-radius: 8px;
+  }
 }
 
-[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"] > svg {
-  color: var(--muted-foreground);
-  opacity: 1;
+@container style(--sf-has-3: 1) {
+  [data-promptbox-send-menu] button[aria-label="Send options"] > svg:is(*, .sf-pad) {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
 }
 
-[data-promptbox-send-menu]:not(:has([data-promptbox-submit-label], [aria-label^="Create new thread"])) button[aria-label="Send options"]:is(:hover, [data-state="open"]) {
-  box-shadow: inset 0 0 0 20px var(--state-hover);
+@container style(--sf-has-3: 1) {
+  [data-promptbox-send-menu] button[aria-label="Send options"]:is(:hover, [data-state="open"]):is(*, .sf-pad) {
+    box-shadow: inset 0 0 0 20px var(--state-hover);
+  }
 }
 
 /* The model picker's trigger: the model in the text color, its level and
@@ -1279,22 +1324,32 @@ form[data-promptbox] button[aria-label^="Provider, model and reasoning"] {
     margin-right: 0;
   }
 
-  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active, :has(> [data-tab-pill-close]:focus-visible)) [data-tab-pill-close] {
-    opacity: 0;
-    pointer-events: none;
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active, :has(> [data-tab-pill-close]:focus-visible)) { --sf-has-4: 1; }
+
+  @container style(--sf-has-4: 1) {
+    [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active) [data-tab-pill-close]:is(*, .sf-pad) {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
-  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):has(> [data-tab-pill-close]:focus-visible) > button:not([data-tab-pill-close]) {
-    -webkit-mask-image: linear-gradient(to left, transparent 24px, #000 36px);
-    mask-image: linear-gradient(to left, transparent 24px, #000 36px);
+  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):has(> [data-tab-pill-close]:focus-visible) { --sf-has-5: 1; }
+
+  @container style(--sf-has-5: 1) {
+    [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active) > button:not([data-tab-pill-close]):is(*, .sf-pad.sf-pad) {
+      -webkit-mask-image: linear-gradient(to left, transparent 24px, #000 36px);
+      mask-image: linear-gradient(to left, transparent 24px, #000 36px);
+    }
   }
 
   /* A status after the title ("(deleted)", "(exited)") would fade instead, so
      those tabs make room while the cross shows. */
-  [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active):has(> [data-tab-pill-close]:focus-visible) > button:not([data-tab-pill-close]):has(> span.ml-1.shrink-0) {
-    padding-right: 26px;
-    -webkit-mask-image: none;
-    mask-image: none;
+  @container style(--sf-has-5: 1) {
+    [data-secondary-panel-tab-content] .group\/tab-pill:not(.bg-state-active) > button:not([data-tab-pill-close]):has(> span.ml-1.shrink-0):is(*, .sf-pad.sf-pad) {
+      padding-right: 26px;
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
   }
 }
 
@@ -1371,18 +1426,22 @@ form[data-promptbox] button[aria-label^="Provider, model and reasoning"] {
   padding: 0 16px 24px;
 }
 
-[data-panel-new-tab-page]:has(input[aria-label^="Search files"]) [data-testid="new-tab-actions"] > section > .flex-col::before {
-  content: "Open a file to preview it here.\A or";
-  flex: 0 0 100%;
-  margin-bottom: 10px;
-  white-space: pre;
-  text-align: center;
-  line-height: 2.4;
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  background:
-    linear-gradient(var(--border), var(--border)) calc(50% - 66px) calc(100% - 15px) / 88px 1px no-repeat,
-    linear-gradient(var(--border), var(--border)) calc(50% + 66px) calc(100% - 15px) / 88px 1px no-repeat;
+[data-panel-new-tab-page]:has(input[aria-label^="Search files"]) { --sf-has-6: 1; }
+
+@container style(--sf-has-6: 1) {
+  [data-panel-new-tab-page] [data-testid="new-tab-actions"] > section > .flex-col:is(*, sfpad.sf-pad)::before {
+    content: "Open a file to preview it here.\A or";
+    flex: 0 0 100%;
+    margin-bottom: 10px;
+    white-space: pre;
+    text-align: center;
+    line-height: 2.4;
+    font-size: var(--text-sm);
+    color: var(--muted-foreground);
+    background:
+      linear-gradient(var(--border), var(--border)) calc(50% - 66px) calc(100% - 15px) / 88px 1px no-repeat,
+      linear-gradient(var(--border), var(--border)) calc(50% + 66px) calc(100% - 15px) / 88px 1px no-repeat;
+  }
 }
 
 [data-testid="new-tab-actions"] > section > .flex-col .group {
@@ -1439,8 +1498,12 @@ form[data-promptbox] button[aria-label^="Provider, model and reasoning"] {
   }
 }
 
-[data-panel-new-tab-page] section:has(> .border-dashed) > :first-child {
-  display: none;
+[data-panel-new-tab-page] section:has(> .border-dashed) { --sf-has-7: 1; }
+
+@container style(--sf-has-7: 1) {
+  [data-panel-new-tab-page] section > div:first-child:is(*, .sf-pad) {
+    display: none;
+  }
 }
 
 [data-panel-new-tab-page] section > .border-dashed {
@@ -1534,10 +1597,17 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
    bb's sentence-case headings on purpose: its overview's own subheadings are
    bb's small caps, and caps sections would flatten the two levels. */
 [data-sf-page-title] section:not(section section) > :first-child > :first-child:has(> :first-child > h2),
-[data-sf-page-title]:not([data-sf-page-title=""], :has([data-testid="plugin-settings-sections"] :is([data-bb-plugin-root] > :not(.border, style), .space-y-3 > :is(h3, p)))) section[data-resource-detail-section] > :is(:first-child:has(> h2), p),
 [data-sf-page-title=""] > div > .space-y-3:first-child,
 [data-sf-page-title] [data-updates-machine] section > :first-child > :first-child:has(> :first-child > h2) {
   padding-inline: 16px;
+}
+
+[data-sf-page-title]:not([data-sf-page-title=""], :has([data-testid="plugin-settings-sections"] :is([data-bb-plugin-root] > :not(.border, style), .space-y-3 > :is(h3, p)))) { --sf-has-8: 1; }
+
+@container style(--sf-has-8: 1) {
+  [data-sf-page-title]:not([data-sf-page-title=""]) section[data-resource-detail-section] > :is(div:first-child:has(> h2), p):is(*, .sf-pad.sf-pad) {
+    padding-inline: 16px;
+  }
 }
 
 [data-sf-page-title] section:not(section section) > :first-child > :first-child > :first-child > h2:not(.text-lg, :has(span, code, .font-mono)),
@@ -1560,7 +1630,7 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
   display: none;
 }
 
-[data-sf-page-title] section > :first-child:has(> :only-child > :only-child > h2[data-sf-duplicate]:only-child) + * {
+[data-sf-page-title] section > :first-child:has(> :only-child > :only-child > h2[data-sf-duplicate]:only-child) + div {
   margin-top: 0;
 }
 
@@ -1581,13 +1651,17 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
     margin-top: -54px;
   }
 
-  [data-sf-page-title] section > :first-child:has(> :first-child > :only-child > h2[data-sf-duplicate]:only-child):has(> :nth-child(2)) + * {
+  [data-sf-page-title] section > :first-child:has(> :first-child > :only-child > h2[data-sf-duplicate]:only-child):has(> :nth-child(2)) + div {
     margin-top: 22px;
   }
 
   /* With a lead (Projects), only the actions move up: 54 px of title less the lead's 14. */
-  [data-sf-page-title] section > :first-child:has(> :first-child > :first-child > h2[data-sf-duplicate]:only-child):has(> :first-child > p:nth-child(2)) > :nth-child(2) {
-    margin-top: -40px;
+  [data-sf-page-title] section > :first-child:has(> :first-child > :first-child > h2[data-sf-duplicate]:only-child):has(> :first-child > p:nth-child(2)) { --sf-has-9: 1; }
+
+  @container style(--sf-has-9: 1) {
+    [data-sf-page-title] section > :first-child > div:nth-child(2):is(*, sfpad sfpad.sf-pad.sf-pad.sf-pad.sf-pad.sf-pad.sf-pad) {
+      margin-top: -40px;
+    }
   }
 }
 
@@ -1597,7 +1671,7 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
   }
 
   /* Phones wrap a heading's actions under it, on the heading's inset. */
-  [data-sf-page-title] section:not(section section) > :first-child > :first-child:has(> :first-child > h2) + * {
+  [data-sf-page-title] section:not(section section) > :first-child > :first-child:has(> :first-child > h2) + div {
     margin-inline-start: 16px;
   }
 }
@@ -1613,20 +1687,28 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
   padding: 0;
 }
 
-[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement] {
-  min-height: 50px;
-  margin-block: 0;
-  padding: 10px 16px;
+[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) { --sf-has-10: 1; }
+
+@container style(--sf-has-10: 1) {
+  [data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5 > [data-control-placement]:is(*, .sf-pad) {
+    min-height: 50px;
+    margin-block: 0;
+    padding: 10px 16px;
+  }
 }
 
-[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement] {
-  border-top: 1px solid var(--border);
+@container style(--sf-has-10: 1) {
+  [data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5 > [data-control-placement] + [data-control-placement]:is(*, .sf-pad) {
+    border-top: 1px solid var(--border);
+  }
 }
 
 /* A last row's field or list under its label keeps the side inset below it, so
    its edge and the card's read as one inset group. */
-[data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5:not(:has(> :not([data-control-placement]))) > [data-control-placement="below"]:last-child {
-  padding-bottom: 16px;
+@container style(--sf-has-10: 1) {
+  [data-sf-page-title] .rounded-lg.border.bg-card > .space-y-5 > [data-control-placement="below"]:last-child:is(*, .sf-pad) {
+    padding-bottom: 16px;
+  }
 }
 
 /* The Sidebar footer list's last item drops its divider, as bb means it to;
@@ -1645,26 +1727,56 @@ main[data-sidebar="inset"] header [data-sf-page-parent]::after {
   background-color: var(--card);
 }
 
-[data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement],
-[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] {
-  min-height: 50px;
-  margin-block: 0;
-  padding: 10px 16px;
+[data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) { --sf-has-11: 1; }
+
+[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) { --sf-has-12: 1; }
+
+@container style(--sf-has-11: 1) {
+  [data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4 > [data-control-placement]:is(*, .sf-pad) {
+    min-height: 50px;
+    margin-block: 0;
+    padding: 10px 16px;
+  }
 }
 
-[data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement],
-[data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4:not(:has(> :not([data-control-placement]))) > [data-control-placement] + [data-control-placement] {
-  border-top: 1px solid var(--border);
+@container style(--sf-has-12: 1) {
+  [data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4 > [data-control-placement]:is(*, .sf-pad) {
+    min-height: 50px;
+    margin-block: 0;
+    padding: 10px 16px;
+  }
+}
+
+@container style(--sf-has-11: 1) {
+  [data-testid^="plugin-detail-"] > .rounded-md.border > .space-y-4 > [data-control-placement] + [data-control-placement]:is(*, .sf-pad) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+@container style(--sf-has-12: 1) {
+  [data-testid^="plugin-detail-"] [data-bb-plugin-root] > .rounded-md.border > .space-y-4 > [data-control-placement] + [data-control-placement]:is(*, .sf-pad) {
+    border-top: 1px solid var(--border);
+  }
 }
 
 /* The header's enable switch ends where the switches in those rows do, and its
    icon and name start on the section headings' inset. */
-main:has([data-testid^="plugin-detail-"] .rounded-md.border > .space-y-4 > [data-control-placement]) header > button[role="switch"].mr-\[13px\] {
-  margin-right: 17px;
+main:has([data-testid^="plugin-detail-"] .rounded-md.border > .space-y-4 > [data-control-placement]) { --sf-has-13: 1; }
+
+@container style(--sf-has-13: 1) {
+  main header > button[role="switch"].mr-\[13px\]:is(*, .sf-pad.sf-pad.sf-pad.sf-pad.sf-pad) {
+    margin-right: 17px;
+  }
 }
 
-[data-sf-page-title]:not([data-sf-page-title=""], :has([data-testid="plugin-settings-sections"] :is([data-bb-plugin-root] > :not(.border, style), .space-y-3 > :is(h3, p)))) header:has(> button[role="switch"]):has(+ * > section[data-resource-detail-section]) > .flex.min-w-0:first-child {
-  margin-inline-start: 16px;
+@container style(--sf-has-8: 1) {
+  [data-sf-page-title]:not([data-sf-page-title=""]) header:has(> button[role="switch"]):has(+ * > section[data-resource-detail-section]) { --sf-has-14: 1; }
+}
+
+@container style(--sf-has-14: 1) {
+  [data-sf-page-title]:not([data-sf-page-title=""]) header > .flex.min-w-0:first-child:is(*, sfpad sfpad.sf-pad.sf-pad.sf-pad.sf-pad) {
+    margin-inline-start: 16px;
+  }
 }
 
 /* San Francisco's swatches stand in for its Accent color select, and their own
@@ -1695,17 +1807,25 @@ main:has([data-testid^="plugin-detail-"] .rounded-md.border > .space-y-4 > [data
     animation: sf-await-row 0s 5s backwards;
   }
 
-  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .flex-1 {
-    animation: sf-await-label 0s 5s backwards;
+  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) { --sf-has-15: 1; }
+
+  @container style(--sf-has-15: 1) {
+    [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child > .flex-1:is(*, sfpad.sf-pad) {
+      animation: sf-await-label 0s 5s backwards;
+    }
   }
 
-  [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .shrink-0 {
-    animation: sf-await-strip 0s 5s backwards;
+  @container style(--sf-has-15: 1) {
+    [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child > .shrink-0:is(*, sfpad.sf-pad) {
+      animation: sf-await-strip 0s 5s backwards;
+    }
   }
 
   @container sf-accent-wait (width < 520px) {
-    [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child:has(button[aria-label="Accent color"]) > .shrink-0 {
-      animation-name: sf-await-strip-under;
+    @container style(--sf-has-15: 1) {
+      [data-testid="plugin-detail-san-francisco"] > .rounded-md.border > .space-y-4 > [data-control-placement]:only-child > .shrink-0:is(*, sfpad.sf-pad) {
+        animation-name: sf-await-strip-under;
+      }
     }
   }
 }
@@ -1786,8 +1906,12 @@ svg.text-input {
 
 /* Search fields (Installed plugins, Archived threads) take the rows' 14 px text. */
 @media (width >= 768px), (pointer: fine) {
-  main[data-sidebar="inset"]:has(header [data-sf-page]) input.pl-8.text-xs {
-    font-size: var(--text-sm);
+  main[data-sidebar="inset"]:has(header [data-sf-page]) { --sf-has-16: 1; }
+
+  @container style(--sf-has-16: 1) {
+    main[data-sidebar="inset"] input.pl-8.text-xs:is(*, sfpad.sf-pad) {
+      font-size: var(--text-sm);
+    }
   }
 }
 
@@ -1934,8 +2058,12 @@ input {
   background-color: color-mix(in srgb, var(--foreground) 5%, var(--background));
 }
 
-[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child) > svg:last-child {
-  display: none;
+[data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child) { --sf-has-17: 1; }
+
+@container style(--sf-has-17: 1) {
+  [data-control-placement] button[aria-haspopup="menu"] > svg:last-child:is(*, sfpad.sf-pad.sf-pad) {
+    display: none;
+  }
 }
 
 [data-control-placement] button[aria-haspopup="menu"]:has(> svg[data-icon="ChevronDown"]:last-child)::after {
@@ -1980,8 +2108,12 @@ button.border.border-ring.min-w-24 {
 
   /* A resource toolbar's buttons (Installed plugins, Archived threads) take its
      search field's 14 px text, at bb's 32 px. */
-  main[data-sidebar="inset"]:has(header [data-sf-page]) :is([data-resource-toolbar]:has(input.pl-8.text-xs) button, div.flex-wrap:has(> div > input.pl-8.text-xs) > button).text-xs {
-    font-size: var(--text-sm);
+  :is([data-resource-toolbar]:has(input.pl-8.text-xs), div.flex-wrap:has(> div > input.pl-8.text-xs)) { --sf-has-toolbar: 1; }
+
+  @container style(--sf-has-16: 1) and style(--sf-has-toolbar: 1) {
+    main[data-sidebar="inset"] :is([data-resource-toolbar] button, div.flex-wrap > button).text-xs:is(*, sfpad sfpad sfpad sfpad.sf-pad.sf-pad.sf-pad) {
+      font-size: var(--text-sm);
+    }
   }
 }
 
@@ -2325,8 +2457,12 @@ file-tree-container {
 }
 
 /* As in a menu, one row is lit: a hovered row takes the fill from the focused one. */
-[aria-label="More sidebar navigation"][role="dialog"]:has([data-sidebar-overflow-item]:hover) [data-sidebar-overflow-item]:focus-visible:not(:hover) {
-  background-color: transparent;
+[aria-label="More sidebar navigation"][role="dialog"]:has([data-sidebar-overflow-item]:hover) { --sf-has-18: 1; }
+
+@container style(--sf-has-18: 1) {
+  [aria-label="More sidebar navigation"][role="dialog"] [data-sidebar-overflow-item]:focus-visible:not(:hover):is(*, .sf-pad.sf-pad) {
+    background-color: transparent;
+  }
 }
 
 /* Group labels in popovers take the menu labels' 12 px. */
@@ -2353,12 +2489,20 @@ file-tree-container {
     height: 32px;
   }
 
-  [data-radix-popper-content-wrapper] > [role="dialog"]:has([role="listbox"][aria-label="Models"]) > .border-b.py-1 {
-    padding: 0;
+  [data-radix-popper-content-wrapper] > [role="dialog"]:has([role="listbox"][aria-label="Models"]) { --sf-has-19: 1; }
+
+  @container style(--sf-has-19: 1) {
+    [data-radix-popper-content-wrapper] > [role="dialog"] > .border-b.py-1:is(*, .sf-pad.sf-pad) {
+      padding: 0;
+    }
   }
 
-  [data-radix-popper-content-wrapper] .relative:has(> input[aria-label="Search models"]) > svg {
-    left: 12px;
+  [data-radix-popper-content-wrapper] .relative:has(> input[aria-label="Search models"]) { --sf-has-20: 1; }
+
+  @container style(--sf-has-20: 1) {
+    [data-radix-popper-content-wrapper] .relative > svg:is(*, sfpad.sf-pad) {
+      left: 12px;
+    }
   }
 
   [data-radix-popper-content-wrapper] input[aria-label="Search models"] {
@@ -2376,13 +2520,22 @@ file-tree-container {
 /* Its rows, its empty search result and the More models list beside it. */
 [data-radix-popper-content-wrapper] [role="listbox"][aria-label="Models"] :is([role="option"], button[aria-haspopup="menu"]),
 [data-radix-popper-content-wrapper] [role="listbox"][aria-label="Models"] > .px-2.text-xs.text-muted-foreground:not(.sticky),
-[data-radix-popper-content-wrapper] > [role="dialog"]:has([role="listbox"][aria-label="Models"]) .shrink-0.p-1 > button,
 [data-radix-popper-content-wrapper] > [role="dialog"] > button.w-full.select-none.justify-between.rounded-sm {
   min-height: 26px;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 12.5px;
   line-height: 17px;
+}
+
+@container style(--sf-has-19: 1) {
+  [data-radix-popper-content-wrapper] > [role="dialog"] .shrink-0.p-1 > button:is(*, .sf-pad.sf-pad) {
+    min-height: 26px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    line-height: 17px;
+  }
 }
 
 /* Branch lists keep bb's 12 px rows, so no more long names wrap than in bb. */
@@ -2423,8 +2576,12 @@ file-tree-container {
     padding-bottom: 6px;
   }
 
-  [data-radix-popper-content-wrapper] .shrink-0.px-2:has(> [role="radiogroup"][aria-label="Reasoning"]) > .sticky.mb-2 {
-    margin-bottom: 6px;
+  [data-radix-popper-content-wrapper] .shrink-0.px-2:has(> [role="radiogroup"][aria-label="Reasoning"]) { --sf-has-21: 1; }
+
+  @container style(--sf-has-21: 1) {
+    [data-radix-popper-content-wrapper] .shrink-0.px-2 > .sticky.mb-2:is(*, .sf-pad.sf-pad) {
+      margin-bottom: 6px;
+    }
   }
 }
 
@@ -2474,16 +2631,24 @@ file-tree-container {
    selected row, so it never melts into the row's fill. The text is a step
    darker than bb's to stay as legible on either plate. Thread rows keep the
    chip in a sibling of the option. */
-[data-testid="command-palette"] :is([role="option"], div:not([role]):has(> [role="option"])) kbd {
-  height: 20px;
-  padding-block: 0;
-  border-radius: 6px;
-  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
-  color: var(--muted-foreground);
+[data-testid="command-palette"] :is([role="option"], div:not([role]):has(> [role="option"])) { --sf-has-22: 1; }
+
+@container style(--sf-has-22: 1) {
+  [data-testid="command-palette"] :is([role="option"], div:not([role])) kbd:is(*, .sf-pad) {
+    height: 20px;
+    padding-block: 0;
+    border-radius: 6px;
+    background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+    color: var(--muted-foreground);
+  }
 }
 
-[data-testid="command-palette"] :is([role="option"]:is([aria-selected="true"], [data-selected="true"]), div:not([role]):has(> [role="option"]:is([aria-selected="true"], [data-selected="true"]))) kbd {
-  background-color: var(--popover);
+[data-testid="command-palette"] :is([role="option"]:is([aria-selected="true"], [data-selected="true"]), div:not([role]):has(> [role="option"]:is([aria-selected="true"], [data-selected="true"]))) { --sf-has-23: 1; }
+
+@container style(--sf-has-23: 1) {
+  [data-testid="command-palette"] :is([role="option"]:is([aria-selected="true"], [data-selected="true"]), div:not([role])) kbd:is(*, sfpad.sf-pad) {
+    background-color: var(--popover);
+  }
 }
 
 @media (width >= 768px) {
