@@ -6,6 +6,7 @@ import {
   type MountedPluginContentScripts,
 } from "@get-bb/plugin-sdk/testing/app";
 import { asPluginApp } from "../testing";
+import { setEnabled } from "./focus";
 
 // A Tesla's browser before the 2026.26 update, and since. Chrome on an Android
 // tablet sends the same user agent as a Tesla now does.
@@ -69,6 +70,7 @@ afterEach(async () => {
     await mounted.lifecycle.dispose();
   mounted = undefined;
   HTMLElement.prototype.focus = originalFocus;
+  setEnabled(true);
   vi.unstubAllGlobals();
   Reflect.deleteProperty(navigator, "userAgent");
   Reflect.deleteProperty(navigator, "maxTouchPoints");
@@ -215,6 +217,13 @@ it("passes the focus through once stopped, under another script's wrapper", asyn
   HTMLElement.prototype.focus = outer;
   await mounted!.lifecycle.dispose();
   expect(HTMLElement.prototype.focus).toBe(outer);
+  field().focus();
+  expect(document.activeElement).toBe(field());
+});
+
+it("leaves the focus to BB while the UI Polish setting is off", async () => {
+  await mount();
+  setEnabled(false);
   field().focus();
   expect(document.activeElement).toBe(field());
 });

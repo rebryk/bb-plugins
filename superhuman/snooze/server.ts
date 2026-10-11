@@ -70,7 +70,16 @@ interface StoredSnooze {
 
 type Snoozes = Record<string, StoredSnooze>;
 
-export default async function registerSnoozeServer(bb: BbPluginApi) {
+/** The part of the root settings handle that Snooze reads. */
+interface SnoozeSettings {
+  get(): Promise<{ snooze?: boolean }>;
+  onChange(listener: (next: { snooze?: boolean }) => void): void;
+}
+
+export default async function registerSnoozeServer(
+  bb: BbPluginApi,
+  settings: SnoozeSettings,
+) {
   const { threads } = bb.sdk;
   const { kv } = bb.storage;
 
@@ -175,6 +184,7 @@ export default async function registerSnoozeServer(bb: BbPluginApi) {
       return { snoozes, last: last ?? null };
     },
     async snooze({ threadId, until, choice }) {
+      if (!on) throw new Error("Snooze is off in Superhuman's settings.");
       const result = await serial(() => snooze(threadId, until, choice));
       wakeTimer();
       return result;
@@ -183,6 +193,20 @@ export default async function registerSnoozeServer(bb: BbPluginApi) {
       await serial(() => wake(threadId, false));
       return null;
     },
+  });
+
+  // Turned off, Snooze brings every snoozed thread back at once, so none stays
+  // hidden with nothing to find it by.
+  function wakeAll() {
+    serial(async () => {
+      for (const threadId of Object.keys(await load())) await wake(threadId, false);
+    }).catch((error: unknown) => warn("Could not wake the snoozed threads", error));
+  }
+  let on = (await settings.get()).snooze !== false;
+  if (!on) wakeAll();
+  settings.onChange((next) => {
+    on = next.snooze !== false;
+    if (!on) wakeAll();
   });
 
   // A turn that ends or fails, or an agent that needs an answer, wakes the

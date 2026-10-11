@@ -12,8 +12,9 @@ vi.mock("./threads", () => ({ installThreadSearch: vi.fn() }));
 vi.mock("./palette", () => ({ installPaletteSearch: vi.fn() }));
 const invalidate = vi.fn(), stopThreads = vi.fn(), stopPalette = vi.fn();
 const versionData = {
-  currentVersion: "0.44.0", isDevelopment: false, latestVersion: null,
-  source: "npm" as const, updateAvailable: false, upgradeCommand: "",
+  currentVersion: "0.46.0", currentCommit: null, installKind: "npm" as const,
+  isDevelopment: false, latestVersion: null, source: "npm" as const,
+  updateAvailable: false, upgradeCommand: "",
 };
 const version = vi.fn(async () => versionData);
 

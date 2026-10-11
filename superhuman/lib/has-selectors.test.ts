@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { insideHasSelectors } from "./has-selectors";
 
@@ -23,7 +22,10 @@ describe("insideHasSelectors", () => {
 });
 
 it("keeps every stylesheet of the plugin free of them", () => {
-  const files = execSync("git ls-files '*.css'", { cwd: __dirname + "/..", encoding: "utf8" }).split("\n").filter(Boolean);
+  // The plugin's own stylesheets, also in an export without git.
+  const files = readdirSync(`${__dirname}/..`, { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".css") && !/^(node_modules|dist)\//.test(file));
+  expect(files.length).toBeGreaterThan(0);
   const found = files.flatMap((file) =>
     insideHasSelectors(readFileSync(`${__dirname}/../${file}`, "utf8")).map((selector) => `${file}: ${selector}`));
   expect(found).toEqual([]);

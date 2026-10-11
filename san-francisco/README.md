@@ -129,8 +129,8 @@ San Francisco is one of the
 [San Francisco Plugins](https://github.com/rebryk/bb-plugins), a family of BB
 plugins. The others:
 
-- [Superhuman](../superhuman): Superhuman-style speed for BB, with shortcut
-  hints, snooze, a compact grid of navigation icons, and a phone layout.
+- [Superhuman](../superhuman): Superhuman-style speed for BB, with shortcuts and
+  search in any keyboard layout, snoozed threads, and a phone layout.
 - [Bookmarks](../bookmarks): save any chat message and jump back to it from the
   thread's right panel.
 - [Canvas](../canvas): images, text, and drawing in each thread, with

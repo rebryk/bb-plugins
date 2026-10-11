@@ -13,17 +13,23 @@ const LINUX = /\(X11; (?:GNU\/)?Linux\b/;
 // A tap on the box around a field focuses the field within the tap.
 const BOX = "[data-promptbox], [data-app-terminal]";
 
+// The UI Polish setting; app.tsx keeps it current.
+let enabled = true;
+export function setEnabled(on: boolean) {
+  enabled = on;
+}
+
 /** On a Tesla, BB focuses a field only in a tap on its box or a key press. */
 export function start() {
   if (!tesla()) return;
   // BB may have focused a field before the plugin started.
   const active = document.activeElement;
-  if (active && isKeyboardInputElement(active)) active.blur();
+  if (enabled && active && isKeyboardInputElement(active)) active.blur();
   const prototype = HTMLElement.prototype;
   const original = prototype.focus;
   let on = true;
   function focus(this: HTMLElement, options?: FocusOptions) {
-    if (on && isKeyboardInputElement(this) && !asked(this)) return;
+    if (on && enabled && isKeyboardInputElement(this) && !asked(this)) return;
     original.call(this, options);
   }
   prototype.focus = focus;

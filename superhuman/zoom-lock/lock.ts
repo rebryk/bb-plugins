@@ -30,6 +30,15 @@ function startLock(doc: Document) {
     cx: number; cy: number; width: number; height: number;
   }) | null = null;
   const restoreImage = () => { if (image) image.style.transform = transform; };
+  // A preview's Previous and Next load another image into the same <img>,
+  // which starts unzoomed.
+  const loaded = (event: Event) => {
+    if (event.target !== image || (scale === 1 && !x && !y)) return;
+    restoreImage();
+    scale = 1;
+    x = y = 0;
+    gesture = null;
+  };
   const start = (event: TouchEvent) => {
     if (!event.touches.length) { gesture = null; return; }
     const preview = event.target instanceof Element ? event.target.closest(PREVIEW) : null;
@@ -84,6 +93,7 @@ function startLock(doc: Document) {
   for (const type of ["touchstart", "touchend", "touchcancel"] as const) doc.addEventListener(type, start, options);
   doc.addEventListener("touchmove", move, options);
   doc.addEventListener("click", click, true);
+  doc.addEventListener("load", loaded, true);
   return () => {
     restoreImage();
     if (meta?.content === locked) meta.content = original;
@@ -91,6 +101,7 @@ function startLock(doc: Document) {
     for (const type of ["touchstart", "touchend", "touchcancel"] as const) doc.removeEventListener(type, start, true);
     doc.removeEventListener("touchmove", move, true);
     doc.removeEventListener("click", click, true);
+    doc.removeEventListener("load", loaded, true);
     roots.forEach((root, index) => { root.style.touchAction = actions[index]; });
   };
 }

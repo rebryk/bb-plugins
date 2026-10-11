@@ -10,10 +10,8 @@ it("uses only the public SDK and package-local source", async () => {
         // React, BB's toasts, and the vendored components' libraries.
         /^(react|react-dom|sonner|cmdk|clsx|tailwind-merge)$/,
         /^@radix-ui\/react-(dialog|slot)$/,
-        /^@hugeicons\//,
-        // Tests and the browser geometry check.
+        // Tests.
         /^@testing-library\//,
-        /^(playwright-core|typescript)$/,
       ],
     },
   );

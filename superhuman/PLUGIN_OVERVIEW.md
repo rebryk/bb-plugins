@@ -1,30 +1,29 @@
-Superhuman-style features for BB:
+Superhuman-style speed for BB:
 
-- **Shortcuts.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
-  **E** archives, and numbers open a new thread's menus, in any keyboard layout.
+- **Shortcuts.** Shortcut hints on a held modifier; **/** searches, **H**
+  snoozes, **E** archives, and numbers open a new thread's menus, in any
+  keyboard layout.
 - **Universal Search.** Find commands, threads, and snoozed threads using both
-  the typed query and its English/Russian keyboard equivalent. On by default;
-  built-in command and thread search support requires BB 0.44.0.
-- **Snooze.** Hide a thread until a set time or until its agent needs you; use
-  the moon in its header or before Archive in the sidebar row.
+  the typed query and its English/Russian keyboard equivalent.
+- **Snooze.** Hide a thread until a time you pick or until its agent needs you,
+  from the moon in its header or any thread menu; **Show snoozed threads** lists
+  them.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
-- **Thread ETA.** The time left on an agent's background process counts down
-  at the end of its sidebar row until it runs out or the agent clears it.
-- **Code Copy.** Click or tap a code block or inline command in an agent's
-  reply to copy it. Always on; text selection still works.
-- **Preload Threads.** Load the tail of recent and newly completed threads in
-  the background. On by default; uses BB 0.44.0's cache and pauses when hidden.
-- **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
-- **Terminal Paste.** A Paste button for the terminal on phones and tablets.
-- **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Mobile Layout.** Bottom bars, gestures, and haptics on phones, with a fixed
-  interface scale and pinch-to-zoom images. Thread titles stay hidden on phones.
-- **UI Polish.** Icons in one tone, even menu rows, and a thread bar without
-  the git action or external editor picker.
+- **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
+  fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
+- **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
+  and the sidebar and right panel buttons; their shortcuts still work.
+- **UI Polish.** Icons in one tone and a thread bar without the external editor
+  picker, with fixes for Safari's layout and for a Tesla's keyboard.
 
-Settings include four main switches: **Shortcuts**, **Universal Search**,
-**Mobile Layout**, and **Archive Button**. **Experimental** contains
-**Thread ETA** and **Preload Threads**. All six are on by default.
+Shortcuts work on desktop, outside text fields, by key position, so **H** is
+**H** in a Russian layout too. Snooze sits before Archive in every thread menu.
+To snooze from a sidebar row in one click, add it in the row menu's
+**Customize row actions**. Universal Search in the command palette and thread
+search is verified for BB 0.46.0 and turns itself off on other versions.
+Settings have a switch for each feature, all on by default except Hide Title
+Bar; turning Snooze off
+brings snoozed threads back.
 
 ## More San Francisco Plugins
 

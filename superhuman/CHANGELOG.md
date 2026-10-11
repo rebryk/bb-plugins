@@ -3,6 +3,67 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.20 (2026-10-11)
+
+- Superhuman is rebuilt for BB 0.46 and needs it. It has seven features,
+  Shortcuts, Universal Search, Snooze, Archive Button, Mobile Layout, Hide
+  Title Bar, and UI Polish, each with a switch in Settings, on by default except
+  Hide Title Bar. Thread ETA, Code Copy, Preload Threads, Dia Sidebar, Terminal
+  Paste, and Server Switcher are gone, and so are their settings. Snoozed
+  threads stay snoozed.
+- New: Hide Title Bar removes the macOS desktop app's 48px top row, with back
+  and forward and the sidebar and right panel buttons, whose shortcuts still
+  work. The window's buttons keep their corner: the rail's Home starts below
+  them, and New thread, or a page's title while the sidebar is closed, beside
+  them. The window drags by the frame's top edge and the room above Home.
+- Archive Button runs BB's own Archive, with its confirmation for a thread with
+  children and its Undo, and shows only for threads the sidebar lists.
+- Mobile Layout follows BB 0.46's phone header: the thread bar again reads New
+  thread, Archive, Snooze, other plugins' buttons, the thread's menu, then the
+  right panel's button, without BB's Close pane, and a tap between its buttons
+  no longer scrolls the thread to the top. In BB's apps the cards sit as far
+  above the home bar as in a browser instead of twice as far.
+- On a phone, BB 0.46's navigation rail runs upside down: Home and the rest
+  stack up from the bottom, within reach of the thumb, with Home level with the
+  footer's buttons, and Settings is at the top, level with the first row of
+  Settings' list. The rail takes the thread list's background, with a line
+  between them. BB's New thread moves down to the footer, and back and forward
+  leave the sidebar.
+- On the Terminal tab, BB's row of terminal keys sits just above the right
+  panel's card, and alone above the keyboard while it is open. The bars now also
+  give way to the keyboard on Android, which BB doesn't report.
+- Paging through images in the fullscreen preview starts each one unzoomed.
+- Mobile Layout leaves Settings' list of sections and the Paste key to BB 0.46,
+  which has its own, and takes UI Polish's taller rows in sheets such as the
+  branch picker.
+- UI Polish no longer hides Commit, which BB 0.46's **Show Git changes and
+  Commit button** setting does. Its one icon tone covers BB 0.46's navigation
+  rail and the row above the threads, and the setting turns it off at once.
+- Snooze can be turned off. Turning it off brings every snoozed thread back and
+  removes the moon, the menu item, its commands, and **H**.
+- Universal Search works in BB 0.46.0's command palette and thread search, and
+  turns itself off there on other versions.
+- Snooze, or Unsnooze with the wake time, is in every thread menu: the header's
+  **…**, a sidebar row's menu and right-click menu, and the long-press menu on
+  phones, just before Archive. **Customize row actions** can make it a button on
+  sidebar rows. It replaces the moon in sidebar rows, which BB 0.46 no longer
+  showed.
+- **E** archives through BB's own Archive, with its confirmation for threads
+  with children and its Undo.
+- Shortcuts follow the keys BB 0.46 saves separately for macOS, Windows, and
+  Linux, so **/** and the hints use this computer's keys.
+- Hints under **⌘** or **⌃** show as soon as the key goes down. A key pressed
+  under it, such as the 1 of **⌘1**, hides them until the modifier rests alone
+  again, so the thread switch it starts does no hint work. **⇧** and **⌥** still
+  wait for the key held alone, so typing capitals shows none.
+- While Shortcuts' hints show, and for a moment after, BB's own hints stay
+  hidden instead of appearing beside them 700 ms later or flashing when the
+  modifier is released. Thread numbers skip rows in collapsed groups, as BB's
+  do, and so does the next thread after snoozing the open one.
+- Open plugins is gone: BB's navigation has Plugins.
+- On phones, the Snooze and Snoozed threads sheets end like BB's own, clear of
+  the home bar, without a second strip below the list.
+
 ## 0.1.19 (2026-10-05)
 
 - Typing and switching threads no longer slow down. No rule styles an

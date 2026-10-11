@@ -4,6 +4,9 @@ import { installPaletteSearch } from "./palette";
 import { installThreadSearch } from "./threads";
 import { searchCache } from "./host";
 
+/** BB versions whose palette and thread search the adapters were checked on. */
+const VERIFIED = ["0.46.0"];
+
 function UniversalSearch() {
   const sdk = useSdk();
   const { values, isLoading } = useSettings();
@@ -20,7 +23,7 @@ function UniversalSearch() {
         // Native search has no SDK extension point. These adapters are checked
         // against this host version; plugin-owned Snooze needs neither adapter.
         if (lifetime.signal.aborted || version.isDevelopment
-          || version.currentVersion !== "0.44.0" || !anchor.current) return;
+          || !VERIFIED.includes(version.currentVersion) || !anchor.current) return;
         const invalidate = searchCache(anchor.current);
         if (!invalidate) return;
         disposers.push(invalidate);

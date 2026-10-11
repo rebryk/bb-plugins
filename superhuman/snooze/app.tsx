@@ -1,14 +1,14 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import Moon02Icon from "@hugeicons/core-free-icons/Moon02Icon";
 import {
+  experimental_THREAD_ACTION_GROUPS,
   useBbContext,
   useBbNavigate,
   useRealtime,
@@ -35,10 +35,9 @@ import { usePortalScopeProps } from "../lib/portal-scope";
 import { cn } from "../lib/utils";
 import { layoutFilter } from "../universal-search/layout";
 import type { Snooze, rpcContract } from "./server";
+import "./app.css";
 import { CHANGED_CHANNEL } from "./shared";
 import { nextThread, sidebarThreadIds } from "./sidebar";
-import { mountRowButtons } from "./row-button";
-import "./app.css";
 import {
   fmtUntil,
   fmtWhen,
@@ -50,11 +49,11 @@ import {
 
 type DialogRequest = { kind: "snooze"; threadId: string } | { kind: "snoozed" };
 
-// Commands have no React tree and the header button exists only on thread
-// pages, so both open the dialogs through this store, and an app overlay
-// renders them. The last dialog stays set while it animates closed. Each
-// opening gets a new key, since BB's drawer on phones keeps its content
-// mounted.
+// Commands and thread menus have no React tree of their own and the header
+// button exists only on thread pages, so all of them open the dialogs through
+// this store, and an app overlay renders them. The last dialog stays set while
+// it animates closed. Each opening gets a new key, since BB's drawer on phones
+// keeps its content mounted.
 let dialogState = {
   dialog: null as DialogRequest | null,
   open: false,
@@ -161,7 +160,13 @@ function showError(title: string, error: unknown) {
   });
 }
 
+/** The plugin's glyphs from `bb.branding.experimental_icons`. */
+const MOON = "superhuman/moon";
+const MOON_FILLED = "superhuman/moon-filled";
+
 /** The snoozes and the last choice, refetched after every server write. */
+type SnoozeRpc = ReturnType<typeof useRpc<typeof rpcContract>>;
+
 function useSnoozes() {
   const rpc = useRpc<typeof rpcContract>();
   const [state, setState] = useState<{
@@ -193,6 +198,36 @@ function useSnoozes() {
     previous.current = connection;
   }, [connection, refetch]);
   return { rpc, ...state };
+}
+
+/** Whether the Snooze setting is on; it is until the settings load. */
+function useSnoozeOn() {
+  return useSettings().values?.snooze !== false;
+}
+
+// Commands have no React tree; the dialogs' overlay keeps this current.
+let snoozeOn = true;
+
+/** What thread menus read: each snoozed thread's wake time, and the way to wake it. */
+function useMenuData() {
+  const { rpc, snoozes } = useSnoozes();
+  const on = useSnoozeOn();
+  return useMemo(
+    () => ({
+      on,
+      until: new Map(snoozes.map((row) => [row.threadId, row.until])),
+      unsnooze: (threadId: string) => unsnooze(rpc, threadId),
+    }),
+    [on, rpc, snoozes],
+  );
+}
+
+function unsnooze(rpc: SnoozeRpc, threadId: string) {
+  rpc
+    .call("unsnooze", { threadId })
+    .catch((error: unknown) =>
+      showError("Could not unsnooze the thread", error),
+    );
 }
 
 function TimeItem(props: {
@@ -371,8 +406,11 @@ function SnoozedList(props: {
   );
 }
 
-export function openSnooze(threadId: string) {
+/** Opens the picker for a thread, unless the Snooze setting is off. */
+export function openSnooze(threadId: string): boolean {
+  if (!snoozeOn) return false;
   openDialog({ kind: "snooze", threadId });
+  return true;
 }
 
 /**
@@ -399,8 +437,9 @@ function PaletteDialog(props: {
         aria-describedby={undefined}
         className={cn(
           "top-[12%] max-w-[640px] translate-y-0 gap-0 p-0 shadow-lg sm:rounded-xl",
-          // In the drawer on phones: close to the handle, clear of the home bar.
-          "max-md:-mt-3 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]",
+          // In the drawer on phones, which keeps clear of the home bar itself:
+          // close to the handle, and flat, without the palette's shadow.
+          "max-md:-mt-3 max-md:pb-2 max-md:shadow-none",
         )}
       >
         <DialogTitle className="sr-only">{props.title}</DialogTitle>
@@ -428,10 +467,15 @@ function PaletteDialog(props: {
 }
 
 function SnoozeDialogs() {
-  const { dialog } = useDialogState();
+  const { dialog, open } = useDialogState();
   const { rpc, snoozes, last } = useSnoozes();
   const context = useBbContext();
   const navigate = useBbNavigate();
+  const on = useSnoozeOn();
+  useEffect(() => {
+    snoozeOn = on;
+    if (!on && open) closeDialog();
+  }, [on, open]);
 
   async function snooze(threadId: string, until: number, choice: Choice) {
     closeDialog();
@@ -471,14 +515,6 @@ function SnoozeDialogs() {
     }
   }
 
-  function unsnooze(threadId: string) {
-    rpc
-      .call("unsnooze", { threadId })
-      .catch((error: unknown) =>
-        showError("Could not unsnooze the thread", error),
-      );
-  }
-
   return (
     <>
       <PaletteDialog kind="snooze" title="Snooze thread">
@@ -491,7 +527,7 @@ function SnoozeDialogs() {
             }
             onUnsnooze={() => {
               closeDialog();
-              unsnooze(dialog.threadId);
+              unsnooze(rpc, dialog.threadId);
             }}
           />
         )}
@@ -503,7 +539,7 @@ function SnoozeDialogs() {
             closeDialog();
             navigate.toThread(threadId);
           }}
-          onUnsnooze={unsnooze}
+          onUnsnooze={(threadId) => unsnooze(rpc, threadId)}
         />
       </PaletteDialog>
     </>
@@ -512,6 +548,8 @@ function SnoozeDialogs() {
 
 function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
   const { snoozes } = useSnoozes();
+  const on = useSnoozeOn();
+  if (!on) return null;
   const until = snoozes.find((row) => row.threadId === threadId)?.until;
   const label =
     until === undefined
@@ -525,30 +563,46 @@ function MoonButton({ threadId }: PluginThreadHeaderActionProps) {
       onClick={() => openDialog({ kind: "snooze", threadId })}
       className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[color:var(--subtle-foreground)] transition-colors duration-150 hover:bg-[var(--state-hover)] hover:text-muted-foreground hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:pointer-coarse:size-9"
     >
-      <HugeiconsIcon
-        icon={Moon02Icon}
-        size={16}
-        strokeWidth={1.5}
-        fill={until === undefined ? "none" : "currentColor"}
-        className="max-md:pointer-coarse:size-5"
-        // How BB marks its own icons, so the styles for those color it too.
-        data-icon-root=""
+      <Icon
+        name={until === undefined ? MOON : MOON_FILLED}
+        className="size-4 max-md:pointer-coarse:size-5"
+        aria-hidden
       />
     </button>
   );
 }
 
 export default function registerSnooze(app: PluginAppBuilder) {
-  app.contentScripts.register({
-    id: "snooze-row-buttons",
-    mount: (context) =>
-      mountRowButtons(context, (threadId) =>
-        openDialog({ kind: "snooze", threadId }),
-      ),
+  // In every thread menu, before Archive; a row shows it as a button once the
+  // user adds it in Customize row actions.
+  app.slots.experimental_threadAction({
+    id: "snooze",
+    title: "Snooze",
+    icon: MOON,
+    group: experimental_THREAD_ACTION_GROUPS.lifecycle,
+    order: 10,
+    useData: useMenuData,
+    item: ({ thread, data }) => {
+      if (!data.on || thread.archivedAt !== null) return null;
+      const until = data.until.get(thread.id);
+      if (until === undefined) {
+        return {
+          label: "Snooze",
+          icon: MOON,
+          run: () => openDialog({ kind: "snooze", threadId: thread.id }),
+        };
+      }
+      return {
+        label: "Unsnooze",
+        detail: `Until ${fmtUntil(until, Date.now())}`,
+        icon: MOON_FILLED,
+        run: () => data.unsnooze(thread.id),
+      };
+    },
   });
 
   app.slots.experimental_threadHeaderAction({
-    id: "snooze",
+    id: "snooze-moon",
     title: "Snooze thread",
     component: MoonButton,
   });
@@ -561,7 +615,7 @@ export default function registerSnooze(app: PluginAppBuilder) {
   app.commands.register({
     id: "snooze-thread",
     title: "Snooze thread",
-    isAvailable: ({ threadId }) => threadId !== null,
+    isAvailable: ({ threadId }) => snoozeOn && threadId !== null,
     run: ({ threadId }) => {
       if (threadId !== null) openDialog({ kind: "snooze", threadId });
     },
@@ -570,6 +624,7 @@ export default function registerSnooze(app: PluginAppBuilder) {
   app.commands.register({
     id: "show-snoozed-threads",
     title: "Show snoozed threads",
+    isAvailable: () => snoozeOn,
     run: () => openDialog({ kind: "snoozed" }),
   });
 }

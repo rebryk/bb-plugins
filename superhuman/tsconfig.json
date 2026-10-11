@@ -24,15 +24,17 @@
   "include": [
     "*.ts",
     "*.tsx",
+    "archive-button",
     "components",
-    "code-copy",
-    "dia-sidebar",
+    "haptics",
     "hooks",
     "hotkeys",
     "lib",
-    "server-switcher",
+    "phone-layout",
     "snooze",
-    "terminal-paste",
-    "thread-prefetch"
+    "title-bar",
+    "ui-polish",
+    "universal-search",
+    "zoom-lock"
   ]
 }

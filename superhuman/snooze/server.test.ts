@@ -55,7 +55,10 @@ async function setup(threads = family()) {
       },
     },
   });
-  await plugin(bb);
+  const settings = bb.settings.define({
+    snooze: { type: "boolean", label: "Snooze", default: true },
+  });
+  await plugin(bb, settings);
 
   const snooze = (threadId: string, until: number, choice: unknown = null) =>
     harness.behavior.callRpc("snooze", { threadId, until, choice }) as Promise<{
@@ -272,5 +275,29 @@ describe("waking on time", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(stopped).toBe(true);
     await harness.lifecycle.dispose();
+  });
+});
+
+describe("the Snooze setting", () => {
+  it("brings every snoozed thread back when turned off, and takes no new snoozes", async () => {
+    const { harness, snooze, list, visibility, unread } = await setup();
+    await snooze("a", NOW + HOUR);
+    expect(visibility()).toMatchObject({ a: "hidden", b: "hidden", c: "hidden" });
+    await harness.behavior.setSettings({ snooze: false });
+    await vi.waitFor(async () => {
+      expect((await list()).snoozes).toEqual([]);
+    });
+    expect(visibility()).toEqual({
+      a: "visible",
+      b: "visible",
+      c: "visible",
+      d: "hidden",
+      x: "visible",
+    });
+    expect(unread()).toEqual([]);
+    await expect(snooze("x", NOW + HOUR)).rejects.toThrow(/Snooze is off/);
+    await harness.behavior.setSettings({ snooze: true });
+    await snooze("x", NOW + HOUR);
+    expect(visibility().x).toBe("hidden");
   });
 });

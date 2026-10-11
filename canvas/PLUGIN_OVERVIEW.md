@@ -49,8 +49,8 @@ including San Francisco's accent colors.
 
 Canvas is one of the San Francisco Plugins, a family of BB plugins. The others:
 
-- **Superhuman**: Superhuman-style speed for BB, with shortcut hints, snooze,
-  a compact grid of navigation icons, and a phone layout.
+- **Superhuman**: Superhuman-style speed for BB, with shortcuts and search in
+  any keyboard layout, snoozed threads, and a phone layout.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with

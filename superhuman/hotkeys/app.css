@@ -59,7 +59,9 @@
   padding-inline: 4px !important;
   gap: 4px;
 }
-/* BB's own delayed hint, where a pill already shows the keys. */
+/* BB's own delayed hints, while pills show the keys. They sit beside their
+   controls, and back and forward share one box before both buttons. */
+html[data-superhuman-hints] kbd[aria-hidden="true"].pointer-events-none,
 [data-superhuman-key] kbd[aria-hidden="true"].pointer-events-none,
 [data-superhuman-key] + kbd[aria-hidden="true"].pointer-events-none {
   display: none !important;

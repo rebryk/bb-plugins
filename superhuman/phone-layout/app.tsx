@@ -5,13 +5,12 @@ import { lockZoom } from "../zoom-lock/lock";
 import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
 import { NewThreadButton } from "./new-thread";
-import { startSettingsSidebar } from "./settings";
 import { startPanelSlide } from "./slide";
 import { startPanelSwipe } from "./swipe";
 import "./app.css";
 import "./slide.css";
 
-// The settings reach the page through this React bridge.
+// The setting reaches the page through this React bridge.
 function PhoneLayout() {
   const { values } = useSettings();
   const enabled = values?.phoneLayout !== false;
@@ -24,7 +23,6 @@ function PhoneLayout() {
       startPanelSlide(document),
       startPanelSwipe(document),
       startKeyboardSwipe(document),
-      startSettingsSidebar(document),
     ];
     return () => stops.forEach((stop) => stop());
   }, [enabled]);
@@ -33,7 +31,8 @@ function PhoneLayout() {
 
 export default function registerPhoneLayout(app: PluginAppBuilder) {
   app.slots.experimental_appOverlay({ id: "phone-layout", component: PhoneLayout });
-  // Superhuman registers it after Archive, so the reversed bar shows it first.
+  // Registered after Snooze's moon, so the bar, which runs from its end,
+  // shows New thread first.
   app.slots.experimental_threadHeaderAction({
     id: "new-thread",
     title: "New thread",

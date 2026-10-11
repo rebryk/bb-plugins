@@ -1,13 +1,12 @@
 import { useSyncExternalStore } from "react";
 import {
-  experimental_useSidebarThreadActions,
   useBbContext,
+  useBbNavigate,
   useSettings,
   type PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../components/ui/icon";
-
-const PHONE = "(width < 48rem) and (pointer: coarse)";
+import { PHONE } from "./layout";
 
 function usePhone() {
   return useSyncExternalStore(
@@ -23,12 +22,12 @@ function usePhone() {
 /**
  * On a phone, the thread's bar starts a new thread as the sidebar's New thread
  * does, in the thread's project. The button's group, left empty elsewhere,
- * takes no room: see archive-button/app.css.
+ * takes no room: see snooze/app.css.
  */
 export function NewThreadButton(_: PluginThreadHeaderActionProps) {
   const { values } = useSettings();
   const { projectId } = useBbContext();
-  const actions = experimental_useSidebarThreadActions();
+  const navigate = useBbNavigate();
   const phone = usePhone();
   if (values?.phoneLayout === false || !phone) return null;
   return (
@@ -37,7 +36,7 @@ export function NewThreadButton(_: PluginThreadHeaderActionProps) {
       aria-label="New thread"
       title="New thread"
       onClick={() =>
-        actions.openNewThread({
+        navigate.toCompose({
           ...(projectId ? { projectId } : {}),
           focusPrompt: true,
         })
