@@ -22,7 +22,7 @@ function merge(first: Search, second: Search, limit: number): Search {
   return { active: group("active"), archived: group("archived") };
 }
 
-/** BB 0.44.0's search transport. Other requests pass through untouched. */
+/** BB's thread search transport. Other requests pass through untouched. */
 export function installThreadSearch(host: Pick<Window, "fetch" | "location">) {
   const original = host.fetch;
   const lifetime = new AbortController();

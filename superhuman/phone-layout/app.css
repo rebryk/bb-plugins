@@ -1,478 +1,458 @@
 /*
- * Phones only: BB's compact layout on a touch screen, while the Mobile Layout
- * setting is on. Every selector targets BB's own markup, which isn't a
- * versioned API; when a BB update changes it, a bar stays where BB puts it.
+ * Phones only: layout.ts marks the page while it is a phone's, a touch screen
+ * narrower than 48rem, and the Mobile Layout setting is on. Every selector
+ * targets BB's own markup, which isn't a versioned API; when a BB update
+ * changes it, a bar stays where BB puts it.
  */
-@media (width < 48rem) and (pointer: coarse) {
-  html[data-phone-layout] {
-    /*
-     * Buttons bigger than BB's, to suit a thumb: 44px with 24px icons, in rows
-     * 56px tall, as in the sidebar's grid.
-     */
-    --phone-layout-bar-height: calc(var(--spacing, 0.25rem) * 14);
-    --phone-layout-button-size: calc(var(--spacing, 0.25rem) * 11);
-    --phone-layout-icon-size: calc(var(--spacing, 0.25rem) * 6);
-    --phone-layout-button-gap: calc(var(--spacing, 0.25rem) * 0.5);
+html[data-phone-layout] {
+  /*
+   * Buttons bigger than BB's, to suit a thumb: 44px with 24px icons.
+   */
+  --phone-layout-button-size: calc(var(--spacing, 0.25rem) * 11);
+  --phone-layout-icon-size: calc(var(--spacing, 0.25rem) * 6);
+  --phone-layout-button-gap: calc(var(--spacing, 0.25rem) * 0.5);
 
-    /*
-     * The bars float as cards in the shape of a thread's message box: as far
-     * from the screen's sides, as round, with its border and shadow, and as
-     * tall as the box is while it shows one line. Their buttons take the size
-     * of the box's own, 40px, and sit as far from a card's sides as from its
-     * top and bottom; a title starts where the box's text does. A card keeps
-     * the box's distance from the screen's bottom, or the room for the home
-     * indicator if that is more. A theme that shapes the message box its own
-     * way sets --phone-layout-card-radius and --phone-layout-card-text-inset
-     * to match, as San Francisco does.
-     */
-    --phone-layout-card-height: calc(var(--spacing, 0.25rem) * 12 + 2px);
-    --phone-layout-card-button-size: calc(var(--spacing, 0.25rem) * 10);
-    --phone-layout-card-inset: calc(var(--spacing, 0.25rem) * 4);
-    --phone-layout-card-bottom: max(var(--phone-layout-card-inset), env(safe-area-inset-bottom, 0px));
-    --phone-layout-card-padding: calc((var(--phone-layout-card-height) - var(--phone-layout-card-button-size)) / 2 - 1px);
+  /*
+   * The bars float as cards in the shape of a thread's message box: as far
+   * from the screen's sides, as round, with its border and shadow, and as
+   * tall as the box is while it shows one line. Their buttons take the size
+   * of the box's own, 40px, and sit as far from a card's sides as from its
+   * top and bottom; a title starts where the box's text does. A card keeps
+   * the box's distance from the screen's bottom, or the room for the home
+   * indicator if that is more: BB's app reports that room in
+   * --bb-safe-area-bottom, a browser in env(). A theme that shapes the message
+   * box its own way sets --phone-layout-card-radius and
+   * --phone-layout-card-text-inset to match, as San Francisco does.
+   */
+  --phone-layout-card-height: calc(var(--spacing, 0.25rem) * 12 + 2px);
+  --phone-layout-card-button-size: calc(var(--spacing, 0.25rem) * 10);
+  --phone-layout-card-inset: calc(var(--spacing, 0.25rem) * 4);
+  --phone-layout-card-bottom: max(
+    var(--phone-layout-card-inset),
+    var(--bb-safe-area-bottom, env(safe-area-inset-bottom, 0px))
+  );
+  --phone-layout-card-padding: calc((var(--phone-layout-card-height) - var(--phone-layout-card-button-size)) / 2 - 1px);
 
-    /*
-     * BB stacks a page's header and its content in one column: a thread,
-     * Settings, Plugins, Skills and every plugin page. The header moves below
-     * the content.
-     */
-    header:has(> [data-testid="app-page-header-content-row"]) {
-      order: 1;
+  /*
+   * BB stacks a page's header and its content in one column: a thread,
+   * Settings, Plugins, Skills and every plugin page. The header moves below
+   * the content.
+   */
+  header:has(> [data-testid="app-page-header-content-row"]) {
+    order: 1;
+  }
+
+  /*
+   * A tap on BB's header scrolls the page to its top. At the bottom, a tap
+   * between the card's buttons would do it by mistake.
+   */
+  header > button[aria-label="Scroll to top"] {
+    display: none;
+  }
+
+  /*
+   * A thread's messages stop at their first and last line instead of
+   * stretching past them and springing back.
+   */
+  [data-thread-window] .thread-scrollbar {
+    overscroll-behavior-y: none;
+  }
+
+  /*
+   * BB keeps room for the home indicator below a page and below the right
+   * panel. A card, or the home page's button, takes that room into its own
+   * distance from the bottom, so that a card's shadow falls over the room
+   * instead of ending at its top.
+   */
+  [data-testid="app-layout-content-shell"],
+  [data-testid="secondary-panel-shelf"]:has(> div > aside > * > [data-testid="thread-secondary-panel-top-chrome"]) {
+    padding-bottom: 0;
+  }
+
+  /*
+   * While the on-screen keyboard is open, the bars give their room to the
+   * page, and a terminal keeps only BB's row of keys above the keyboard. BB
+   * tells of an iPhone's keyboard by setting --bb-safe-area-bottom on <body>
+   * only then; layout.ts tells of others'. The rules that read this are at the
+   * end, after those they override.
+   */
+  body[style*="--bb-safe-area-bottom"],
+  &[data-phone-keyboard] body {
+    --phone-layout-keyboard: 1;
+  }
+
+  /*
+   * The sidebar opens with a swipe from the screen's left edge, so its
+   * button goes, and so does the room BB keeps for it at the bar's left.
+   */
+  [data-testid="app-sidebar-trigger-overlay"] {
+    display: none;
+  }
+
+  header > [data-testid="app-page-header-content-row"][class*="pointer-coarse:pl-[40px]"] {
+    padding-left: 0;
+  }
+
+  /*
+   * The home page has no header, only a button at each top corner. The right
+   * panel's moves to the bottom, where it sits in another page's card.
+   */
+  main:has(> div > [aria-label*="right panel"]) {
+    --phone-layout-home: 1;
+    --phone-layout-button-size: var(--phone-layout-card-button-size);
+    padding-bottom: calc(var(--phone-layout-card-height) + var(--phone-layout-card-bottom));
+  }
+
+  /*
+   * Rules that depend on what an element holds mark it with :has() and style
+   * its inside through a style query, since `A:has(B) C` would restyle much
+   * of the page on every change. `:is(*, …)` or a repeated compound keeps a
+   * rule's original specificity.
+   */
+  @container style(--phone-layout-home: 1) {
+    main > div:has(> [aria-label*="right panel"]):is(*, superhuman-pad.superhuman-pad) {
+      top: auto;
+      right: calc(
+        env(safe-area-inset-right, 0px) + var(--phone-layout-card-inset) + 1px + var(--phone-layout-card-padding)
+      );
+      bottom: calc(var(--phone-layout-card-bottom) + 1px + var(--phone-layout-card-padding));
+    }
+  }
+
+  /*
+   * Every button, whoever adds it: BB, this plugin or another. BB's buttons
+   * with text and the tabs have their own rules below. A plugin's own icon is
+   * a box that BB paints with the icon's shape.
+   *
+   * The browser tries these rules on every button, link, icon and image of
+   * the page each time the page restyles, which happens often, as when the
+   * keyboard opens. So each bar has a rule of its own, which starts from a
+   * tag such as header or aside that rules out most of the page at once, and
+   * a tab's buttons are told apart by their parent alone.
+   */
+  header > [data-testid="app-page-header-content-row"]
+    :is(button, a):not([class*="pointer-coarse:h-9"]) {
+    min-width: var(--phone-layout-button-size);
+    min-height: var(--phone-layout-button-size);
+
+    :is(svg, img, [data-plugin-icon-asset]) {
+      width: var(--phone-layout-icon-size);
+      height: var(--phone-layout-icon-size);
+    }
+  }
+
+  main > div > [aria-label*="right panel"] {
+    min-width: var(--phone-layout-button-size);
+    min-height: var(--phone-layout-button-size);
+
+    :is(svg, img) {
+      width: var(--phone-layout-icon-size);
+      height: var(--phone-layout-icon-size);
+    }
+  }
+
+  aside [data-testid="thread-secondary-panel-top-chrome"]
+    :is(button, a):not([class*="pointer-coarse:h-9"], [class*="group/tab-pill"] > *) {
+    min-width: var(--phone-layout-button-size);
+    min-height: var(--phone-layout-button-size);
+
+    :is(svg, img, [data-plugin-icon-asset]) {
+      width: var(--phone-layout-icon-size);
+      height: var(--phone-layout-icon-size);
+    }
+  }
+
+  header > [data-testid="app-page-header-content-row"] {
+    &,
+    > div,
+    [data-thread-header-workflow-actions] {
+      gap: var(--phone-layout-button-gap);
     }
 
     /*
-     * A thread's messages stop at their first and last line instead of
-     * stretching past them and springing back.
+     * Buttons with text or an app's icon take the buttons' height but keep
+     * BB's padding.
      */
-    [data-thread-window] .thread-scrollbar {
-      overscroll-behavior-y: none;
-    }
+    button[class*="pointer-coarse:h-9"] {
+      height: var(--phone-layout-button-size);
 
-    /*
-     * BB keeps room for the home indicator below a page and below the right
-     * panel. A card, or the home page's button, takes that room into its own
-     * distance from the bottom, so that a card's shadow falls over the room
-     * instead of ending at its top.
-     */
-    [data-testid="app-layout-content-shell"],
-    [data-testid="secondary-panel-shelf"]:has(> div > aside > * > [data-testid="thread-secondary-panel-top-chrome"]) {
-      padding-bottom: var(--bb-safe-area-bottom, 0px);
-    }
+      img {
+        width: calc(var(--spacing, 0.25rem) * 5);
+        height: calc(var(--spacing, 0.25rem) * 5);
+      }
 
-    /*
-     * BB sets --bb-safe-area-bottom on <body> only while the on-screen keyboard
-     * is open. The bar gives its room to the page until the keyboard closes.
-     */
-    body[style*="--bb-safe-area-bottom"]
-      header:has(> [data-testid="app-page-header-content-row"]) {
-      display: none;
-    }
-
-    /*
-     * The sidebar opens with a swipe from the screen's left edge, so its
-     * button goes, and so does the room BB keeps for it at the bar's left.
-     */
-    [data-testid="app-sidebar-trigger-overlay"] {
-      display: none;
-    }
-
-    header > [data-testid="app-page-header-content-row"][class*="pointer-coarse:pl-[40px]"] {
-      padding-left: 0;
-    }
-
-    /*
-     * The home page has no header, only a button at each top corner. The right
-     * panel's moves to the bottom, where it sits in another page's card.
-     */
-    main:has(> div > [aria-label*="right panel"]) {
-      --phone-layout-home: 1;
-      --phone-layout-button-size: var(--phone-layout-card-button-size);
-      padding-bottom: calc(var(--phone-layout-card-height) + var(--phone-layout-card-bottom));
-
-      body[style*="--bb-safe-area-bottom"] & {
-        padding-bottom: calc(var(--spacing, 0.25rem) * 4);
+      svg.size-3 {
+        width: calc(var(--spacing, 0.25rem) * 3.5);
+        height: calc(var(--spacing, 0.25rem) * 3.5);
       }
     }
 
-    /*
-     * Rules that depend on what an element holds mark it with :has() and style
-     * its inside through a style query, since `A:has(B) C` would restyle much
-     * of the page on every change. `:is(*, …)` or a repeated compound keeps a
-     * rule's original specificity.
-     */
-    @container style(--phone-layout-home: 1) {
-      main > div:has(> [aria-label*="right panel"]):is(*, superhuman-pad.superhuman-pad) {
-        top: auto;
-        right: calc(
-          env(safe-area-inset-right, 0px) + var(--phone-layout-card-inset) + 1px + var(--phone-layout-card-padding)
-        );
-        bottom: calc(var(--phone-layout-card-bottom) + 1px + var(--phone-layout-card-padding));
-
-        body[style*="--bb-safe-area-bottom"] & {
-          display: none;
-        }
-      }
+    /* Plugins' buttons sit in a box that BB caps at the desktop's height. */
+    [data-bb-plugin-root] > span[class*="max-h-7"] {
+      max-height: none;
     }
 
-    /*
-     * Every button, whoever adds it: BB, this plugin or another. BB's buttons
-     * with text and the tabs have their own rules below.
-     *
-     * The browser tries these rules on every button, link, icon and image of
-     * the page each time the page restyles, which happens often, as when the
-     * keyboard opens. So each bar has a rule of its own, which starts from a
-     * tag such as header or aside that rules out most of the page at once, and
-     * a tab's buttons are told apart by their parent alone.
-     */
-    header > [data-testid="app-page-header-content-row"]
-      :is(button, a):not([class*="pointer-coarse:h-9"]) {
-      min-width: var(--phone-layout-button-size);
-      min-height: var(--phone-layout-button-size);
-
-      :is(svg, img) {
-        width: var(--phone-layout-icon-size);
-        height: var(--phone-layout-icon-size);
-      }
-    }
-
-    main > div > [aria-label*="right panel"] {
-      min-width: var(--phone-layout-button-size);
-      min-height: var(--phone-layout-button-size);
-
-      :is(svg, img) {
-        width: var(--phone-layout-icon-size);
-        height: var(--phone-layout-icon-size);
-      }
-    }
-
-    aside [data-testid="thread-secondary-panel-top-chrome"]
-      :is(button, a):not([class*="pointer-coarse:h-9"], [class*="group/tab-pill"] > *) {
-      min-width: var(--phone-layout-button-size);
-      min-height: var(--phone-layout-button-size);
-
-      :is(svg, img) {
-        width: var(--phone-layout-icon-size);
-        height: var(--phone-layout-icon-size);
-      }
-    }
-
-    header > [data-testid="app-page-header-content-row"] {
-      &,
-      :is([data-app-page-header-actions], [data-thread-header-workflow-actions]) {
-        gap: var(--phone-layout-button-gap);
-      }
-
-      /*
-       * Buttons with text or an app's icon, such as the split button that
-       * opens the workspace in an app, take the buttons' height but keep BB's
-       * padding.
-       */
-      button[class*="pointer-coarse:h-9"] {
-        height: var(--phone-layout-button-size);
-
-        img {
-          width: calc(var(--spacing, 0.25rem) * 5);
-          height: calc(var(--spacing, 0.25rem) * 5);
-        }
-
-        svg.size-3 {
-          width: calc(var(--spacing, 0.25rem) * 3.5);
-          height: calc(var(--spacing, 0.25rem) * 3.5);
-        }
-      }
-
-      /* Other plugins' buttons sit in a box that BB caps at the desktop's height. */
-      [data-bb-plugin-root] > span[class*="max-h-7"] {
-        max-height: none;
-      }
-
-      /* A title, or the icon before a plugin page's, starts where the box's text does. */
-      > div:not([data-app-page-header-actions]) > div:has(p) {
-        padding-left: calc(
-          var(--phone-layout-card-text-inset, calc(var(--spacing, 0.25rem) * 4)) - var(--phone-layout-card-padding)
-        );
-      }
-    }
-
-    /*
-     * A thread's buttons run in the reverse of BB's order, the last added
-     * first, up to the button that shows the right panel, which stays at the
-     * end. Only the visual order changes; focus and screen readers keep BB's.
-     */
-    header > [data-testid="app-page-header-content-row"] [data-thread-header-workflow-actions] {
-      flex-direction: row-reverse;
-    }
-
-    /*
-     * Without its title, a thread's bar holds only buttons, and they spread
-     * evenly across the card: the icons sit as far from the card's sides as
-     * from each other. The boxes BB groups them in give way, so the buttons
-     * share one row, which runs from its end: the right panel's button, then
-     * the rest from the last, down to the thread's menu.
-     */
-    header
-      > [data-testid="app-page-header-content-row"]:has(
-        > [data-app-page-header-actions] > [data-thread-header-workflow-actions]
-      ) {
-      --phone-layout-thread-bar: 1;
-      flex-direction: row-reverse;
-      justify-content: space-evenly;
-      /* With the card's padding, as wide as the room around an icon in its button. */
-      padding-inline: calc(
-        (var(--phone-layout-button-size) - var(--phone-layout-icon-size)) / 2 - var(--phone-layout-card-padding)
+    /* A page's title, or the icon before a plugin page's, starts where the box's text does. */
+    > div:first-child > div:has(p) {
+      padding-left: calc(
+        var(--phone-layout-card-text-inset, calc(var(--spacing, 0.25rem) * 4)) - var(--phone-layout-card-padding)
       );
     }
+  }
 
-    @container style(--phone-layout-thread-bar: 1) {
-      header > [data-testid="app-page-header-content-row"]:is(*, .superhuman-pad.superhuman-pad) {
-        [data-thread-header-pane-actions] > span,
-        [data-thread-header-pane-actions] > button {
-          order: -1;
-        }
+  /*
+   * A phone's thread bar has no title, so it holds only buttons, and they
+   * spread evenly across the card: the icons sit as far from the card's sides
+   * as from each other. The boxes BB groups them in give way, so the buttons
+   * share one row, which runs from its end: the right panel's button, the
+   * thread's menu, then the plugins' buttons from the last added, such as New
+   * thread and Snooze. Only the visual order changes;
+   * focus and screen readers keep BB's.
+   */
+  header
+    > [data-testid="app-page-header-content-row"]:has(> div > [data-thread-header-workflow-actions]) {
+    --phone-layout-thread-bar: 1;
+    flex-direction: row-reverse;
+    justify-content: space-evenly;
+    /* With the card's padding, as wide as the room around an icon in its button. */
+    padding-inline: calc(
+      (var(--phone-layout-button-size) - var(--phone-layout-icon-size)) / 2 - var(--phone-layout-card-padding)
+    );
+  }
 
-        > div:not([data-app-page-header-actions]),
-        > div:not([data-app-page-header-actions]) > div,
-        > [data-app-page-header-actions],
-        > [data-app-page-header-actions] > div {
-          display: contents;
-        }
-
-        /* A plugin that shows nothing here leaves no gap. */
-        [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
-          display: none;
-        }
+  @container style(--phone-layout-thread-bar: 1) {
+    header > [data-testid="app-page-header-content-row"]:is(*, .superhuman-pad.superhuman-pad) {
+      > div,
+      > div > div {
+        display: contents;
       }
-    }
 
-    aside [data-testid="thread-secondary-panel-top-chrome"] {
-      /* The groups of buttons sit as close as the buttons, to leave the tabs room. */
-      &,
-      > :not([role="toolbar"]),
-      [data-testid="mobile-panel-tab-pager"],
-      [data-testid="mobile-panel-tab-pager"] > div {
-        gap: var(--phone-layout-button-gap);
+      /* The title goes. BB puts it in a paragraph in a box of its own. */
+      > div > div > div:has(> p > .bb-thread-title) {
+        display: none;
+      }
+
+      [data-thread-header-pane-actions] > :not(button) {
+        order: -2;
       }
 
       /*
-       * A tab is a pill around a button with the tab's icon: a square button
-       * for a view, and one with a title for a terminal or a file. In the open
-       * tab, a button to close it covers the icon.
+       * BB's Close pane takes a phone back to the start page, as New thread
+       * does, and the sidebar's threads are a swipe away.
        */
-      [class*="group/tab-pill"] {
-        height: var(--phone-layout-button-size);
-
-        > button:not([data-tab-pill-close]) {
-          height: 100%;
-
-          > span:first-child:has(> :is(svg, img)),
-          > span:first-child > :is(svg, img):is(svg, img) {
-            width: var(--phone-layout-icon-size);
-            height: var(--phone-layout-icon-size);
-          }
-        }
-
-        > button[class*="pointer-coarse:w-9"] {
-          width: var(--phone-layout-button-size);
-        }
-
-        > button[class*="pointer-coarse:pl-9"] {
-          padding-left: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
-        }
-
-        > [data-tab-pill-close] {
-          min-width: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
-          min-height: var(--phone-layout-button-size);
-
-          svg {
-            width: calc(var(--spacing, 0.25rem) * 4);
-            height: calc(var(--spacing, 0.25rem) * 4);
-          }
-        }
+      [data-thread-header-pane-actions] > button[aria-label^="Close pane"] {
+        display: none;
       }
-    }
 
-    /*
-     * The right panel's row of tabs and buttons moves below its content, and
-     * what BB shows under the row, such as a diff's summary, moves above it.
-     */
-    [data-testid="secondary-panel-shelf"]
-      aside
-      > :has(> [data-testid="thread-secondary-panel-top-chrome"]) {
-      order: 1;
-      display: flex;
-      flex-direction: column-reverse;
-
-      body[style*="--bb-safe-area-bottom"] & {
+      /* A plugin that shows nothing here leaves no gap. */
+      [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
         display: none;
       }
     }
+  }
 
-    [data-testid="secondary-panel-shelf"]
-      aside
-      > *
-      > [data-testid="thread-secondary-panel-top-chrome"][data-testid="thread-secondary-panel-top-chrome"] {
-      flex-shrink: 0;
+  aside [data-testid="thread-secondary-panel-top-chrome"] {
+    /* The groups of buttons sit as close as the buttons, to leave the tabs room. */
+    &,
+    > :not([role="toolbar"]),
+    [data-testid="mobile-panel-tab-pager"],
+    [data-testid="mobile-panel-tab-pager"] > div {
+      gap: var(--phone-layout-button-gap);
     }
 
     /*
-     * A page's bar is a card, and so is the right panel's row, so the button
-     * to hide the panel sits where the page's button to show it does.
+     * A tab is a pill around a button with the tab's icon: a square button
+     * for a view, and one with a title for a terminal or a file. In the open
+     * tab, a button to close it covers the icon.
      */
-    :is(
-      header:has(> [data-testid="app-page-header-content-row"]),
-      [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
-    ) {
-      --phone-layout-button-size: var(--phone-layout-card-button-size);
-      height: var(--phone-layout-card-height);
-      margin: 0 var(--phone-layout-card-inset) var(--phone-layout-card-bottom);
-      padding: 0 var(--phone-layout-card-padding);
-      border: 1px solid var(--border);
-      border-radius: var(--phone-layout-card-radius, calc(var(--radius) + 4px));
-      background-color: var(--background);
-      box-shadow: var(--shadow-lift);
+    [class*="group/tab-pill"] {
+      height: var(--phone-layout-button-size);
+
+      > button:not([data-tab-pill-close]) {
+        height: 100%;
+
+        > span:first-child:has(> :is(svg, img)),
+        > span:first-child > :is(svg, img):is(svg, img) {
+          width: var(--phone-layout-icon-size);
+          height: var(--phone-layout-icon-size);
+        }
+      }
+
+      > button[class*="pointer-coarse:w-9"] {
+        width: var(--phone-layout-button-size);
+      }
+
+      > button[class*="pointer-coarse:pl-9"] {
+        padding-left: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
+      }
+
+      > [data-tab-pill-close] {
+        min-width: calc(var(--spacing, 0.25rem) * 4 + var(--phone-layout-icon-size));
+        min-height: var(--phone-layout-button-size);
+
+        svg {
+          width: calc(var(--spacing, 0.25rem) * 4);
+          height: calc(var(--spacing, 0.25rem) * 4);
+        }
+      }
+    }
+  }
+
+  /*
+   * The right panel's row of tabs and buttons moves below its content, and
+   * what BB shows under the row, such as a diff's summary, moves above it.
+   * A terminal's own row of keys stays above the card, by the keyboard.
+   */
+  [data-testid="secondary-panel-shelf"]
+    aside
+    > :has(> [data-testid="thread-secondary-panel-top-chrome"]) {
+    order: 1;
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  [data-testid="secondary-panel-shelf"]
+    aside
+    > *
+    > [data-testid="thread-secondary-panel-top-chrome"][data-testid="thread-secondary-panel-top-chrome"] {
+    flex-shrink: 0;
+  }
+
+  /*
+   * A page's bar is a card, and so is the right panel's row, so the button
+   * to hide the panel sits where the page's button to show it does.
+   */
+  :is(
+    header:has(> [data-testid="app-page-header-content-row"]),
+    [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
+  ) {
+    --phone-layout-button-size: var(--phone-layout-card-button-size);
+    height: var(--phone-layout-card-height);
+    margin: 0 var(--phone-layout-card-inset) var(--phone-layout-card-bottom);
+    padding: 0 var(--phone-layout-card-padding);
+    border: 1px solid var(--border);
+    border-radius: var(--phone-layout-card-radius, calc(var(--radius) + 4px));
+    background-color: var(--background);
+    box-shadow: var(--shadow-lift);
+  }
+
+  :is(
+    header,
+    [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
+  ) > [data-testid="app-page-header-content-row"] {
+    height: 100%;
+  }
+
+  /* The panel's card keeps clear of what ends above it, such as BB's row of terminal keys. */
+  [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"] {
+    margin-top: calc(var(--spacing, 0.25rem) * 2);
+  }
+
+  /*
+   * A new tab stacks its blocks up from that row: the search field, then the
+   * actions, then the recent files. It opens scrolled to the bottom.
+   */
+  [data-testid="secondary-panel-shelf"]
+    :has(> [data-panel-new-tab-page] > * > [data-testid="new-tab-actions"]) {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  [data-testid="secondary-panel-shelf"]
+    * > [data-panel-new-tab-page]:has(> * > [data-testid="new-tab-actions"])[data-panel-new-tab-page] {
+    --phone-layout-new-tab: 1;
+    justify-content: flex-end;
+  }
+
+  @container style(--phone-layout-new-tab: 1) {
+    [data-testid="secondary-panel-shelf"] * > [data-panel-new-tab-page] > div:is(*, .superhuman-pad.superhuman-pad) {
+      flex-direction: column-reverse;
+    }
+  }
+
+  /*
+   * Phones turn the navigation rail upside down, so its destinations are
+   * within reach of the thumb: Home and the rest stack up from the bottom,
+   * Home lowest, and Settings goes to the top. New thread moves down to the
+   * footer, and the thread list starts at the top. Only the visual order
+   * changes; focus and screen readers keep BB's.
+   */
+  [data-testid="app-nav-rail"] {
+    /* On the sidebar's own background, as the thread list is, with a line between them. */
+    background-color: transparent;
+    border-right: 1px solid var(--sidebar-border, var(--border));
+
+    /* The room it keeps for the sidebar's top row, which moves down. */
+    > [aria-hidden="true"] {
+      display: none;
     }
 
-    :is(
-      header,
-      [data-testid="secondary-panel-shelf"] aside > * > [data-testid="thread-secondary-panel-top-chrome"]
-    ) > [data-testid="app-page-header-content-row"] {
-      height: 100%;
-    }
-
-    /*
-     * A new tab stacks its blocks up from that row: the search field, then the
-     * actions, then the recent files. It opens scrolled to the bottom.
-     */
-    [data-testid="secondary-panel-shelf"]
-      :has(> [data-panel-new-tab-page] > * > [data-testid="new-tab-actions"]) {
-      display: flex;
+    > nav,
+    > nav > div {
       flex-direction: column-reverse;
     }
 
-    [data-testid="secondary-panel-shelf"]
-      * > [data-panel-new-tab-page]:has(> * > [data-testid="new-tab-actions"])[data-panel-new-tab-page] {
-      --phone-layout-new-tab: 1;
-      justify-content: flex-end;
-    }
-
-    @container style(--phone-layout-new-tab: 1) {
-      [data-testid="secondary-panel-shelf"] * > [data-panel-new-tab-page] > div:is(*, .superhuman-pad.superhuman-pad) {
-        flex-direction: column-reverse;
-      }
-    }
-
     /*
-     * Phones turn the sidebar upside down: the footer goes to the top and the
-     * grid to the bottom, within reach of the thumb, in place of the row with
-     * the sidebar button and the back and forward buttons. Only the visual order
-     * changes; focus and screen readers keep BB's.
+     * Home sits level with the footer's buttons, which are as big, 8px above
+     * the bottom: with the list's own 2px, the rail's room below it. Settings
+     * sits level with the first row of Settings' list, 4px below the top.
      */
-    [data-testid="app-sidebar-body"]:has(> [data-testid="sidebar-navigation-region"] [data-dia-sidebar]) {
-      --phone-layout-dia-sidebar: 1;
+    > nav {
+      padding-top: calc(
+        var(--spacing, 0.25rem) +
+          (var(--bb-sidebar-row-height-coarse, 2.5rem) - var(--bb-sidebar-control-size, 36px)) / 2
+      );
+      padding-bottom: calc(var(--spacing, 0.25rem) * 1.5);
     }
-
-    @container style(--phone-layout-dia-sidebar: 1) {
-      [data-testid="app-sidebar-body"]:is(*, .superhuman-pad.superhuman-pad) {
-        > [data-sidebar="footer"] {
-          order: -1;
-          /* A footer item's panel opens below the row instead of above it. */
-          flex-direction: column-reverse;
-
-          /* Items that don't fit wrap below the row instead of above it. */
-          > [data-sidebar="menu"] { flex-wrap: wrap; }
-        }
-        /*
-         * The divider and the grid's bottom row take the shape of BB's header: a
-         * hairline that is part of the row's height, and buttons centered in a
-         * full-height row below it, overhanging the bottom by a pixel.
-         * BB 0.43 draws the divider after the navigation, and later versions
-         * inside it after the grid; either way it goes above the grid.
-         */
-        > [data-testid="app-sidebar-navigation-divider"] {
-          order: 1;
-          margin-bottom: 0;
-        }
-        > [data-testid="sidebar-navigation-region"] {
-          order: 2;
-          display: flex;
-          flex-direction: column;
-
-          [data-testid="navigation-divider"] {
-            order: -1;
-            margin-bottom: 0;
-          }
-
-          /* The tiles take the thumb-sized buttons' size, 44px. */
-          [data-dia-sidebar] {
-            --dia-sidebar-button-size: var(--phone-layout-button-size);
-            --dia-sidebar-icon-size: var(--phone-layout-icon-size);
-          }
-
-          [data-testid="plugin-nav-sidebar-items"]:not([data-sidebar-navigation-customize-mode="true"]) {
-            --dia-sidebar-row-inset: calc((var(--phone-layout-bar-height) - var(--dia-sidebar-button-size)) / 2);
-            gap: var(--phone-layout-button-gap);
-            padding-top: var(--dia-sidebar-row-inset);
-            padding-bottom: calc(var(--dia-sidebar-row-inset) - 1px);
-
-            /*
-             * Tiles that don't fit in one row at that size narrow, down to BB's
-             * size, so the arrow stays at the row's end.
-             */
-            > :is([data-sidebar-navigation-item], [data-testid="sidebar-navigation-more-row"]) {
-              flex: 1 1 calc(var(--spacing, 0.25rem) * 9);
-              max-width: var(--dia-sidebar-button-size);
-            }
-
-            :is([data-sidebar-navigation-item] > button, [data-testid="sidebar-navigation-more-trigger"]) {
-              width: 100%;
-            }
-
-            /*
-             * The "…" at the end of the tiles becomes an arrow toward the rest of
-             * the navigation, in the tone UI Polish gives the other tiles' icons.
-             */
-            [data-testid="sidebar-navigation-more-trigger"] {
-              > svg {
-                display: none;
-              }
-
-              &::before {
-                content: "";
-                flex-shrink: 0;
-                width: var(--dia-sidebar-icon-size);
-                height: var(--dia-sidebar-icon-size);
-                background-color: var(--subtle-foreground);
-                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18'/%3E%3C/svg%3E")
-                  center / contain no-repeat;
-              }
-            }
-          }
-        }
-
-        /* The thread list fades out under the footer, now at its top edge. */
-        > [data-sidebar="footer"] > [data-overflow-fade] {
-          top: 100%;
-          transform: scaleY(-1);
-        }
-      }
-    }
-
-    /*
-     * Phones drop the row with the back and forward buttons from every sidebar:
-     * the app's, Settings', Plugins' and Skills'.
-     */
-    [data-testid$="-sidebar-top-reserve-row"] { display: none; }
   }
-}
 
-/*
- * A phone's thread bar always has no title. BB 0.43 puts the title right in
- * its box, and later versions in a paragraph there.
- */
-@media (width < 48rem) and (pointer: coarse) {
-  html header
-    > [data-testid="app-page-header-content-row"]
-    div:has(> .bb-thread-title, > p > .bb-thread-title) {
-    display: none;
+  [data-testid="app-sidebar-body"] {
+    > [data-testid="app-sidebar-top-reserve-row"] {
+      order: 1;
+    }
+
+    > [data-sidebar="footer"] {
+      order: 2;
+    }
+  }
+
+  /*
+   * Back and forward leave every sidebar: the app's, where New thread stays,
+   * and Settings', Plugins' and Skills', where nothing else is.
+   */
+  [data-testid$="-sidebar-top-reserve-row"] {
+    :is(button[aria-label^="Go back"], button[aria-label^="Go forward"], [data-sidebar-history-shortcut-hints]) {
+      display: none;
+    }
+
+    &:not(:has(button[aria-label^="New thread"])) {
+      display: none;
+    }
+  }
+
+  /*
+   * A picker's list in a sheet, such as the thread info panel's branches,
+   * takes the rows of BB's other sheets.
+   */
+  [data-persistent-drawer-content] .overflow-y-auto > button.w-full[class*="py-[0.3125rem]"] {
+    padding-block: calc(var(--spacing, 0.25rem) * 2);
+
+    & + & {
+      margin-top: calc(var(--spacing, 0.25rem) * 0.5);
+    }
+  }
+
+  @container style(--phone-layout-keyboard: 1) {
+    header:has(> [data-testid="app-page-header-content-row"]),
+    [data-testid="secondary-panel-shelf"]
+      aside
+      > :has(> [data-testid="thread-secondary-panel-top-chrome"]),
+    main > div:has(> [aria-label*="right panel"]) {
+      display: none;
+    }
+
+    main:has(> div > [aria-label*="right panel"]) {
+      padding-bottom: calc(var(--spacing, 0.25rem) * 4);
+    }
   }
 }

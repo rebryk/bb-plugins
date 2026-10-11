@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-superhuman",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -13,14 +13,18 @@
   },
   "homepage": "https://github.com/rebryk/bb-plugins/tree/main/superhuman#readme",
   "engines": {
-    "bb": ">=0.43.4",
-    "bbPluginSdk": ">=0.5.9"
+    "bb": ">=0.46.0",
+    "bbPluginSdk": ">=0.6.37"
   },
   "bb": {
     "name": "Superhuman",
-    "description": "Superhuman-style speed for BB: keyboard shortcuts, universal search, snoozed threads, a compact icon sidebar, a mobile layout with image zoom, terminal paste, and one-click server changes.",
+    "description": "Superhuman-style speed for BB: keyboard shortcuts and search in any layout, threads you snooze until a time you pick or until their agent needs you, a layout for phones, and a quieter interface.",
     "branding": {
-      "icon": "Zap"
+      "icon": "Zap",
+      "experimental_icons": {
+        "moon": "./assets/moon.svg",
+        "moon-filled": "./assets/moon-filled.svg"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx",
@@ -29,18 +33,15 @@
   "scripts": {
     "build": "bb plugin build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:browser": "node scripts/test-accessory-fit.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@hugeicons/core-free-icons": "^4.3.4",
-    "@hugeicons/react": "^1.1.6",
-    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-slot": "^1.3.0",
     "cmdk": "^1.1.1",
-    "zod": "^4.3.6"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.5.29",
+    "@get-bb/plugin-sdk": "0.6.37",
     "@pierre/diffs": "^1.2.9",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-context-menu": "^2.3.3",
@@ -64,7 +65,6 @@
     "cron-parser": "^5.5.0",
     "hono": "^4.11.9",
     "jsdom": "^27.0.1",
-    "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sonner": "^1.7.4",

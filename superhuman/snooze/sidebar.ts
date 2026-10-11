@@ -6,6 +6,10 @@ export function sidebarThreadIds(): string[] {
   );
   for (const element of elements) {
     if (element.closest("[data-sidebar-overflow='true']")) continue;
+    // Rows in a collapsed group stay in the DOM; BB skips them too.
+    if (element.checkVisibility?.({ visibilityProperty: true }) === false) {
+      continue;
+    }
     if (element instanceof HTMLAnchorElement) {
       if (element.dataset.sidebarThreadId) {
         ids.push(element.dataset.sidebarThreadId);

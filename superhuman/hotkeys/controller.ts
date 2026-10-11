@@ -8,7 +8,9 @@ type Bindings = Awaited<
 type Modifier = "ctrlKey" | "altKey" | "shiftKey" | "metaKey";
 type Chord = Record<Modifier, boolean> & { key: string };
 
-const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+// BB's own reading of the platform, for the shortcuts it saves per platform.
+const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const windows = !mac && /Win|windows|win32/.test(navigator.platform);
 const desktop = !!Reflect.get(window, "bbDesktop");
 const SYMBOLS: Record<Modifier, string> = mac
   ? { ctrlKey: "⌃", altKey: "⌥", shiftKey: "⇧", metaKey: "⌘" }
@@ -16,8 +18,8 @@ const SYMBOLS: Record<Modifier, string> = mac
 const MODIFIERS = Object.keys(SYMBOLS) as Modifier[];
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta", "OS"]);
 const NONE = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
-// Hints wait for a modifier held alone this long, so a chord such as ⌘1 or a
-// capital letter typed with Shift does no hint work at all.
+// ⇧ and ⌥ also type text, so their hints wait for the modifier held alone this
+// long, and a capital letter typed with Shift does no hint work at all.
 export const HOLD_MS = 300;
 const PANEL =
   ':is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"])';
@@ -36,7 +38,7 @@ const CONTROLS = [
 ];
 const CONTROL = CONTROLS.join(", ");
 const MODEL = CONTROLS[1];
-const [KEY, MODE, ANCHOR] = ["key", "mode", "anchor"].map(
+const [KEY, MODE, ANCHOR, HINTS] = ["key", "mode", "anchor", "hints"].map(
   (name) => `data-superhuman-${name}`,
 );
 
@@ -47,10 +49,13 @@ let running = false;
 let mods: Record<Modifier, boolean> = NONE;
 let held = false;
 let holding = 0;
+let chorded = false;
 let tagged: HTMLElement[] = [];
 let frame = 0;
 let dismissed: Element | null = null;
-let threadActions: { snooze(): void; archive(): void } | undefined;
+let unhiding = 0;
+/** Each returns whether it ran; Snooze can be off. */
+let threadActions: { snooze(): boolean; archive(): boolean } | undefined;
 
 /** Receives the plugin settings and BB's resolved keybindings. */
 export function update(next: {
@@ -138,6 +143,8 @@ function binding(command: string): Chord | undefined {
 function chordFor(item: Bindings[number]): Chord | undefined {
   const context: Record<string, boolean> = {
     macPlatform: mac,
+    windowsPlatform: windows,
+    linuxPlatform: !mac && !windows,
     webSurface: !desktop,
     desktopSurface: desktop,
   };
@@ -200,9 +207,13 @@ function hints(pills: Map<HTMLElement, string>) {
     "[aria-keyshortcuts]",
   ))
     add(element, parse(element.getAttribute("aria-keyshortcuts")!));
-  // BB labels the rows itself while its own hints show, and split panes take the numbers.
+  // BB labels the rows itself while its own hints show, and split panes take
+  // the numbers. Like BB, count only the rows on show: a collapsed group keeps
+  // its rows in the DOM.
   const rows = [...document.querySelectorAll<HTMLElement>(ROW)].filter(
-    (row) => !row.closest('[data-sidebar-overflow="true"]'),
+    (row) =>
+      !row.closest('[data-sidebar-overflow="true"]') &&
+      row.checkVisibility?.({ visibilityProperty: true }) !== false,
   );
   if (rows.some((row) => row.hasAttribute("aria-keyshortcuts"))) return;
   if (document.querySelectorAll("[data-split-pane-id]").length > 1) return;
@@ -219,6 +230,7 @@ function paint() {
   const tabs = items.length > 0 && !!setup?.open?.matches(MODEL);
   const pills = new Map(items.map((item, i) => [item, `${(i + 1) % 10}`]));
   if (!pills.size) hints(pills);
+  hideNativeHints(!items.length && pills.size > 0);
   // Measure every host before marking any, so one layout serves them all.
   const marks = [...pills].map(([element, key]) => {
     const host =
@@ -249,6 +261,26 @@ function paint() {
   tagged = hosts;
 }
 
+/**
+ * BB's own hints follow 700 ms later beside many of the same controls, so
+ * app.css hides them while pills show. BB clears them on its next render, after
+ * the frame that clears the pills, so they stay hidden a moment longer; that
+ * also covers the wait before the pills return under a modifier still held.
+ */
+function hideNativeHints(hide: boolean) {
+  const root = document.documentElement;
+  if (hide) {
+    clearTimeout(unhiding);
+    unhiding = 0;
+    if (!root.hasAttribute(HINTS)) root.setAttribute(HINTS, "");
+  } else if (root.hasAttribute(HINTS) && !unhiding) {
+    unhiding = window.setTimeout(() => {
+      unhiding = 0;
+      root.removeAttribute(HINTS);
+    }, HOLD_MS + 100);
+  }
+}
+
 /** Sets an attribute only when it changes, since each write restyles. */
 function mark(element: Element, name: string, value: string) {
   if (element.getAttribute(name) !== value) element.setAttribute(name, value);
@@ -265,11 +297,22 @@ function schedule() {
   });
 }
 
-/** Hints show once the modifiers stay down, with no other key, for HOLD_MS. */
-function wait() {
+/**
+ * A fresh ⌘ or ⌃, BB's own hint keys, shows hints at once. Any other key under
+ * a modifier, such as the 1 of ⌘1, hides them until the modifiers are released,
+ * so the thread switch or copy it starts does no hint work; until then, as for
+ * ⇧ and ⌥, which also type text, hints show once the modifiers stay down with
+ * no other key for HOLD_MS. AltGr, which Windows reports as Ctrl+Alt, types
+ * text too.
+ */
+function wait(event: KeyboardEvent | null) {
   clearTimeout(holding);
-  held = false;
-  if (MODIFIERS.some((key) => mods[key]))
+  const down = MODIFIERS.some((key) => mods[key]);
+  if (!down) chorded = false;
+  else if (event && !MODIFIER_KEYS.has(event.key)) chorded = true;
+  const altGraph = !!event?.getModifierState("AltGraph");
+  held = down && !chorded && (mods.metaKey || mods.ctrlKey) && !altGraph;
+  if (!held && down)
     holding = window.setTimeout(() => {
       held = true;
       paint();
@@ -286,7 +329,7 @@ function keydown(event: KeyboardEvent) {
   }
   // Windows repeats a held modifier, which changes nothing.
   if (event.repeat && MODIFIER_KEYS.has(event.key)) return;
-  wait();
+  wait(event);
   // Typing changes no pill before the next frame, so paint at most once a frame.
   schedule();
 }
@@ -304,8 +347,7 @@ export function handle(event: KeyboardEvent): boolean {
       || editable(event.target) || panels().length) return false;
     if (key === "/") return search();
     if (!threadActions) return false;
-    threadActions[key === "h" ? "snooze" : "archive"]();
-    return true;
+    return threadActions[key === "h" ? "snooze" : "archive"]();
   }
   if (key !== "escape" && !/^[0-9]$/.test(key)) return false;
   const setup = composer();
@@ -366,7 +408,7 @@ function search() {
 
 function release(event: Event) {
   mods = event instanceof KeyboardEvent ? event : NONE;
-  wait();
+  wait(event instanceof KeyboardEvent ? event : null);
   schedule();
 }
 
@@ -413,8 +455,12 @@ export function start({ signal }: { signal: AbortSignal }) {
     frame = 0;
     clearTimeout(holding);
     held = false;
+    chorded = false;
     tagged.forEach(clear);
     tagged = [];
+    clearTimeout(unhiding);
+    unhiding = 0;
+    document.documentElement.removeAttribute(HINTS);
     mods = NONE;
     dismissed = null;
   };

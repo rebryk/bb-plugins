@@ -1,11 +1,9 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import registerSnoozeServer from "./snooze/server";
-import registerThreadEtaServer from "./thread-eta/server";
-import { experimentalSettings } from "./settings/options";
 
 export default async function plugin(bb: BbPluginApi) {
-  // The browser reads these: the keyboard features in hotkeys/controller.ts,
-  // the rest in their features' app.tsx. Thread ETA's server reads its own.
+  // The browser reads these: Shortcuts in hotkeys/controller.ts, the rest in
+  // their features' app.tsx. Snooze's server reads its own.
   const settings = bb.settings.define({
     threadShortcuts: {
       type: "boolean",
@@ -21,10 +19,11 @@ export default async function plugin(bb: BbPluginApi) {
         "Search commands, threads and snoozed threads in both English and Russian keyboard layouts.",
       default: true,
     },
-    phoneLayout: {
+    snooze: {
       type: "boolean",
-      label: "Mobile Layout",
-      description: "Mobile bars and gestures, haptics, and a fixed interface scale. Images still zoom.",
+      label: "Snooze",
+      description:
+        "Hide a thread until a time you pick or until its agent needs you. Turning it off brings snoozed threads back.",
       default: true,
     },
     archiveButton: {
@@ -33,8 +32,27 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
-    ...experimentalSettings,
+    phoneLayout: {
+      type: "boolean",
+      label: "Mobile Layout",
+      description:
+        "Mobile bars and gestures, haptics, and a fixed interface scale. Images still zoom.",
+      default: true,
+    },
+    hideTitleBar: {
+      type: "boolean",
+      label: "Hide Title Bar",
+      description:
+        "In the macOS desktop app, no top row with back, forward, and the sidebar and right panel buttons. Their shortcuts still work.",
+      default: false,
+    },
+    uiPolish: {
+      type: "boolean",
+      label: "UI Polish",
+      description:
+        "Icons in one tone, a thread bar without the external editor picker, and fixes for Safari and Tesla.",
+      default: true,
+    },
   });
-  await registerSnoozeServer(bb);
-  await registerThreadEtaServer(bb, settings);
+  await registerSnoozeServer(bb, settings);
 }

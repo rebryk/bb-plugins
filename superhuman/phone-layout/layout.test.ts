@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { startKeyboardSwipe } from "./keyboard";
 import { startPhoneLayout } from "./layout";
-import { startSettingsSidebar } from "./settings";
 import { startPanelSlide } from "./slide";
 
 // jsdom has no matchMedia; a test flips `matches` to leave the phone.
@@ -51,8 +50,15 @@ function swipe(element: Element, x: number, y: number) {
   }
 }
 
-it("marks the page for app.css until it stops", () => {
+it("marks the page for app.css while it is a phone's, until it stops", () => {
   const stop = startPhoneLayout(document);
+  expect(document.documentElement.dataset.phoneLayout).toBe("");
+  // A screen that turns or a window that widens leaves the phone layout.
+  phone.matches = false;
+  phone.dispatchEvent(new Event("change"));
+  expect(document.documentElement.dataset.phoneLayout).toBeUndefined();
+  phone.matches = true;
+  phone.dispatchEvent(new Event("change"));
   expect(document.documentElement.dataset.phoneLayout).toBe("");
   stop();
   expect(document.documentElement.dataset.phoneLayout).toBeUndefined();
@@ -129,45 +135,29 @@ function go(path: string) {
   if (!path.startsWith("/settings")) list?.remove();
 }
 
-it("opens the sidebar each time a phone enters Settings", async () => {
-  document.body.insertAdjacentHTML(
-    "beforeend",
-    `<div data-sidebar="panel" data-state="closed"></div>
-     <button data-sidebar="trigger"></button>`,
-  );
-  const open = vi.fn();
-  document
-    .querySelector("[data-sidebar=trigger]")!
-    .addEventListener("click", open);
-  const stop = startSettingsSidebar(document);
-
-  go("/settings");
-  await settle();
-  expect(open).toHaveBeenCalledTimes(1);
-
-  // A section of Settings leaves the sidebar to BB.
-  go("/settings/providers");
-  await settle();
-  expect(open).toHaveBeenCalledTimes(1);
-
-  go("/");
-  await settle();
-  go("/settings/general");
-  await settle();
-  expect(open).toHaveBeenCalledTimes(2);
-
-  go("/");
-  await settle();
-  phone.matches = false;
-  go("/settings");
-  await settle();
-  expect(open).toHaveBeenCalledTimes(2);
-
-  stop();
-  phone.matches = true;
-  go("/");
-  await settle();
-  go("/settings");
-  await settle();
-  expect(open).toHaveBeenCalledTimes(2);
+it("marks the page while a field has the keyboard open, as on Android", () => {
+  const view = Object.assign(new EventTarget(), { height: 800 });
+  vi.stubGlobal("visualViewport", view);
+  window.matchMedia = vi.fn((query: string) =>
+    query.includes("orientation") ? { matches: false } : phone,
+  ) as unknown as typeof window.matchMedia;
+  const open = () => document.documentElement.hasAttribute("data-phone-keyboard");
+  const stop = startPhoneLayout(document);
+  try {
+    // A field with the focus but no keyboard yet, as with a hardware keyboard.
+    message().focus();
+    expect(open()).toBe(false);
+    view.height = 420;
+    view.dispatchEvent(new Event("resize"));
+    expect(open()).toBe(true);
+    message().blur();
+    expect(open()).toBe(false);
+    // A short viewport without a field, as with the browser's own panels.
+    view.dispatchEvent(new Event("resize"));
+    expect(open()).toBe(false);
+  } finally {
+    stop();
+    vi.unstubAllGlobals();
+  }
+  expect(open()).toBe(false);
 });

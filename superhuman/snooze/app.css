@@ -1,21 +1,4 @@
-/* The host reserves space for Archive and its menu on hover. Snooze adds one
-   more 28px control and a 2px gap; keep long titles clear of all three.
-   row-button.ts marks the title's box. */
-@media (width >= 48rem), (pointer: fine) {
-  /* The row marks itself for a style query: `row:has(…) > title` would restyle
-     much of the page on every change. */
-  :root
-    .bb-sidebar-hover-actions-row:is(
-      :hover,
-      :has(:focus-visible),
-      :has(.bb-sidebar-hover-actions[data-sidebar-hover-actions-open="true"])
-    ) {
-    --superhuman-snooze-room: 1;
-  }
-
-  @container style(--superhuman-snooze-room: 1) {
-    :root .bb-sidebar-hover-actions-row > [data-superhuman-snooze-title] {
-      padding-right: calc(var(--spacing, 0.25rem) * 15);
-    }
-  }
+/* A button that a setting turns off leaves an empty group, which takes no gap in the header. */
+[data-bb-plugin="superhuman"] > span[role="group"]:empty {
+  display: none;
 }

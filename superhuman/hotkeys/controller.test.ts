@@ -49,40 +49,83 @@ it("numbers a new thread's setup controls unless thread shortcuts are off", () =
   expect(pills()).toEqual([]);
 });
 
-it("shows the remaining keys under a held modifier unless hints are off", () => {
+it("shows the remaining keys at once under ⌘ unless hints are off", () => {
   vi.useFakeTimers();
   window.dispatchEvent(
     new KeyboardEvent("keyup", { key: "Shift", metaKey: true }),
   );
-  vi.advanceTimersByTime(HOLD_MS - 1);
-  expect(pills()).toEqual([]);
-  vi.advanceTimersByTime(1);
+  vi.advanceTimersToNextFrame();
   expect(pills()).toEqual([["Switch model", "Shift + M"]]);
   update({ settings: { threadShortcuts: false } });
   expect(pills()).toEqual([]);
   vi.useRealTimers();
 });
 
-it("waits for the modifier alone, so chords and typing skip the hints", () => {
+it("hides BB's own hints while the pills show and a moment after they go", () => {
+  vi.useFakeTimers();
+  const hidden = () =>
+    document.documentElement.hasAttribute("data-superhuman-hints");
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift", metaKey: true }));
+  vi.advanceTimersByTime(HOLD_MS);
+  expect(hidden()).toBe(true);
+  // Releasing the modifier clears the pills at once; BB clears its own hints
+  // on its next render, so they stay hidden until then.
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "Meta" }));
+  vi.advanceTimersToNextFrame();
+  expect(pills().some(([text]) => text === "Switch model")).toBe(false);
+  vi.advanceTimersByTime(HOLD_MS + 99);
+  expect(hidden()).toBe(true);
+  vi.advanceTimersByTime(1);
+  expect(hidden()).toBe(false);
+  vi.useRealTimers();
+});
+
+it("hides ⌘'s hints for a chord, so ⌘1 does no hint work, until ⌘ rests alone", () => {
   vi.useFakeTimers();
   const key = (init: KeyboardEventInit) =>
     window.dispatchEvent(new KeyboardEvent("keyup", init));
+  const hints = () => pills().filter(([text]) => text === "Switch model");
   key({ key: "Shift", metaKey: true });
-  vi.advanceTimersByTime(HOLD_MS - 100);
-  // Another key under the modifier, such as the 1 of ⌘1, starts the wait over.
+  vi.advanceTimersToNextFrame();
+  expect(hints()).toEqual([["Switch model", "Shift + M"]]);
+  // The 1 of ⌘1 switches threads; the hints stay off while BB redraws.
   key({ key: "1", metaKey: true });
-  vi.advanceTimersByTime(HOLD_MS - 100);
-  expect(pills()).toEqual([]);
-  vi.advanceTimersByTime(100);
-  expect(pills()).toEqual([["Switch model", "Shift + M"]]);
+  vi.advanceTimersToNextFrame();
+  expect(hints()).toEqual([]);
+  vi.advanceTimersByTime(HOLD_MS - 20);
+  expect(hints()).toEqual([]);
+  vi.advanceTimersByTime(20);
+  expect(hints()).toEqual([["Switch model", "Shift + M"]]);
+  // Released and pressed again, ⌘ shows them at once.
   key({ key: "Meta" });
-  vi.advanceTimersByTime(HOLD_MS);
+  vi.advanceTimersToNextFrame();
   expect(pills()).toEqual([
     ["Project", "1"],
     ["Model", "2"],
     ["Machine", "3"],
     ["Branch", "4"],
   ]);
+  key({ key: "Shift", metaKey: true });
+  vi.advanceTimersToNextFrame();
+  expect(hints()).toEqual([["Switch model", "Shift + M"]]);
+  vi.useRealTimers();
+});
+
+it("waits for ⇧ held alone, so typing capitals skips the hints", () => {
+  vi.useFakeTimers();
+  const key = (init: KeyboardEventInit) =>
+    window.dispatchEvent(new KeyboardEvent("keyup", init));
+  // A typed prompt, so the new thread's numbers make way for the hints.
+  document.querySelector("[contenteditable]")!.textContent = "Fix";
+  const hints = () => pills().filter(([text]) => text === "Switch model");
+  key({ key: "a", shiftKey: true });
+  vi.advanceTimersByTime(HOLD_MS - 100);
+  // Another capital starts the wait over.
+  key({ key: "b", shiftKey: true });
+  vi.advanceTimersByTime(HOLD_MS - 1);
+  expect(hints()).toEqual([]);
+  vi.advanceTimersByTime(1);
+  expect(hints()).toEqual([["Switch model", "Meta + M"]]);
   vi.useRealTimers();
 });
 
@@ -105,7 +148,7 @@ it.each([
   ["ا", "KeyH", "snooze"], ["у", "KeyE", "archive"], ["e", "KeyE", "archive"],
   ["h", "", "snooze"],
 ] as const)("runs %s at %s using the physical key", (key, code, action) => {
-  const actions = { snooze: vi.fn(), archive: vi.fn() };
+  const actions = { snooze: vi.fn(() => true), archive: vi.fn(() => true) };
   update({ threadActions: actions });
   expect(handle(press(key, code))).toBe(true);
   expect(actions[action]).toHaveBeenCalledOnce();
@@ -130,7 +173,7 @@ it("opens search from the slash position in Russian", () => {
 });
 
 it("preserves typing, composition, repeats, modifiers, dialogs and disabled shortcuts", () => {
-  const actions = { snooze: vi.fn(), archive: vi.fn() };
+  const actions = { snooze: vi.fn(() => true), archive: vi.fn(() => true) };
   update({ threadActions: actions });
   expect(handle(press("h", "KeyJ"))).toBe(false);
   for (const init of [
@@ -177,4 +220,48 @@ it("normalizes registered modifier shortcuts, preserving custom character bindin
   const custom = press("л", "KeyK", { ctrlKey: true });
   handle(custom);
   expect(custom.key).toBe("л");
+});
+
+it("uses the shortcut BB saved for this platform", () => {
+  // jsdom reports no platform, which BB reads as Linux.
+  type Platform = "windowsPlatform" | "macPlatform" | "linuxPlatform";
+  const on = (platform: Platform, key: string) => ({
+    ...binding("thread.search", key),
+    when: { all: [platform], none: [] },
+  });
+  update({ bindings: [on("windowsPlatform", "f"), on("macPlatform", "j"), on("linuxPlatform", "g")] });
+  const receive = vi.fn();
+  document.body.addEventListener("keydown", receive, { once: true });
+  expect(handle(press("/", "Slash"))).toBe(true);
+  expect(receive.mock.calls[0]![0].key).toBe("g");
+});
+
+it("numbers only the sidebar rows on show, as BB does", () => {
+  vi.useFakeTimers();
+  const jump = (n: number) => ({
+    command: `thread.jump.${n}`, desktopOnly: false, when: { all: [], none: [] },
+    shortcut: { key: `${n}`, mod: false, control: true, meta: false, shift: false, alt: false },
+  });
+  update({ bindings: [jump(1), jump(2)] as never });
+  const nav = document.createElement("nav");
+  nav.innerHTML = `
+    <div data-sidebar-rename-row><a data-sidebar-thread-shortcut-target>Collapsed</a><span></span></div>
+    <div data-sidebar-rename-row><a data-sidebar-thread-shortcut-target>First</a><span></span></div>
+    <div data-sidebar-rename-row><a data-sidebar-thread-shortcut-target>Second</a><span></span></div>`;
+  document.body.append(nav);
+  // jsdom has no layout; a browser answers this from the rendered box.
+  nav.querySelector("a")!.checkVisibility = () => false;
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift", ctrlKey: true }));
+  vi.advanceTimersByTime(HOLD_MS);
+  expect(pills().filter(([text]) => text !== "Switch model")).toEqual([
+    ["First", "1"],
+    ["Second", "2"],
+  ]);
+  nav.remove();
+  vi.useRealTimers();
+});
+
+it("lets H through when Snooze is off", () => {
+  update({ threadActions: { snooze: () => false, archive: () => true } });
+  expect(handle(press("h", "KeyH"))).toBe(false);
 });

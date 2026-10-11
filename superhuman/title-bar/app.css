@@ -1,0 +1,66 @@
+/*
+ * BB's desktop app on macOS frames the page under a 48px row with back and
+ * forward, the sidebar's button and the right panel's. With Hide Title Bar on,
+ * the row goes and the frame starts at its 12px lip; the keys for those
+ * buttons still work. Other platforms and the browser have no such row.
+ */
+html[data-superhuman-no-title-bar] {
+  [data-testid="app-window-title-bar"] {
+    display: none;
+  }
+
+  [data-framed] {
+    padding-top: var(--bb-window-frame-lip);
+    --bb-window-frame-top: var(--bb-window-frame-lip);
+
+    /* The row was where a window is dragged; the lip above the frame is now. */
+    &::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto;
+      height: var(--bb-window-frame-lip);
+      app-region: drag;
+      -webkit-app-region: drag;
+    }
+  }
+
+  /*
+   * macOS draws the window's buttons 18px from the top left corner, over what
+   * starts there now. BB's row kept 84px for them, except in full screen,
+   * where they hide; the row, still in the page, tells which.
+   */
+  &:has([data-testid="app-window-title-bar"][class*="pl-[84px]"]) {
+    --superhuman-traffic-lights: 1;
+  }
+
+  @container style(--superhuman-traffic-lights: 1) {
+    /* The rail's Home starts below the buttons, and the room above it drags the window. */
+    [data-testid="app-nav-rail"]:is(*, superhuman-pad) {
+      padding-top: calc(var(--spacing, 0.25rem) * 4);
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto;
+        height: calc(var(--spacing, 0.25rem) * 6);
+        app-region: drag;
+        -webkit-app-region: drag;
+      }
+    }
+
+    /*
+     * Beside them, New thread at the sidebar's top, or a page's title while
+     * the sidebar is closed, starts where BB's row started its buttons.
+     */
+    [data-testid="app-sidebar-top-reserve-row"]:is(*, superhuman-pad) {
+      padding-left: calc(84px - var(--bb-sidebar-control-size, 28px) - 24px - 1px - var(--spacing, 0.25rem) * 2);
+    }
+
+    [data-state="collapsed"]
+      ~ main
+      header
+      > [data-testid="app-page-header-content-row"]:is(*, superhuman-pad) {
+      padding-left: calc(84px - var(--bb-sidebar-control-size, 28px) - 24px - var(--spacing, 0.25rem) * 4);
+    }
+  }
+}

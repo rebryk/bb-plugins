@@ -3,7 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { installPaletteSearch } from "./palette";
 
 let stop: () => void;
-let input: HTMLInputElement, list: HTMLElement, choose: ReturnType<typeof vi.fn>;
+let input: HTMLInputElement, list: HTMLElement;
+let choose: ReturnType<typeof vi.fn<(id: string) => void>>;
 function nativeRow(id: string, title: string) {
   const row = document.createElement("div");
   row.setAttribute("role", "option");

@@ -96,3 +96,17 @@ it("leaves normal images and taps alone, and resets each newly opened preview", 
   expect(touch(next, "touchmove", [[100, 150], [300, 150]])).toBe(false);
   expect(next.style.transform).toBe("");
 });
+
+it("starts the next image unzoomed when Previous or Next swaps the preview's image", () => {
+  const image = preview();
+  stop = lockZoom(document);
+  touch(image, "touchstart", [[150, 150], [250, 150]]);
+  touch(image, "touchmove", [[125, 150], [275, 150]]);
+  touch(image, "touchend", []);
+  expect(image.style.transform).toBe("translate(0px, 0px) scale(1.5)");
+  image.dispatchEvent(new Event("load"));
+  expect(image.style.transform).toBe("");
+  touch(image, "touchstart", [[150, 150], [250, 150]]);
+  touch(image, "touchmove", [[125, 150], [275, 150]]);
+  expect(image.style.transform).toBe("translate(0px, 0px) scale(1.5)");
+});

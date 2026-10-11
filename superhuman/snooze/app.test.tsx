@@ -7,9 +7,9 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import type { PluginThreadActionTarget } from "@get-bb/plugin-sdk/app";
 import {
   loadPluginApp,
-  mountPluginContentScripts,
   renderSlot,
   type CapturedPluginApp,
 } from "@get-bb/plugin-sdk/testing/app";
@@ -91,7 +91,6 @@ async function openDialog(
   command: "snooze-thread" | "show-snoozed-threads",
   list: { snoozes: Snooze[]; last: unknown },
   rpc: Record<string, (input: unknown) => unknown> = {},
-  settings: Record<string, boolean> = {},
 ) {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -100,7 +99,6 @@ async function openDialog(
     app.appOverlays[0]!,
     {},
     {
-      settings,
       context: { threadId: "t2", projectId: "p1" },
       rpc: {
         listSnoozes: () => list,
@@ -131,8 +129,26 @@ function runCommand(app: CapturedPluginApp, command: string) {
 }
 
 describe("registrations", () => {
-  it("adds the header moon, the dialogs, and two commands without keys", async () => {
+  it("adds the menu action, the header moon, the dialogs, and two commands without keys", async () => {
     const app = await loadPluginApp(asPluginApp(() => import("./app")));
+    // Before Archive, which BB adds to the same group without an order.
+    expect(
+      app.threadActions.map(({ id, title, icon, group, order }) => ({
+        id,
+        title,
+        icon,
+        group,
+        order,
+      })),
+    ).toEqual([
+      {
+        id: "snooze",
+        title: "Snooze",
+        icon: "superhuman/moon",
+        group: "4_lifecycle",
+        order: 10,
+      },
+    ]);
     expect(app.threadHeaderActions.map((action) => action.title)).toEqual([
       "Snooze thread",
     ]);
@@ -157,35 +173,75 @@ describe("registrations", () => {
   });
 });
 
-it("opens Snooze for a redrawn sidebar row without navigating, and cleans up", async () => {
-  const { app, slot } = await openDialog("snooze-thread", {
-    snoozes: [],
-    last: null,
+/** A thread as thread menus describe it. */
+function target(
+  id: string,
+  overrides: Partial<PluginThreadActionTarget> = {},
+): PluginThreadActionTarget {
+  return {
+    id,
+    projectId: "p1",
+    parentThreadId: null,
+    archivedAt: null,
+    pinnedAt: null,
+    sectionId: null,
+    isUnread: false,
+    status: "idle",
+    environment: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Renders the dialogs with the menu action's data, as BB renders the action
+ * once for the app, and returns the action BB would show for a thread.
+ */
+async function threadMenu(list: { snoozes: Snooze[]; last: unknown }) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const app = await loadPluginApp(asPluginApp(() => import("./app")));
+  const registration = app.threadActions[0]!;
+  const Overlay = app.appOverlays[0]!.component;
+  let data: unknown;
+  function Menu() {
+    data = registration.useData!({ threadIds: ["t1"] });
+    return <Overlay />;
+  }
+  const slot = renderSlot(
+    { component: Menu },
+    {},
+    {
+      context: { threadId: "t2", projectId: "p1" },
+      rpc: {
+        listSnoozes: () => list,
+        snooze: () => ({ title: "Fix the login bug", previous: null, hidden: ["t1"] }),
+        unsnooze: () => null,
+      },
+    },
+  );
+  await vi.waitFor(() => {
+    expect(slot.inspection.rpcCalls).toContainEqual({
+      method: "listSnoozes",
+      input: null,
+    });
   });
-  fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
-  sidebar(`<div data-sidebar-rename-row>
-    <a data-sidebar-thread-id="t1" data-sidebar-thread-shortcut-target></a>
-    <span data-sidebar-row-controls><button aria-label="Archive thread"></button></span>
-  </div>`);
-  const scripts = await mountPluginContentScripts(app, {
-    pluginId: "superhuman",
-  });
-  try {
-    const archive = screen.getByRole("button", { name: "Archive thread" });
-    expect(archive.previousElementSibling).toBe(
-      screen.getByRole("button", { name: "Snooze thread" }),
-    );
-    // app.css makes room for the button in the box that holds the title.
-    expect(document.querySelector("[data-superhuman-snooze-title]")).toBe(
-      document.querySelector("[data-sidebar-thread-id]")!.parentElement,
-    );
-    // BB replaces the controls when a row leaves and re-enters the viewport.
-    archive.parentElement!.replaceChildren(archive.cloneNode());
-    const button = await screen.findByRole("button", { name: "Snooze thread" });
-    expect(
-      screen.getAllByRole("button", { name: "Snooze thread" }),
-    ).toHaveLength(1);
-    fireEvent.click(button);
+  const action = (thread: PluginThreadActionTarget) =>
+    registration.item({
+      thread,
+      data,
+      sdk: undefined as never,
+      navigate: undefined as never,
+    });
+  return { slot, action };
+}
+
+describe("thread menus", () => {
+  it("opens the picker for that thread and snoozes it without navigating", async () => {
+    const { slot, action } = await threadMenu({ snoozes: [], last: null });
+    const snooze = action(target("t1"))!;
+    expect(snooze).toMatchObject({ label: "Snooze", icon: "superhuman/moon" });
+    expect(snooze.detail).toBeUndefined();
+    act(() => void snooze.run({ requestRename: () => {} }));
     fireEvent.click(await screen.findByText("Tomorrow"));
     await vi.waitFor(() => {
       expect(slot.inspection.rpcCalls).toContainEqual({
@@ -198,14 +254,49 @@ it("opens Snooze for a redrawn sidebar row without navigating, and cleans up", a
       });
     });
     expect(slot.inspection.navigateCalls).toEqual([]);
-  } finally {
-    await scripts.lifecycle.dispose();
-  }
-  expect(document.querySelector("[data-superhuman-snooze-button]")).toBeNull();
-  expect(document.querySelector("[data-superhuman-snooze-title]")).toBeNull();
+  });
+
+  it("wakes a snoozed thread and says when it would wake", async () => {
+    const until = new Date(2026, 8, 27, 9).getTime();
+    const { slot, action } = await threadMenu({
+      snoozes: [{ threadId: "t1", title: "Fix the login bug", until }],
+      last: null,
+    });
+    await vi.waitFor(() => {
+      expect(action(target("t1"))?.label).toBe("Unsnooze");
+    });
+    const unsnooze = action(target("t1"))!;
+    expect(unsnooze).toMatchObject({
+      detail: "Until tomorrow at 9:00 AM",
+      icon: "superhuman/moon-filled",
+    });
+    act(() => void unsnooze.run({ requestRename: () => {} }));
+    await vi.waitFor(() => {
+      expect(slot.inspection.rpcCalls).toContainEqual({
+        method: "unsnooze",
+        input: { threadId: "t1" },
+      });
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("leaves archived threads alone", async () => {
+    const { action } = await threadMenu({ snoozes: [], last: null });
+    expect(action(target("t1", { archivedAt: NOW }))).toBeNull();
+  });
 });
 
 describe("sidebar order", () => {
+  it("skips rows that aren't visible, as in a collapsed group", () => {
+    sidebar(`
+      <a data-sidebar-thread-shortcut-target data-sidebar-thread-id="t1"></a>
+      <a data-sidebar-thread-shortcut-target data-sidebar-thread-id="t2"></a>`);
+    // jsdom has no layout; a browser answers this from the rendered box.
+    const hidden = document.querySelector('[data-sidebar-thread-id="t1"]')!;
+    hidden.checkVisibility = () => false;
+    expect(sidebarThreadIds()).toEqual(["t2"]);
+  });
+
   it("reads rows and windowed placeholders, skipping the overflow", () => {
     sidebar(`
       <a data-sidebar-thread-shortcut-target data-sidebar-thread-id="t1"></a>
@@ -417,24 +508,6 @@ describe("snoozed threads", () => {
     ],
     last: null,
   };
-
-  it.each([true, false])("respects Universal Search = %s", async (enabled) => {
-    await openDialog(
-      "show-snoozed-threads",
-      list,
-      {},
-      { universalSearch: enabled },
-    );
-    const input = await screen.findByPlaceholderText<HTMLInputElement>(
-      "Search snoozed threads…",
-    );
-    fireEvent.change(input, { target: { value: "щту" } });
-    expect(input.value).toBe("щту");
-    expect(rows().length).toBe(enabled ? 1 : 0);
-    if (enabled) expect(rows()[0]).toContain("One");
-    fireEvent.change(input, { target: { value: "One" } });
-    expect(rows()).toHaveLength(1);
-  });
 
   it("lists the snoozes and opens one without waking it", async () => {
     const { slot } = await openDialog("show-snoozed-threads", list);

@@ -1,52 +1,55 @@
 # Superhuman
 
-Superhuman-style features for BB:
+Superhuman-style speed for BB:
 
-- **Shortcuts.** Shortcut hints on a held modifier; **/** searches, **H** snoozes,
-  **E** archives, and numbers open a new thread's menus, in any keyboard layout.
+- **Shortcuts.** Shortcut hints on a held modifier; **/** searches, **H**
+  snoozes, **E** archives, and numbers open a new thread's menus, in any
+  keyboard layout.
 - **Universal Search.** Find commands, threads, and snoozed threads using both
-  the typed query and its English/Russian keyboard equivalent. On by default.
-- **Snooze.** Hide a thread until a set time or until its agent needs you; use
-  the moon in its header or before Archive in the sidebar row.
+  the typed query and its English/Russian keyboard equivalent.
+- **Snooze.** Hide a thread until a time you pick or until its agent needs you,
+  from the moon in its header or any thread menu; **Show snoozed threads** lists
+  them.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
-- **Thread ETA.** The time left on an agent's background process counts down
-  at the end of its sidebar row until it runs out or the agent clears it.
-- **Code Copy.** Click or tap a code block or inline command in an agent's
-  reply to copy it. Always on; text selection still works.
-- **Preload Threads.** Load the tail of recent and newly completed threads in
-  the background. On by default; uses BB 0.44.0's cache and pauses when hidden.
-- **Dia Sidebar.** The sidebar's navigation as a compact grid of icons.
-- **Terminal Paste.** A Paste button for the terminal on phones and tablets.
-- **Server Switcher.** A **Change Server** button in the sidebar footer.
-- **Mobile Layout.** Bottom bars, gestures, and haptics on phones, with a fixed
-  interface scale and pinch-to-zoom images. Thread titles stay hidden on phones.
-- **UI Polish.** Icons in one tone, even menu rows, and a thread bar without
-  the git action or external editor picker.
+- **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
+  fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
+- **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
+  and the sidebar and right panel buttons; their shortcuts still work.
+- **UI Polish.** Icons in one tone and a thread bar without the external editor
+  picker, with fixes for Safari's layout and for a Tesla's keyboard.
 
-Settings include four main switches: **Shortcuts**, **Universal Search**,
-**Mobile Layout**, and **Archive Button**. **Experimental** contains
-**Thread ETA** and **Preload Threads**. All six are on by default.
+Settings have a switch for each, all on by default except Hide Title Bar.
+Turning Snooze off brings snoozed threads back.
 
 ## Install
 
-Needs bb 0.43.4 or later. Install the plugin on every server you open, since a
+Needs bb 0.46.0 or later. Install the plugin on every server you open, since a
 BB page loads only its own server's plugins.
 
-Hotkeys use physical key positions outside text inputs; modified BB shortcuts
-also accept their physical key when the typed character has no binding.
-Universal Search supports US English and Russian ЙЦУКЕН in both directions,
-keeps the input unchanged, and combines matches without duplicate rows. Turn it
-off with **Universal Search** in Superhuman's settings. Built-in command and
-thread search support is verified for BB 0.44.0 and disables itself on other
-versions; the snoozed-thread filter works independently. The built-in adapters
-read the palette's React row handlers and wrap its thread-search requests, so
-BB updates require another compatibility check.
+Shortcuts work on desktop, outside text fields, by key position, so **H** is
+**H** in a Russian layout too; BB's own modified shortcuts accept the key
+position as well when the typed character has no binding. While a modifier's
+hints show, BB's own hints stay hidden. Snooze sits before Archive in every
+thread menu. To snooze from a sidebar row in one click, add it in the row
+menu's **Customize row actions**.
 
-Preload Threads fetches up to four recent dialogue segments per thread, each
-starting with a user message. Older history loads normally when scrolling back.
-It keeps a bounded cache without marking threads read, uses BB's internal cache
-layout, and disables itself on unverified BB versions. Other features work on
-the versions listed above.
+On a phone, Mobile Layout moves BB's bars into cards at the bottom of the
+screen and the sidebar's navigation to its bottom, opens the sidebar and
+the right panel with swipes from the screen's edges, and hides the bars while
+the keyboard is open, leaving a terminal's row of keys above it. A swipe down a
+terminal hides the keyboard.
+
+UI Polish hides only the editor picker; **Show Git changes and Commit button**
+in BB's settings hides Commit. On a Tesla, whose browser reports a mouse, BB
+focuses a field only on a tap on it or a key press, so the car's keyboard stays
+down when a thread or a tab opens.
+
+Universal Search supports US English and Russian ЙЦУКЕН in both directions,
+keeps the input unchanged, and combines matches without duplicate rows. BB has
+no way for plugins to extend its search, so in the command palette and thread
+search it reads the palette's React row handlers and wraps its thread-search
+requests. That is verified for BB 0.46.0 and turns itself off on other
+versions until checked again; the snoozed-thread filter works on any version.
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
@@ -63,12 +66,8 @@ npm ci
 npm test
 npm run typecheck
 npm run build
-npm run test:browser
 bb plugin reload superhuman
 ```
-
-`npm run test:browser` checks Dia Sidebar's layout in Google Chrome, which must
-be installed.
 
 ## More San Francisco Plugins
 

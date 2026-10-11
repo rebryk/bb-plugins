@@ -1,30 +1,75 @@
-import { useEffect } from "react";
+import { memo, useEffect, useMemo } from "react";
 import {
   useSdk,
   useSettings,
   useBbContext,
-  experimental_useSidebarThreadActions,
+  experimental_useSidebarThreads,
+  experimental_useThreadActions,
   type PluginAppBuilder,
+  type PluginThreadActionTarget,
 } from "@get-bb/plugin-sdk/app";
 import { start, update } from "./controller";
 import { openSnooze } from "../snooze/app";
 import "./app.css";
 
+/**
+ * E runs BB's own Archive, with its confirmation, pane cleanup and Undo. Memo:
+ * the bridge redraws on every sidebar change, this only when the thread does.
+ */
+const ThreadActions = memo(function ThreadActions({
+  thread,
+}: {
+  thread: PluginThreadActionTarget;
+}) {
+  const [archive] = experimental_useThreadActions(thread, {
+    keys: ["bb--core/archive"],
+  });
+  const run = archive?.action.run;
+  useEffect(() => {
+    update({
+      threadActions: {
+        snooze: () => openSnooze(thread.id),
+        archive: () => {
+          if (!run) return false;
+          void run();
+          return true;
+        },
+      },
+    });
+    return () => update({ threadActions: undefined });
+  }, [thread.id, run]);
+  return null;
+});
+
+/** The open thread as thread menus see it, while the sidebar lists it. */
+function useOpenThread(): PluginThreadActionTarget | null {
+  const { threadId } = useBbContext();
+  const { threads } = experimental_useSidebarThreads();
+  const thread = threads.find((candidate) => candidate.id === threadId);
+  return useMemo(
+    () =>
+      thread
+        ? {
+            id: thread.id,
+            projectId: thread.projectId,
+            parentThreadId: thread.parentThreadId,
+            archivedAt: thread.archivedAt,
+            pinnedAt: thread.pinnedAt,
+            sectionId: thread.sectionId,
+            isUnread: thread.isUnread,
+            status: thread.status,
+            environment: null,
+          }
+        : null,
+    [thread],
+  );
+}
+
 // Settings and keybindings reach the page script through this React bridge.
 function Bridge() {
   const sdk = useSdk();
   const { values } = useSettings();
-  const { threadId } = useBbContext();
-  const actions = experimental_useSidebarThreadActions();
-  useEffect(() => {
-    update({
-      threadActions: threadId ? {
-        snooze: () => openSnooze(threadId),
-        archive: () => actions.archive(threadId),
-      } : undefined,
-    });
-    return () => update({ threadActions: undefined });
-  }, [threadId, actions]);
+  const thread = useOpenThread();
   useEffect(() => update({ settings: values ?? {} }), [values]);
   useEffect(() => {
     const refresh = () =>
@@ -39,7 +84,7 @@ function Bridge() {
     ];
     return () => stops.forEach((stop) => stop());
   }, [sdk]);
-  return null;
+  return thread ? <ThreadActions thread={thread} /> : null;
 }
 
 export default function registerHotkeys(app: PluginAppBuilder) {
@@ -47,16 +92,5 @@ export default function registerHotkeys(app: PluginAppBuilder) {
   app.slots.experimental_appOverlay({
     id: "hotkeys-bridge",
     component: Bridge,
-  });
-  // BB has no command for its Plugins page, and the SDK cannot navigate there.
-  app.commands.register({
-    id: "open-plugins",
-    title: "Open plugins",
-    defaultShortcut: { key: "p", mod: true },
-    run: () => {
-      if (location.pathname === "/plugins") return;
-      history.pushState(history.state, "", "/plugins");
-      dispatchEvent(new PopStateEvent("popstate", { state: history.state }));
-    },
   });
 }

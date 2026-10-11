@@ -18,34 +18,24 @@ it("registers every feature under an id of its own", async () => {
     registrations.map(({ id }) => id);
   const registered = {
     contentScripts: ids(app.contentScripts),
-    appOverlays: ids(app.appOverlays),
-    sidebarNavigations: ids(app.experimentalSidebarNavigations),
+    threadActions: ids(app.threadActions),
     threadHeaderActions: ids(app.threadHeaderActions),
+    appOverlays: ids(app.appOverlays),
     commands: ids(commands(app)),
-    sidebarFooterItems: ids(app.experimentalSidebarFooterItems),
-    settingsSections: ids(app.settingsSections),
   };
   expect(registered).toEqual({
-    contentScripts: [
-      "hotkeys",
-      "snooze-row-buttons",
-      "terminal-paste",
-      "ui-polish",
-    ],
+    contentScripts: ["hotkeys", "ui-polish"],
+    threadActions: ["snooze"],
+    threadHeaderActions: ["snooze-moon", "archive", "new-thread"],
     appOverlays: [
       "hotkeys-bridge",
       "universal-search",
       "snooze-dialogs",
-      "code-copy",
+      "ui-polish-switch",
       "phone-layout",
-      "thread-prefetch",
-      "thread-eta",
+      "title-bar-switch",
     ],
-    sidebarNavigations: ["dia-sidebar"],
-    threadHeaderActions: ["snooze", "archive", "new-thread"],
-    commands: ["open-plugins", "snooze-thread", "show-snoozed-threads"],
-    sidebarFooterItems: ["change-server"],
-    settingsSections: ["experimental-settings"],
+    commands: ["snooze-thread", "show-snoozed-threads"],
   });
   const all = Object.values(registered).flat();
   expect(new Set(all).size).toBe(all.length);
