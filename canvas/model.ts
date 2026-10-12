@@ -237,3 +237,7 @@ export const COLORS = [
   ["Blue", "#087bdf"],
   ["Purple", "#8854c8"],
 ] as const;
+// Exports draw saved colors on white. On the board, Graphite follows the
+// theme's text color so it stays readable on a dark background.
+export const boardInk = (color: string) =>
+  color === COLORS[0][1] ? "var(--cv-graphite)" : color;

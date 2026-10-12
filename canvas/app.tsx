@@ -27,6 +27,7 @@ import {
   STICKY_BACKGROUND,
   STICKY_SIZE,
   assetUrl,
+  boardInk,
   boundsOf,
   constrainLine,
   contentBounds,
@@ -149,7 +150,7 @@ function ColorChoices({
           aria-label={label}
           aria-pressed={value === color}
           title={label}
-          style={{ "--swatch": color } as CSSProperties}
+          style={{ "--swatch": boardInk(color) } as CSSProperties}
           onClick={() => onChange(color)}
         />
       ))}
@@ -1415,7 +1416,7 @@ function CanvasPanel({ threadId }: { threadId: string }) {
               x={view.x}
               y={view.y}
             >
-              <circle cx="1" cy="1" r=".7" fill="#ced0d3" />
+              <circle cx="1" cy="1" r=".7" fill="var(--cv-dot)" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill={`url(#dots-${threadId})`} />
@@ -1524,7 +1525,10 @@ function CanvasPanel({ threadId }: { threadId: string }) {
               height: editing.height * view.zoom,
               fontSize:
                 (editingLayout?.fontSize ?? editing.fontSize) * view.zoom,
-              color: editing.color,
+              color:
+                editing.type === "sticky"
+                  ? editing.color
+                  : boardInk(editing.color),
             }}
             onPointerDown={(event) => event.stopPropagation()}
             onSelect={(event) => {

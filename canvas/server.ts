@@ -34,7 +34,9 @@ export const rpcContract = defineRpcContract({
     output: z.object({ id: idSchema, width: z.number(), height: z.number() }),
   },
   captureCanvasTab: {
-    input: threadInput.extend({ tabId: idSchema }),
+    // BB owns the tab id format (`browser:<id>:<environment>`); it is only
+    // compared against the host's tab list.
+    input: threadInput.extend({ tabId: z.string().min(1).max(500) }),
     output: z.object({
       base64: z.string(),
       width: z.number(),

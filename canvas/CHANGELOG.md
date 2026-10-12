@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `canvas/v<version>`.
 
+## 0.1.13 (2026-10-11)
+
+- Fix the browser toolbar's **Canvas** button, which added nothing in BB 0.46
+  because Canvas rejected BB's new Browser tab ids.
+- Follow the BB theme on the board: it takes BB's background in light and dark
+  mode, Graphite ink shows in the theme's text color, and the dot grid and
+  empty state use theme colors. Saved colors and PNG exports stay unchanged.
+
 ## 0.1.12 (2026-10-01)
 
 - Simplify gesture, draft, and import lifecycles with shared state updates and

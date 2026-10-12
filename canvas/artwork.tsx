@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import {
   arrowPath,
+  boardInk,
   drawPath,
   isTextElement,
   type CanvasElement,
@@ -64,7 +65,11 @@ export const CanvasArtwork = memo(function CanvasArtwork({
                     }
                   : undefined
               }
-              fill={element.color}
+              fill={
+                element.type === "sticky"
+                  ? element.color
+                  : boardInk(element.color)
+              }
               xmlSpace="preserve"
             >
               {(layout?.lines ?? element.text.split("\n")).map(
@@ -98,7 +103,7 @@ export const CanvasArtwork = memo(function CanvasArtwork({
           <path
             d={path!}
             fill="none"
-            stroke={element.color}
+            stroke={boardInk(element.color)}
             strokeWidth={element.strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"

@@ -378,6 +378,43 @@ describe("Canvas editing workflows", () => {
     if (saved.type === "draw") expect(saved.points.at(-1)).toEqual([0, 0]);
   });
 
+  it("shows Graphite in the theme's ink on the board and keeps sticky ink as saved", async () => {
+    const sticky: CanvasElement = {
+      id: "graphite-note",
+      type: "sticky",
+      x: 300,
+      y: 0,
+      width: 180,
+      height: 180,
+      text: "Note",
+      color: "#242424",
+      background: STICKY_BACKGROUND,
+      fontSize: 24,
+    };
+    const { slot } = await open([
+      stroke,
+      { ...note, id: "graphite-text", color: "#242424" },
+      note,
+      sticky,
+    ]);
+    const ink = (selector: string, attribute: string) =>
+      slot.container.querySelector(selector)!.getAttribute(attribute);
+    expect(ink('[data-element="stroke"] path:last-child', "stroke")).toBe(
+      "var(--cv-graphite)",
+    );
+    expect(ink('[data-element="graphite-text"] text', "fill")).toBe(
+      "var(--cv-graphite)",
+    );
+    expect(ink('[data-element="annotation"] text', "fill")).toBe("#e5484d");
+    expect(ink('[data-element="graphite-note"] text', "fill")).toBe("#242424");
+    fireEvent.click(slot.getByRole("button", { name: "Draw (D)" }));
+    expect(
+      slot
+        .getByRole("button", { name: "Graphite" })
+        .style.getPropertyValue("--swatch"),
+    ).toBe("var(--cv-graphite)");
+  });
+
   it("creates a square sticky note over an image with automatic text sizing and inline color", async () => {
     const { slot, board } = await open([picture]);
     fireEvent.keyDown(slot.getByLabelText("Canvas"), { key: "s" });
