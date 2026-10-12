@@ -53,6 +53,8 @@ Canvas is one of the San Francisco Plugins, a family of BB plugins. The others:
   any keyboard layout, snoozed threads, and a phone layout.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **Auto Update**: updates for the plugins you pick, installed every hour, day,
+  or week.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with
   your pick of the eight macOS accent colors.
 - **Pool Usage**: how much of each provider's capacity is in use and when it

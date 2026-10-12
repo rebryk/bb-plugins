@@ -58,6 +58,8 @@ others:
   right panel.
 - **Canvas**: images, text, and drawing in each thread, with screenshots your
   agent can read.
+- **Auto Update**: updates for the plugins you pick, installed every hour, day,
+  or week.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 
