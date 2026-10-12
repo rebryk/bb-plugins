@@ -11,6 +11,7 @@ bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install canvas@sf-plugins
+bb plugin install auto-update@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
@@ -21,7 +22,7 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All five suit any BB setup. With Account Pooler, Pool Usage counts every pooled
+All six suit any BB setup. With Account Pooler, Pool Usage counts every pooled
 account.
 
 ### [Superhuman](./superhuman)
@@ -48,6 +49,13 @@ its thread scrolled to the message.
 A canvas in each thread’s right panel for pasted screenshots, movable images,
 text, and drawing. Capture a browser block in desktop BB, annotate it, and let
 your agent read the elements or see the entire board as a PNG.
+
+### [Auto Update](./auto-update)
+
+A page in Settings that lists your plugins by where they came from, each with
+a switch. BB checks the plugins turned on for updates every hour, 6 hours, day,
+or week, or when you click Check Now, and installs them the way
+`bb plugin update` does.
 
 ### [San Francisco](./san-francisco)
 
