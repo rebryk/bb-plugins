@@ -18,20 +18,18 @@ status and code colors are brighter to match.
 ## Familiar places
 
 In the sidebar, rows are a soft black and the open thread is a white pill.
-When Search threads is visible in the navigation, it becomes a search field.
-On a desktop the sidebar loses its row of back and forward buttons, and its
-toggle moves into the thread's header, before the title. Thread and panel
-headers lose their dividers. The composer gets larger corners, a soft shadow
-and one round send button with an up arrow; Stop is the same circle with a
-square. Above the composer, background work becomes one outlined card, and
-queued messages a sheet tucked behind the composer. Right-panel tabs become
-quiet pills, and an empty new tab centers its hint above outlined buttons.
+Thread and panel headers lose their dividers. The composer gets larger corners,
+a soft shadow and one round send button with an up arrow; Stop is the same
+circle with a square. Above the composer, background work becomes one outlined
+card, and queued messages a sheet tucked behind the composer. Right-panel tabs
+become quiet pills, and an empty new tab centers its hint above outlined
+buttons.
 
 ## Settings like a document
 
-Settings pages show a Settings › Page breadcrumb and a large page title.
-Section headings are small caps, and rows sit in cards split by full-width
-lines. Selects shrink to their text and use a double chevron. Buttons, inputs
+Settings pages show a Settings › Page breadcrumb and a large page title. Section
+headings are small caps, and a plugin's settings sit in the same white card as
+BB's own. Selects shrink to their text and use a double chevron. Buttons, inputs
 and badges are lighter, and menus and popovers are compact.
 
 ## One accent color

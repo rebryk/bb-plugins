@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `san-francisco/v<version>`.
 
+## 0.1.4 (2026-10-11)
+
+- Needs BB 0.46.0. In BB's Mac app the window keeps BB's own frame; the
+  content card is drawn only in a browser.
+- The sidebar keeps BB's top row, where BB 0.46 puts New thread, and BB's
+  sidebar toggle.
+- The accent swatches hide BB's Accent color select again, and a plugin's
+  settings sit in a white card again, in BB 0.46's settings markup.
+- Right-panel tabs show their close cross on any device without hover.
+- Rules for what BB 0.46 removed, such as the Search threads field and
+  Customize sidebar, and for what Superhuman styles itself are gone.
+
 ## 0.1.3 (2026-10-05)
 
 - Typing and switching threads no longer slow down: no rule styles an
