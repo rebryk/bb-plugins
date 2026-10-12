@@ -13,11 +13,7 @@ selections, switches and checkboxes.
 The theme restyles:
 
 - **Sidebar**: rows and their icons share one soft black, group labels are
-  gray, and the open thread is a white pill. Search threads becomes a search
-  field. On a desktop the sidebar loses its row of back and forward buttons
-  and starts at the top of the window, or below the window buttons in BB's
-  Mac app. The sidebar button opens the thread's header as the right panel's
-  button ends it, open or closed.
+  gray, and the open thread is a white pill.
 - **Composer**: larger corners, a soft shadow, and one round send button with
   an up arrow, gray while there is nothing to send and black once there is.
   Stop, the voice button and the recording check are the same circle, one
@@ -27,7 +23,7 @@ The theme restyles:
 - **Right panel**: quiet tabs, and a new tab that centers its hint above
   outlined buttons.
 - **Settings**: a Settings › Page breadcrumb, a large page title, small-caps
-  section headings, and rows in cards split by full-width lines.
+  section headings, and a plugin's settings in the white card of BB's own.
 - **Controls and menus**: lighter buttons, inputs and badges, selects sized to
   their text, and checkboxes filled with the accent. Menus and popovers are
   compact, and the model picker's reasoning levels are a segmented control.
@@ -49,12 +45,6 @@ and BB's terminal, diff, status and code colors are brighter to match.
   (the default), Purple, Pink, Red, Orange, Yellow, Green and Graphite.
 - Light and dark follow BB's **Theme** setting, which each device keeps for
   itself.
-- **Search threads** becomes a field only while it is visible in the sidebar
-  navigation. If you hid it, show it again with **More → Customize sidebar**.
-  The field works with both BB's list and Superhuman's Dia Sidebar grid of
-  icons, and shows your Search threads shortcut when one is set. On a phone
-  with Superhuman's Phone layout, the grid stays one row of icons lined up
-  with the thread's bar, so Search threads stays an icon there.
 - To return to BB's look, choose **Default** under **Palette** or run
   `bb theme reset`.
 
@@ -62,7 +52,8 @@ and BB's terminal, diff, status and code colors are brighter to match.
 
 - The plugin adds one BB theme (`bb.themes`), `themes/san-francisco.css`. BB
   keeps the chosen palette on the server and applies it before the first
-  paint.
+  paint. BB's Mac app frames the window itself, so there the theme leaves the
+  frame to BB and draws the card only in a browser.
 - The accent is a plugin setting. The plugin's frontend shows it as a row of
   swatches in place of BB's select, and mirrors it to `data-sf-accent` on
   `<html>`; the stylesheet defines each accent's colors under that attribute.
@@ -82,7 +73,7 @@ and BB's terminal, diff, status and code colors are brighter to match.
   under an `@container style()` query, and `npm test` keeps it that way.
 - Palette, fonts, text sizes, radii, shadows and icon stroke are BB theme
   tokens, set in the `:root, .light` and `.dark` blocks. The other rules target
-  BB 0.43.4's markup: data attributes and roles where BB has them, Tailwind
+  BB 0.46's markup: data attributes and roles where BB has them, Tailwind
   utility combinations where it doesn't. BB's utilities live in cascade layers,
   so the unlayered rules win without `!important`. The few rules that meet
   inline styles, BB's layered `!important` utilities or other plugins' rules
@@ -96,7 +87,7 @@ and BB's terminal, diff, status and code colors are brighter to match.
 
 ## Install
 
-San Francisco needs BB 0.43.4 or later. Installing adds the palette without
+San Francisco needs BB 0.46.0 or later. Installing adds the palette without
 switching to it.
 
 ```sh

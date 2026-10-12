@@ -230,8 +230,8 @@ const PICKER_CSS = `
 }
 
 [data-testid="plugin-detail-${PLUGIN_ID}"]:has([data-sf-accent-picker]) > .rounded-md.border:empty,
-[data-testid="plugin-detail-${PLUGIN_ID}"]:has([data-sf-accent-picker]) > .rounded-md.border:has(> .space-y-4 > [data-control-placement]:only-child button[aria-label="${ACCENT_SETTING.label}"]),
-[data-testid="plugin-detail-${PLUGIN_ID}"]:has([data-sf-accent-picker]) > .rounded-md.border > .space-y-4 > [data-control-placement]:has(button[aria-label="${ACCENT_SETTING.label}"]) {
+[data-testid="plugin-detail-${PLUGIN_ID}"]:has([data-sf-accent-picker]) > .rounded-md.border:has(> .space-y-4 > :only-child > [data-control-placement]:only-child button[aria-label="${ACCENT_SETTING.label}"]),
+[data-testid="plugin-detail-${PLUGIN_ID}"]:has([data-sf-accent-picker]) > .rounded-md.border > .space-y-4 > :has(> [data-control-placement] button[aria-label="${ACCENT_SETTING.label}"]) {
   display: none;
 }
 `;
@@ -353,64 +353,66 @@ export function AccentPicker() {
       <style>{PICKER_CSS}</style>
       <div className="overflow-hidden rounded-md border border-border bg-surface-recessed/70 px-3 py-3">
         <div className="space-y-4">
-          <div
-            data-control-placement="inline"
-            className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:justify-between sm:gap-x-5 sm:items-center"
-            style={{ containerType: "inline-size", containerName: "sf-accent-row" }}
-          >
-            <div className="min-w-0 flex-1 sm:basis-60">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <p id={labelId} className="min-w-0 text-sm font-normal text-foreground">
-                  {ACCENT_SETTING.label}
+          <div className="@container/settings w-full min-w-0">
+            <div
+              data-control-placement="inline"
+              className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:justify-between sm:gap-x-5 sm:items-center"
+              style={{ containerType: "inline-size", containerName: "sf-accent-row" }}
+            >
+              <div className="min-w-0 flex-1 sm:basis-60">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <p id={labelId} className="min-w-0 text-sm font-normal text-foreground">
+                    {ACCENT_SETTING.label}
+                  </p>
+                </div>
+                <p id={descriptionId} className="mt-0.5 text-xs leading-snug text-subtle-foreground/75">
+                  {ACCENT_SETTING.description}
                 </p>
+                {error ? (
+                  <p role="alert" style={{ marginTop: 4, fontSize: 12, lineHeight: "16px", color: "var(--destructive)" }}>
+                    Couldn't save the accent color: {error}
+                  </p>
+                ) : null}
               </div>
-              <p id={descriptionId} className="mt-0.5 text-xs leading-snug text-subtle-foreground/75">
-                {ACCENT_SETTING.description}
-              </p>
-              {error ? (
-                <p role="alert" style={{ marginTop: 4, fontSize: 12, lineHeight: "16px", color: "var(--destructive)" }}>
-                  Couldn't save the accent color: {error}
-                </p>
-              ) : null}
-            </div>
-            {/* Beside the label the strip keeps its width; under it, it may narrow to the row. */}
-            <div className="min-w-0 sm:flex sm:justify-end">
-              <div
-                role="radiogroup"
-                aria-labelledby={labelId}
-                aria-describedby={descriptionId}
-                data-sf-accent-picker=""
-                onKeyDown={onKeyDown}
-              >
-                {ACCENTS.map((option, index) => {
-                  const checked = option === accent;
-                  // The title names the swatch and shows the name on hover, as in
-                  // macOS. An aria-label as well would read the name twice.
-                  return (
-                    <span key={option.id} style={ringStyle(option, checked)}>
-                      <button
-                        ref={(element) => {
-                          radios.current[index] = element;
-                        }}
-                        type="button"
-                        role="radio"
-                        aria-checked={checked}
-                        title={option.name}
-                        tabIndex={option === focusable ? 0 : -1}
-                        data-sf-swatch={option.id}
-                        onClick={() => select(option)}
-                        style={swatchStyle(option)}
-                      >
-                        {checked ? <span aria-hidden="true" style={dotStyle(option)} /> : null}
-                      </button>
-                      {checked ? (
-                        <span aria-hidden="true" data-sf-accent-name={nameEdge(index)} style={NAME_STYLE}>
-                          {option.name}
-                        </span>
-                      ) : null}
-                    </span>
-                  );
-                })}
+              {/* Beside the label the strip keeps its width; under it, it may narrow to the row. */}
+              <div className="min-w-0 sm:flex sm:justify-end">
+                <div
+                  role="radiogroup"
+                  aria-labelledby={labelId}
+                  aria-describedby={descriptionId}
+                  data-sf-accent-picker=""
+                  onKeyDown={onKeyDown}
+                >
+                  {ACCENTS.map((option, index) => {
+                    const checked = option === accent;
+                    // The title names the swatch and shows the name on hover, as in
+                    // macOS. An aria-label as well would read the name twice.
+                    return (
+                      <span key={option.id} style={ringStyle(option, checked)}>
+                        <button
+                          ref={(element) => {
+                            radios.current[index] = element;
+                          }}
+                          type="button"
+                          role="radio"
+                          aria-checked={checked}
+                          title={option.name}
+                          tabIndex={option === focusable ? 0 : -1}
+                          data-sf-swatch={option.id}
+                          onClick={() => select(option)}
+                          style={swatchStyle(option)}
+                        >
+                          {checked ? <span aria-hidden="true" style={dotStyle(option)} /> : null}
+                        </button>
+                        {checked ? (
+                          <span aria-hidden="true" data-sf-accent-name={nameEdge(index)} style={NAME_STYLE}>
+                            {option.name}
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>

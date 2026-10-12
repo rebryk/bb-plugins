@@ -272,12 +272,16 @@ describe("accent picker", () => {
     const { slot } = await renderPicker();
     const group = slot.getByRole("radiogroup", { name: "Accent color" });
     const row = group.closest("[data-control-placement]")!;
-    const well = row.parentElement!.parentElement!;
-    expect(row.parentElement!.className).toBe("space-y-4");
+    const container = row.parentElement!;
+    const list = container.parentElement!;
+    const well = list.parentElement!;
+    expect(container.className).toBe("@container/settings w-full min-w-0");
+    expect(list.className).toBe("space-y-4");
     expect(well.className).toContain("rounded-md border border-border bg-surface-recessed/70");
     // Only the row sits in the block, so a palette's rules for bb's own block apply.
     expect(well.children).toHaveLength(1);
-    expect(row.parentElement!.children).toHaveLength(1);
+    expect(list.children).toHaveLength(1);
+    expect(container.children).toHaveLength(1);
   });
 
   it.each([

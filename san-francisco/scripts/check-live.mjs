@@ -106,27 +106,6 @@ try {
     "the content area floats as a card",
   );
   assert.equal((await style('[data-side="left"] > [data-sidebar="panel"]', ["border-right-color"]))?.["border-right-color"], "rgba(0, 0, 0, 0)", "the sidebar has no seam");
-  assert.equal(await page.$eval('[data-testid$="-sidebar-top-reserve-row"]', (row) => getComputedStyle(row).display), "none", "the sidebar starts at the top, without its top row");
-  const toggleInHeader = () => page.evaluate(() => {
-    const main = document.querySelector('main[data-sidebar="inset"]');
-    const card = main?.getBoundingClientRect();
-    const header = main?.querySelector("header")?.getBoundingClientRect();
-    const toggle = document.querySelector('[data-testid="app-sidebar-trigger-overlay"] [data-sidebar="trigger"]')?.getBoundingClientRect();
-    const title = document.querySelector('[data-testid="app-page-header-content-row"] > :first-child')?.getBoundingClientRect();
-    if (!card || !header || !toggle || !title) return null;
-    return {
-      middle: toggle.top + toggle.height / 2 - (header.top + header.height / 2),
-      inset: toggle.left - card.left - parseFloat(getComputedStyle(main).borderLeftWidth),
-      gap: title.left - toggle.right,
-    };
-  });
-  const inHeader = { middle: 0, inset: 16, gap: 8 };
-  assert.deepEqual(await toggleInHeader(), inHeader, "the sidebar toggle starts the card's header, before the title");
-  await page.click('[data-testid="app-sidebar-trigger-overlay"] [data-sidebar="trigger"]');
-  await page.waitForTimeout(500);
-  assert.deepEqual(await toggleInHeader(), inHeader, "the toggle keeps its place with the sidebar collapsed");
-  await page.click('[data-testid="app-sidebar-trigger-overlay"] [data-sidebar="trigger"]');
-  await page.waitForTimeout(500);
   assert.equal(await page.getAttribute("[data-sf-page]", "data-sf-page"), "General", "breadcrumb names the page");
   assert.equal(await page.getAttribute("[data-sf-page-title]", "data-sf-page-title"), "General", "large title names the page");
   assert.equal((await style('main[data-sidebar="inset"] section h2', ["text-transform"]))?.["text-transform"], "uppercase", "section headings are small caps");
@@ -216,23 +195,6 @@ try {
   assert.ok(Math.abs(segments.track - segments.filled) <= 1, `the segments fill the track (${segments.filled} of ${segments.track} px)`);
   assert.ok(segments.off.length > 0 && segments.off.every((color) => color === "rgba(0, 0, 0, 0)"), "the other levels sit flat on the track");
   await close();
-
-  // Customize sidebar's checkboxes: 16 px, filled with the accent, a white check.
-  await open('[data-testid="sidebar-navigation-more-trigger"]', '[data-testid="sidebar-navigation-customize-trigger"]');
-  await page.click('[data-testid="sidebar-navigation-customize-trigger"]');
-  await page.waitForSelector("[data-plugin-nav-customize-checkbox]");
-  await accent("pink");
-  const box16 = { width: 16, height: 16 };
-  const on16 = '[data-plugin-nav-customize-checkbox][data-state="checked"]';
-  const off16 = '[data-plugin-nav-customize-checkbox][data-state="unchecked"]';
-  assert.deepEqual(await box(on16), box16, "a checked box is 16 px");
-  assert.equal((await style(on16, ["background-color"]))?.["background-color"], "rgb(247, 79, 158)", "a checked box fills with the accent");
-  assert.ok((await box(`${on16} svg`))?.width >= 12, "the check mark is drawn at size");
-  assert.deepEqual(await style(`${on16} svg path`, ["stroke", "visibility"]), { stroke: "rgb(255, 255, 255)", visibility: "visible" }, "the check mark is white on the accent");
-  if (await page.$(off16)) {
-    assert.deepEqual(await box(off16), box16, "an unchecked box is 16 px");
-    assert.equal((await style(off16, ["background-color"]))?.["background-color"], "rgba(0, 0, 0, 0)", "an unchecked box is empty");
-  }
 
   // A new thread's send stays a circle once there is text, on a phone too,
   // where bb sizes the button by its padding.
