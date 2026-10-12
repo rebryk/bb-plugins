@@ -990,6 +990,8 @@ describe("image boundary and exports", () => {
   });
 
   it("captures the exact Browser tab on its owning desktop host", async () => {
+    // BB 0.46 names a Browser tab `browser:<id>:<environment>`.
+    const tabId = "browser:IerUSsiWilmHE7CfYs_Gu:env_iihkzqcd2i";
     const { harness } = setup({
       sdk: {
         hosts: { list: async () => [makeHostResponse({ id: "desktop-host" })] },
@@ -1005,7 +1007,7 @@ describe("image boundary and exports", () => {
             ],
           }),
           listTabs: (async () => ({
-            tabs: [{ tabId: "browser-tab", threadId: "thread-a" }],
+            tabs: [{ tabId, threadId: "thread-a" }],
           })) as never,
           captureTab: async () => ({
             base64: "jpeg",
@@ -1019,7 +1021,7 @@ describe("image boundary and exports", () => {
     expect(
       await harness.behavior.callRpc("captureCanvasTab", {
         threadId: "thread-a",
-        tabId: "browser-tab",
+        tabId,
       }),
     ).toMatchObject({ width: 800, height: 600 });
     expect(
@@ -1031,7 +1033,7 @@ describe("image boundary and exports", () => {
           instanceId: "instance",
           generation: "generation",
           threadId: "thread-a",
-          tabId: "browser-tab",
+          tabId,
         },
       ],
     ]);

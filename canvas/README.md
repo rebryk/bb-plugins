@@ -109,9 +109,11 @@ current browser session.
 
 Canvas uses BB's thread-panel, RPC, realtime, and experimental browser-toolbar
 APIs. Browser capture may need an update when those experimental APIs change.
-The editing controls follow the active theme, including San Francisco's
-accent. Artwork stays white with explicit saved colors in both themes. PNG
-exports render on the server, so agents can see the board with the panel closed.
+The board and its controls follow the active theme, including San Francisco's
+accent: the board takes BB's background, and Graphite ink shows in the theme's
+text color so it stays readable in dark mode. Elements keep their saved colors,
+and PNG exports draw them on white. Exports render on the server, so agents can
+see the board with the panel closed.
 
 Limits are 500 elements, a 2 MB JSON document, 100 MB of images per thread,
 10,000 characters per text element, and 6,000 points per stroke. Imports are

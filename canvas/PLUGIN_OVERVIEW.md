@@ -42,8 +42,8 @@ The board saves locally on the BB server as JSON with separate images. Each
 thread keeps its own canvas across panel closures and restarts. Failed saves
 show **Retry** and retain a recovery draft across reloads in the current browser
 tab when storage is available. Drafts stay isolated between tabs.
-Deleting a thread removes its canvas. The controls follow your BB theme,
-including San Francisco's accent colors.
+Deleting a thread removes its canvas. The board and its controls follow your
+BB theme, light or dark, including San Francisco's accent colors.
 
 ## More San Francisco Plugins
 
