@@ -70,8 +70,8 @@ worktrees, dev caches, or the Trash, and switches do it every night.
 ### [Resource Monitor](./resource-monitor)
 
 Three live bars, CPU, RAM, and GPU, as the plugin's icon in the sidebar's
-navigation rail, updated every 2 seconds. Hover the icon for the numbers;
-click it for the CPU model, the RAM in use, and the GPU name.
+navigation rail, updated every 2 seconds. Hover the icon, or tap it on a touch
+screen, for the numbers.
 
 ### [San Francisco](./san-francisco)
 

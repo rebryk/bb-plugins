@@ -51,35 +51,59 @@ function SampleFeed() {
   return null;
 }
 
-/** The rail tile's box while the mouse rests on it, else null. */
-function useRailHover(icon: RefObject<SVGSVGElement | null>) {
+/**
+ * The rail tile's box while its card shows, else null. A mouse shows the card
+ * on hover and a tap toggles it. Clicks never open the plugin's page, which
+ * would only repeat the card.
+ */
+function useRailCard(icon: RefObject<SVGSVGElement | null>) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   useEffect(() => {
     const tile = icon.current?.closest("[data-nav-rail-item]");
     if (!(tile instanceof HTMLElement)) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const show = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse" || event.buttons !== 0) return;
-      timer = setTimeout(() => setAnchor(tile.getBoundingClientRect()), 150);
-    };
+    let pointerType = "mouse";
+    const box = () => tile.getBoundingClientRect();
     const hide = () => {
       clearTimeout(timer);
       setAnchor(null);
+    };
+    const enter = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || event.buttons !== 0) return;
+      timer = setTimeout(() => setAnchor(box()), 150);
+    };
+    const leave = (event: PointerEvent) => {
+      if (event.pointerType === "mouse") hide();
+    };
+    const down = (event: PointerEvent) => {
+      pointerType = event.pointerType;
+    };
+    // Stopped while capturing, the click never bubbles to BB's onClick.
+    const swallowClick = (event: MouseEvent) => {
+      event.stopPropagation();
+      if (pointerType !== "mouse") setAnchor((open) => (open ? null : box()));
+    };
+    const tapOutside = (event: PointerEvent) => {
+      if (!tile.contains(event.target as Node)) hide();
     };
     // BB's own tooltip opens on pointermove; the card replaces it.
     const muteTooltip = (event: PointerEvent) => {
       if (event.buttons === 0) event.stopPropagation();
     };
-    tile.addEventListener("pointerenter", show);
-    tile.addEventListener("pointerleave", hide);
-    tile.addEventListener("pointerdown", hide);
+    tile.addEventListener("pointerenter", enter);
+    tile.addEventListener("pointerleave", leave);
+    tile.addEventListener("pointerdown", down);
+    tile.addEventListener("click", swallowClick, true);
     tile.addEventListener("pointermove", muteTooltip, true);
+    document.addEventListener("pointerdown", tapOutside, true);
     return () => {
       hide();
-      tile.removeEventListener("pointerenter", show);
-      tile.removeEventListener("pointerleave", hide);
-      tile.removeEventListener("pointerdown", hide);
+      tile.removeEventListener("pointerenter", enter);
+      tile.removeEventListener("pointerleave", leave);
+      tile.removeEventListener("pointerdown", down);
+      tile.removeEventListener("click", swallowClick, true);
       tile.removeEventListener("pointermove", muteTooltip, true);
+      document.removeEventListener("pointerdown", tapOutside, true);
     };
   }, [icon]);
   return anchor;
@@ -108,11 +132,11 @@ function HoverCard({ anchor }: { anchor: DOMRect }) {
   );
 }
 
-/** The sidebar icon: live load as three bars, the numbers on hover. */
+/** The sidebar icon: live load as three bars, the numbers in a card. */
 function RailIcon({ className }: { className?: string }) {
   const sample = useSample();
   const icon = useRef<SVGSVGElement>(null);
-  const anchor = useRailHover(icon);
+  const anchor = useRailCard(icon);
   return (
     <>
       <svg ref={icon} viewBox="0 0 16 16" className={className} fill="currentColor">
