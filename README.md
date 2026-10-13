@@ -11,6 +11,7 @@ bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install canvas@sf-plugins
+bb plugin install annotate@sf-plugins
 bb plugin install auto-update@sf-plugins
 bb plugin install storage-cleaner@sf-plugins
 bb plugin install resource-monitor@sf-plugins
@@ -25,8 +26,9 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All eight suit any BB setup, except that Storage Cleaner needs macOS. With
-Account Pooler, Pool Usage counts every pooled account.
+All nine suit any BB setup, except that Annotate needs the desktop app and
+Storage Cleaner needs macOS. With Account Pooler, Pool Usage counts every
+pooled account.
 
 ### [Superhuman](./superhuman)
 
@@ -53,6 +55,12 @@ its thread scrolled to the message.
 A canvas in each thread’s right panel for pasted screenshots, movable images,
 text, and drawing. Capture a browser block in desktop BB, annotate it, and let
 your agent read the elements or see the entire board as a PNG.
+
+### [Annotate](./annotate)
+
+An Annotate button in the toolbar of the desktop app's Browser. Click an
+element of the page, write a note, and send it to your agent as a pill with
+the element's details and a screenshot.
 
 ### [Auto Update](./auto-update)
 

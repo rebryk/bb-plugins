@@ -33,6 +33,8 @@ The others:
   right panel.
 - **Canvas**: images, text, and drawing in each thread, with screenshots your
   agent can read.
+- **Annotate**: notes on the elements of a page in BB's Browser, sent to your
+  agent with a screenshot.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,
   or week.
 - **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived

@@ -130,6 +130,8 @@ plugins. The others:
   thread's right panel.
 - [Canvas](../canvas): images, text, and drawing in each thread, with
   screenshots your agent can read.
+- [Annotate](../annotate): notes on the elements of a page in BB's Browser,
+  sent to your agent with a screenshot.
 - [Storage Cleaner](../storage-cleaner): what fills your Mac's disk, and
   cleanup of archived threads, worktrees, and caches.
 - [Resource Monitor](../resource-monitor): live CPU, RAM, and GPU bars for the
