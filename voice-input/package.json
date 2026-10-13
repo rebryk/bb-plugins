@@ -1,0 +1,44 @@
+{
+  "name": "bb-plugin-voice-input",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Yurii Rebryk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "voice-input"
+  },
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/voice-input#readme",
+  "engines": {
+    "bb": ">=0.46.0",
+    "bbPluginSdk": ">=0.6.37"
+  },
+  "bb": {
+    "name": "Voice Input",
+    "description": "BB's voice input transcribed on the BB server's Mac by Parakeet Ultra on the Neural Engine: 25 languages, no hesitations, and the audio never leaves the Mac.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "skills": []
+  },
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.37",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cron-parser": "^5.5.0",
+    "hono": "^4.11.9",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  }
+}
