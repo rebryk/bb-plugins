@@ -1,0 +1,20 @@
+.an-browser-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.an-browser-button:hover,
+.an-browser-button[aria-pressed="true"] {
+  color: var(--foreground);
+  background: var(--surface-recessed-soft-solid, var(--muted));
+}

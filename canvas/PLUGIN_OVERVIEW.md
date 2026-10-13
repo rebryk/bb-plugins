@@ -53,6 +53,8 @@ Canvas is one of the San Francisco Plugins, a family of BB plugins. The others:
   any keyboard layout, snoozed threads, and a phone layout.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **Annotate**: notes on the elements of a page in BB's Browser, sent to your
+  agent with a screenshot.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,
   or week.
 - **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived

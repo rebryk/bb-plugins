@@ -44,6 +44,8 @@ others:
   right panel.
 - **Canvas**: images, text, and drawing in each thread, with screenshots your
   agent can read.
+- **Annotate**: notes on the elements of a page in BB's Browser, sent to your
+  agent with a screenshot.
 - **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived
   threads, worktrees, and caches.
 - **Resource Monitor**: live CPU, RAM, and GPU bars for the BB server in the

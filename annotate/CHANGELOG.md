@@ -1,0 +1,13 @@
+# Changelog
+
+Newest version first. [Releases](../README.md#releases) explains when a change
+gets a new version. Each version is tagged `annotate/v<version>`.
+
+## 0.1.0 (2026-10-13)
+
+- First release: an **Annotate** button in the toolbar of the desktop app's
+  Browser, and a **⇧⌘A** shortcut that you can change in BB's keyboard
+  settings. Each pick makes one note: click an element, write the note, and
+  it goes to the composer as a numbered pill. The agent gets the note, the
+  element's details, and a screenshot of the page around it. Pins mark the
+  notes on the page until you send the message.
