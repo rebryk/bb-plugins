@@ -297,6 +297,36 @@
           "subdir": "resource-monitor"
         }
       }
+    },
+    {
+      "id": "slack",
+      "displayName": "Slack",
+      "description": "A Slack button in every thread's header with your unread direct messages and mentions, which opens Slack in the right panel, or the Slack app on a phone.",
+      "icon": {
+        "url": "./slack/assets/icon.svg"
+      },
+      "tags": [
+        "slack",
+        "notifications",
+        "unread",
+        "messages",
+        "thread-header"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "thread-content",
+      "screenshots": [],
+      "overview": "See what waits for you in Slack from every BB thread, and open Slack beside\nyour work without leaving BB.\n\n## A count in every thread\n\nA Slack button in each thread's header shows your unread direct messages and\nmentions, the same number as Slack's own badge. A dot means unread messages in\nchannels or threads you did not mute. The count updates every 20 seconds, on\nyour Mac and on your phone alike.\n\n## Slack beside the thread\n\nIn the BB app, a click opens Slack in the thread's right panel, in BB's own\nbrowser, which keeps you signed in. On a phone, it opens the Slack app.\n\n## Set up once\n\nThe plugin reads the counts with your Slack session from a browser: its token\nand its `d` cookie, which you paste into the plugin's settings. The README\nshows where to find them. The BB server keeps them in a file only your user\ncan read and never sends them to a browser.\n\nThe counts come from the methods of Slack's web client rather than Slack's\npublic API, so a change at Slack can stop them until the plugin catches up.\n",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "slack"
+        }
+      }
     }
   ]
 }

@@ -16,6 +16,7 @@ bb plugin install storage-cleaner@sf-plugins
 bb plugin install resource-monitor@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
+bb plugin install slack@sf-plugins
 ```
 
 `bb marketplace refresh sf-plugins` re-reads the catalog; it never installs or
@@ -84,6 +85,16 @@ out like a document, and your pick of the eight macOS accent colors.
 One number per provider at the right end of the sidebar footer: how much of
 each provider's capacity is in use, across Account Pooler accounts, weighted by
 plan. Click it for the next resets.
+
+## Other plugins
+
+The catalog also serves plugins outside the San Francisco family.
+
+### [Slack](./slack)
+
+A Slack button in every thread's header with your unread direct messages and
+mentions. In the BB app it opens Slack in the thread's right panel; on a phone,
+the Slack app. Needs a Slack session from a browser.
 
 ## Layout
 
