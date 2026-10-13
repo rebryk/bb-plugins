@@ -111,6 +111,8 @@ function layoutTiles(
   out: Tile[],
 ) {
   for (const tile of squarify(kidsOf(node), (n) => n[SIZE], rect)) {
+    // Too small to see: leave the space to the parent instead of a sliver.
+    if (tile.w < 6 || tile.h < 6) continue;
     const childNames = [...names, tile.item[NAME]];
     const framed =
       depth < 2 &&
@@ -180,8 +182,9 @@ function Treemap({
               )
             }
             className={cn(
-              "absolute flex flex-col justify-start overflow-hidden rounded-[4px] px-1.5 text-left",
-              framed ? "py-0.5" : "py-1",
+              "absolute flex flex-col justify-start overflow-hidden rounded-[4px] text-left",
+              // Padding only on tiles with a label, so small ones keep their size.
+              framed ? "px-1.5 py-0.5" : w > 56 && h > 30 && "px-1.5 py-1",
               isFolder(node)
                 ? "cursor-pointer hover:brightness-95 dark:hover:brightness-125"
                 : "cursor-default",
