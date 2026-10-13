@@ -15,6 +15,8 @@ Superhuman-style speed for BB:
   and the sidebar and right panel buttons; their shortcuts still work.
 - **UI Polish.** Icons in one tone and a thread bar without the external editor
   picker, with fixes for Safari's layout and for a Tesla's keyboard.
+- **Brief Replies.** Agents answer in few words of plain English, after Andrej
+  Karpathy's advice, in threads started once it is on.
 
 Shortcuts work on desktop, outside text fields, by key position, so **H** is
 **H** in a Russian layout too. Snooze sits before Archive in every thread menu.
@@ -22,8 +24,7 @@ To snooze from a sidebar row in one click, add it in the row menu's
 **Customize row actions**. Universal Search in the command palette and thread
 search is verified for BB 0.46.0 and turns itself off on other versions.
 Settings have a switch for each feature, all on by default except Hide Title
-Bar; turning Snooze off
-brings snoozed threads back.
+Bar and Brief Replies; turning Snooze off brings snoozed threads back.
 
 ## More San Francisco Plugins
 
