@@ -38,10 +38,11 @@ reload while the pills are in the composer.
 ## What the agent gets
 
 For each pill, the agent reads the note and these facts about the element:
-its tag, id, and classes; a CSS selector; its text; its main attributes; its
-size and position on the page; and 14 of its computed styles. It also gets a
-JPEG of the page around the element, with the element outlined and pinned.
-The agent reads the page's values as data, not as instructions.
+its tag, id, and classes; the shortest CSS selector that matches only it,
+also through open shadow roots; its text; its main attributes; its size and
+position on the page; and 14 of its computed styles. It also gets a JPEG of
+the page around the element, with the element outlined and pinned. The agent
+reads the page's values as data, not as instructions.
 
 ## How it works
 
@@ -63,7 +64,12 @@ The agent reads the page's values as data, not as instructions.
   second that the script is still there and puts it back after a reload. A
   pin then finds its element by the selector.
 - The control takes the screenshot before it adds the pill, so a message sent
-  at once has it too. A new pick shows nothing until the screenshot is done.
+  at once has it too. A new pick waits until the screenshot is done.
+- The overlay is a manual popover in the top layer, above the page's own
+  popovers and full-screen view. While a modal dialog is open, the overlay
+  goes into the dialog, because the dialog makes the rest of the page inert.
+- While a pick is on, **Escape** and **↑** also work when BB has the focus,
+  as after a click on **Annotate** or the shortcut in the composer.
 - The BB server stores each note in the plugin's SQLite database. The
   screenshot is a crop of `captureTab` around the element, saved in the
   thread's storage. When you send the message, the plugin's mention provider

@@ -69,7 +69,7 @@ it("adds a note to the clicked element", () => {
       title: document.title,
       element: expect.objectContaining({
         name: 'button.primary "Save"',
-        selector: "body > main > button",
+        selector: "button",
         text: "Save",
         attributes: { class: "primary", type: "submit" },
       }),
@@ -118,9 +118,13 @@ it("sends the shortcut from the page, in any keyboard layout", () => {
   expect(messages).toEqual([]);
   press({ key: "Ф", code: "KeyA", metaKey: true, shiftKey: true });
   expect(messages).toEqual([{ kind: "toggle" }]);
+  // Punctuation keeps its key: on AZERTY a comma sits on the M key.
+  page().sync({ shortcut: { ...shortcut, key: ",", shiftKey: false } });
+  press({ key: ",", code: "KeyM", metaKey: true });
+  expect(messages).toHaveLength(2);
   page().sync({ shortcut: null });
   press({ key: "A", code: "KeyA", metaKey: true, shiftKey: true });
-  expect(messages).toHaveLength(1);
+  expect(messages).toHaveLength(2);
 });
 
 it("keeps an empty note from being added", () => {
@@ -219,4 +223,46 @@ it("keeps focus changes from the page", () => {
   expect(page().root.activeElement).toBe(find("textarea"));
   expect(pageFocus).not.toHaveBeenCalled();
   document.removeEventListener("focusin", pageFocus);
+});
+
+it("finds an element by a unique selector, also in a shadow root", () => {
+  document.body.innerHTML =
+    '<div class="card"><button>Buy</button></div><div class="card"><button>Buy</button></div><x-widget></x-widget>';
+  const shadow = document.querySelector("x-widget")!.attachShadow({
+    mode: "open",
+  });
+  shadow.innerHTML = "<p><button>Inner</button></p>";
+  const cases = [
+    [document.querySelectorAll("button")[1]!, "div:nth-of-type(2) > button"],
+    [shadow.querySelector("button")!, "x-widget >>> button"],
+  ] as const;
+  for (const [element, selector] of cases) {
+    target = element as HTMLElement;
+    // jsdom has no layout; only the noted element gets a box, so a pin shows
+    // only when its selector finds that element.
+    target.getBoundingClientRect = () =>
+      ({ left: 10, top: 10, width: 50, height: 20 }) as DOMRect;
+    messages = [];
+    page().sync({ picking: true, pins: [] });
+    pick();
+    write("Note");
+    const added = messages[0] as Extract<PageMessage, { kind: "add" }>;
+    expect(added.element.selector).toBe(selector);
+    // After a reload, the pin finds the element by the selector alone.
+    page().sync({ pins: [] });
+    page().sync({
+      pins: [{ id: added.id, number: 1, comment: "", selector }],
+    });
+    expect(find(".pin").style.display).toBe("block");
+  }
+});
+
+it("moves the picker to the parent from the toolbar control", () => {
+  page().sync({ picking: true });
+  find(".shield").dispatchEvent(
+    new MouseEvent("pointermove", { bubbles: true, clientX: 5, clientY: 5 }),
+  );
+  (page() as unknown as { parent(): void }).parent();
+  pick();
+  expect(find(".label").textContent).toBe('1 · main "IntroSave"');
 });

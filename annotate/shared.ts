@@ -153,6 +153,11 @@ export function formatNote(note: Note): string {
     "",
     `- Element: ${element.name}`,
     `- Selector: \`${element.selector}\``,
+    ...(element.selector.includes(" >>> ")
+      ? [
+          "  (` >>> ` steps into the open shadow root of the element before it.)",
+        ]
+      : []),
     ...(element.text ? [`- Text: ${element.text}`] : []),
     ...(attributes ? [`- Attributes: ${attributes}`] : []),
     `- Box: ${rect.width}×${rect.height} at (${rect.x}, ${rect.y}) on the page, in a ${viewport.width}×${viewport.height} viewport`,

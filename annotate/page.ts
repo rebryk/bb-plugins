@@ -119,6 +119,9 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   const host = document.createElement("bb-annotate");
   host.style.cssText =
     "all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:block";
+  // A manual popover sits in the top layer, above the page's own popovers
+  // and full-screen element.
+  if ("popover" in host) host.popover = "manual";
   const root = host.attachShadow({ mode: "closed" });
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(STYLESHEET);
@@ -183,28 +186,28 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     value.replace(/\s+/g, " ").trim().slice(0, max);
   const textOf = (element: Element) =>
     clean((element as HTMLElement).innerText ?? element.textContent ?? "", 300);
-  const unique = (selector: string) => {
-    try {
-      return document.querySelectorAll(selector).length === 1;
-    } catch {
-      return false;
-    }
-  };
-  const selectorOf = (element: Element) => {
-    const parts: string[] = [];
-    for (
-      let node: Element | null = element;
-      node && node !== document.documentElement && parts.length < 12;
-      node = node.parentElement
-    ) {
-      if (node.id && unique(`#${CSS.escape(node.id)}`)) {
-        parts.unshift(`#${CSS.escape(node.id)}`);
-        break;
+  // A selector that matches only `element`: the shortest unique chain of
+  // steps up from it, within its document or shadow root. A ` >>> ` step goes
+  // into the open shadow root of the element before it.
+  const SHADOW = " >>> ";
+  const selectorIn = (element: Element) => {
+    const scope = element.getRootNode() as Document | ShadowRoot;
+    const unique = (selector: string) => {
+      try {
+        return scope.querySelectorAll(selector).length === 1;
+      } catch {
+        return false;
       }
+    };
+    const parts: string[] = [];
+    for (let node: Element | null = element; node; node = node.parentElement) {
       const testId = node.getAttribute("data-testid");
-      const byTestId = testId && `[data-testid="${CSS.escape(testId)}"]`;
-      if (byTestId && unique(byTestId)) {
-        parts.unshift(byTestId);
+      const anchor = [
+        node.id && `#${CSS.escape(node.id)}`,
+        testId && `[data-testid="${CSS.escape(testId)}"]`,
+      ].find((selector) => selector && unique(selector));
+      if (anchor) {
+        parts.unshift(anchor);
         break;
       }
       const tag = node.localName;
@@ -218,8 +221,25 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
           ? `${tag}:nth-of-type(${siblings.indexOf(node) + 1})`
           : tag,
       );
+      if (unique(parts.join(" > "))) break;
     }
     return parts.join(" > ");
+  };
+  const selectorOf = (element: Element): string => {
+    const root = element.getRootNode();
+    const own = selectorIn(element);
+    return root instanceof ShadowRoot
+      ? `${selectorOf(root.host)}${SHADOW}${own}`
+      : own;
+  };
+  const query = (selector: string) => {
+    let scope: ParentNode | null = document;
+    let found: Element | null = null;
+    for (const step of selector.split(SHADOW)) {
+      found = step && scope ? scope.querySelector(step) : null;
+      scope = found?.shadowRoot ?? null;
+    }
+    return found;
   };
   const nameOf = (element: Element) => {
     const classes = Array.from(element.classList)
@@ -277,7 +297,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     const mark = marks.get(pin.id);
     if (mark?.element?.isConnected) return mark.element;
     try {
-      const found = document.querySelector(pin.selector);
+      const found = query(pin.selector);
       if (mark && found) mark.element = found;
       return found;
     } catch {
@@ -296,8 +316,8 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     });
   };
 
-  // Positions everything from the live layout, every frame while anything
-  // shows, so pins follow scrolling, resizing, and animations. It reads the
+  // Positions everything from the live layout: every frame while picking or
+  // editing, and otherwise on scrolls, resizes, and each sync. It reads the
   // layout before it writes styles, so a frame costs one layout.
   let frame = 0;
   let tipFor: Element | null = null;
@@ -341,9 +361,13 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
       editor.style.left = `${Math.max(8, Math.min(targetRect.left, innerWidth - width - 8))}px`;
       editor.style.top = `${Math.max(8, Math.min(top, innerHeight - height - 8))}px`;
     }
-    if (state.pins.length || state.picking || editing)
-      frame = requestAnimationFrame(layout);
+    if (state.picking || editing) frame = requestAnimationFrame(layout);
   };
+  const schedule = () => {
+    if (!frame && host.isConnected) frame = requestAnimationFrame(layout);
+  };
+  addEventListener("scroll", schedule, { capture: true, passive: true });
+  addEventListener("resize", schedule);
   const relayout = () => {
     if (frame) cancelAnimationFrame(frame);
     layout();
@@ -389,6 +413,19 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     relayout();
     input.focus({ preventScroll: true });
   };
+  // An open modal dialog makes the rest of the page inert, so the overlay
+  // goes into it while it is open.
+  const mount = () => {
+    let modal: Element | null = null;
+    try {
+      modal = document.querySelector("dialog:modal");
+    } catch {
+      // A browser without `:modal` has no modal dialogs to mind.
+    }
+    const parent = modal ?? document.documentElement;
+    if (host.parentNode !== parent) parent.appendChild(host);
+    if (host.popover && !host.matches(":popover-open")) host.showPopover();
+  };
   const stopPicking = () => {
     state = { ...state, picking: false };
     layer.classList.remove("picking");
@@ -432,7 +469,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
         id: pin.id,
         number: pin.number,
         comment,
-        url: location.href,
+        url: location.href.slice(0, 16000),
         title: document.title.slice(0, 500),
         element,
       };
@@ -508,16 +545,19 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     const target = hovered?.contains(element) ? hovered : (element ?? hovered);
     if (target) open(target, null);
   });
+  /** Moves the picker from the hovered element to its parent. */
+  const parent = () => {
+    if (!state.picking || editing || !hovered?.parentElement) return;
+    hovered = hovered.parentElement;
+    relayout();
+  };
   shield.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (event.key === "Escape") {
       stopPicking();
       relayout();
       post({ kind: "stop" });
-    } else if (event.key === "ArrowUp" && hovered?.parentElement) {
-      hovered = hovered.parentElement;
-      relayout();
-    }
+    } else if (event.key === "ArrowUp") parent();
   });
 
   /**
@@ -529,8 +569,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     state = { ...state, ...next };
     // The overlay joins the page once it has something to show. The page may
     // also remove it, for example when it re-renders <html>.
-    if ((state.picking || state.pins.length) && !host.isConnected)
-      document.documentElement.appendChild(host);
+    if (state.picking || state.pins.length) mount();
     if (next.pins) drawPins();
     if (
       editing &&
@@ -548,9 +587,9 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   };
 
   // The shortcut also works while the page has the focus, where BB does not
-  // see keys. Keys match the way BB matches them; a key that is no Latin
-  // letter or digit, as in another keyboard layout or with Alt, matches by
-  // its physical key.
+  // see keys. Keys match the way BB matches them. A letter of another
+  // keyboard layout, or a key pressed with Alt that gives no Latin letter or
+  // digit, matches by its physical key.
   const SHIFTED: Record<string, string> = {
     "!": "1",
     "@": "2",
@@ -576,9 +615,11 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   };
   const keyOf = (event: KeyboardEvent) => {
     if (event.key === " " || event.key === "Spacebar") return "space";
-    const physical = /^[a-z0-9]$/i.test(event.key)
-      ? undefined
-      : /^(?:Key|Digit)(.)$/.exec(event.code)?.[1];
+    const physical =
+      !/^[a-z0-9]$/i.test(event.key) &&
+      (event.altKey || /^\p{L}$/u.test(event.key))
+        ? /^(?:Key|Digit)(.)$/.exec(event.code)?.[1]
+        : undefined;
     if (physical) return physical.toLowerCase();
     return (
       event.shiftKey ? (SHIFTED[event.key] ?? event.key) : event.key
@@ -606,7 +647,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     true,
   );
 
-  scope.__bbAnnotate = { sync, root };
+  scope.__bbAnnotate = { sync, parent, root };
 }
 
 /** The expression that installs the page side and shows `state`, a JSON

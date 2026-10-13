@@ -9,7 +9,12 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import "./app.css";
 import type { rpcContract } from "./contract";
-import { pageExpression, type Pin, type Shortcut } from "./page";
+import {
+  pageExpression,
+  type PageState,
+  type Pin,
+  type Shortcut,
+} from "./page";
 import {
   PROVIDER,
   cropBox,
@@ -80,11 +85,25 @@ function useShortcut(): Shortcut | null {
         const change =
           changes.find((item) => item.platform === platform) ??
           changes.find((item) => item.platform === undefined);
-        const taken = config.keybindings.some(
-          (binding) =>
-            JSON.stringify(toEvent(binding.shortcut)) ===
-            JSON.stringify(toEvent(DEFAULT_SHORTCUT)),
-        );
+        const here = (when: { all: string[]; none: string[] }) =>
+          !when.none.includes(`${platform}Platform`) &&
+          !when.all.some(
+            (key) => key.endsWith("Platform") && key !== `${platform}Platform`,
+          );
+        const same = (shortcut: typeof DEFAULT_SHORTCUT) =>
+          JSON.stringify(toEvent(shortcut)) ===
+          JSON.stringify(toEvent(DEFAULT_SHORTCUT));
+        const taken =
+          config.keybindings.some(
+            (binding) => here(binding.when) && same(binding.shortcut),
+          ) ||
+          config.keybindingOverrides.some(
+            (other) =>
+              other.command !== command &&
+              other.shortcut !== null &&
+              (other.platform ?? platform) === platform &&
+              same(other.shortcut),
+          );
         const bound = change
           ? change.shortcut
           : taken
@@ -207,15 +226,36 @@ function AnnotateAction({
       selector: element.selector,
     }));
   const next = Math.max(0, ...drafted.map((note) => note.number)) + 1;
-  const state = JSON.stringify({ picking, next, pins, shortcut });
+  // A new pick waits until the last note's screenshot is taken, so the
+  // screenshot shows only that note.
+  const state = JSON.stringify({
+    picking: picking && !pending.size,
+    next,
+    pins,
+    shortcut,
+  });
   // The page handler reads these without subscribing again on every change.
-  const latest = useRef({ notes, state });
-  latest.current = { notes, state };
+  const latest = useRef({ notes, pending, state });
+  latest.current = { notes, pending, state };
+  const forget = (id: string) =>
+    setPending((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
 
-  // Redraws the page from the latest state, also without the pin of a note
-  // the page added but this control could not keep.
-  const redraw = () => {
-    page?.evaluate(pageExpression(latest.current.state)).catch(warn);
+  // Shows the latest state on the page, with `patch` on top. Only a page
+  // without the script gets the whole script.
+  const redraw = (patch: Partial<PageState> = {}) => {
+    if (!page) return;
+    const state = JSON.stringify({
+      ...JSON.parse(latest.current.state),
+      ...patch,
+    });
+    page
+      .evaluate(`(globalThis.__bbAnnotate?.sync(${state}) ?? false)`)
+      .then((installed) => installed || page.evaluate(pageExpression(state)))
+      .catch(warn);
   };
 
   // The script goes into each page this control shows. It draws nothing
@@ -236,6 +276,27 @@ function AnnotateAction({
     return () => clearInterval(timer);
   }, [page]);
 
+  // While picking, Escape and ↑ also work when BB has the focus, as after a
+  // click on this button or the shortcut in the composer.
+  useEffect(() => {
+    if (!page || !picking) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target;
+      const editable =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      if (event.key === "Escape") setPicking(false);
+      else if (event.key === "ArrowUp" && !editable)
+        page.evaluate("(globalThis.__bbAnnotate?.parent(), null)").catch(warn);
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    addEventListener("keydown", onKey, true);
+    return () => removeEventListener("keydown", onKey, true);
+  }, [page, picking]);
+
   useEffect(() => {
     const control = { threadId, button, toggle: () => setPicking((on) => !on) };
     controls.add(control);
@@ -248,13 +309,18 @@ function AnnotateAction({
     if (!page) return;
     const unsubscribe = page.onMessage((data) => {
       const parsed = pageMessageSchema.safeParse(data);
-      if (!parsed.success) return redraw();
+      if (!parsed.success) {
+        // Drop the pin the page drew for a note it could not describe.
+        setPicking(false);
+        return redraw({ picking: false });
+      }
       const message = parsed.data;
       if (message.kind === "stop") setPicking(false);
       else if (message.kind === "toggle") setPicking((on) => !on);
-      else if (message.kind === "delete")
+      else if (message.kind === "delete") {
+        forget(message.id);
         composer.replace((draft) => withoutNote(draft, message.id));
-      else if (message.kind === "edit") {
+      } else if (message.kind === "edit") {
         const note = latest.current.notes.get(message.id);
         if (!note) return;
         const edited = { ...note, comment: message.comment };
@@ -263,18 +329,15 @@ function AnnotateAction({
       } else {
         const { kind: _, ...note } = message;
         // The note's pin stays on the page while its pill is on the way.
-        const settle = () =>
-          setPending((current) => {
-            const next = new Set(current);
-            next.delete(note.id);
-            return next;
-          });
         remember(note);
         setPending((current) => new Set(current).add(note.id));
         setPicking(false);
+        // The capture starts at once, while the page is still where the note
+        // measured the element.
+        const shot = rpc.call("captureNoteTab", { threadId, tabId });
+        shot.catch(() => undefined);
         const screenshot = async () => {
-          const shot = await rpc.call("captureNoteTab", { threadId, tabId });
-          const base64 = await cropShot(shot, note.element);
+          const base64 = await cropShot(await shot, note.element);
           if (base64)
             await rpc.call("saveNoteImage", { threadId, id: note.id, base64 });
         };
@@ -286,13 +349,18 @@ function AnnotateAction({
             screenshot().catch(warn),
             new Promise((resolve) => setTimeout(resolve, 5000)),
           ]);
-          composer.insert(
-            [{ provider: PROVIDER, id: note.id, label: pillLabel(note) }, " "],
-            { at: "end" },
-          );
+          // A note deleted from its pin in the meantime gets no pill.
+          if (latest.current.pending.has(note.id))
+            composer.insert(
+              [
+                { provider: PROVIDER, id: note.id, label: pillLabel(note) },
+                " ",
+              ],
+              { at: "end" },
+            );
         })()
           .catch(warn)
-          .finally(settle);
+          .finally(() => forget(note.id));
       }
     });
     return () => {
@@ -323,9 +391,6 @@ function AnnotateAction({
           : "Add a note to an element of this page"
       }
       onClick={() => setPicking(!picking)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && picking) setPicking(false);
-      }}
     >
       <Icon />
       {!isCompactViewport && <span>{picking ? "Cancel" : "Annotate"}</span>}
@@ -342,7 +407,7 @@ export default definePluginApp((app) => {
   app.commands.register({
     id: COMMAND,
     title: "Annotate: Pick an element in the Browser",
-    defaultShortcut: { key: "a", mod: true, shift: true },
+    defaultShortcut: DEFAULT_SHORTCUT,
     isAvailable: ({ threadId }) => !!visibleControl(threadId),
     run: ({ threadId }) => visibleControl(threadId)?.toggle(),
   });

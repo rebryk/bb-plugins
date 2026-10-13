@@ -88,7 +88,7 @@ async function setup({
   const lastState = () =>
     JSON.parse(
       String(page.evaluate.mock.calls.at(-1)?.[0]).match(
-        /__bbAnnotate\.sync\((.*)\), null\)$/,
+        /__bbAnnotate\??\.sync\((.*)\)(?:, null| \?\? false)\)$/,
       )![1]!,
     );
   return { slot, rpc, emit, lastState };
@@ -213,10 +213,62 @@ it("keeps a new note's pin while its screenshot is taken", async () => {
     }),
   );
   expect(slot.inspection.composer.draft.mentions).toEqual([]);
+  // A new pick waits for the screenshot.
+  await emit({ kind: "toggle" });
+  expect(slot.getByRole("button", { name: "Stop annotating" })).toBeTruthy();
+  expect(lastState()).toMatchObject({ picking: false });
+});
+
+it("gives no pill to a note deleted while its screenshot is taken", async () => {
+  let capture = () => {};
+  const { slot, rpc, emit } = await setup({
+    captureNoteTab: () =>
+      new Promise((resolve) => {
+        capture = () => resolve({ base64: "", mimeType: "image/jpeg" });
+      }),
+  });
+  const note = sampleNote({ url: "https://example.com/page" });
+  await emit({ kind: "add", ...note });
+  await emit({ kind: "delete", id: note.id });
+  await waitFor(() => expect(rpc.saveNote).toHaveBeenCalled());
+  await act(async () => capture());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(slot.inspection.composer.draft.mentions).toEqual([]);
+});
+
+it("takes Escape and ↑ from BB while picking", async () => {
+  const { slot } = await setup();
+  fireEvent.click(slot.getByRole("button", { name: "Annotate" }));
+  fireEvent.keyDown(window, { key: "ArrowUp" });
+  expect(String(page.evaluate.mock.calls.at(-1)?.[0])).toContain(
+    "__bbAnnotate?.parent()",
+  );
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(slot.getByRole("button", { name: "Annotate" })).toBeTruthy();
+});
+
+it("leaves the default unbound when another command has its keys", async () => {
+  const { lastState } = await setup({
+    keybindingOverrides: [
+      {
+        command: "plugin:other/x",
+        shortcut: {
+          key: "A",
+          mod: true,
+          shift: true,
+          alt: false,
+          control: false,
+          meta: false,
+        },
+      },
+    ],
+  });
+  await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
+  expect(lastState().shortcut).toBe(null);
 });
 
 it("ignores what the page sends that does not fit", async () => {
-  const { slot, rpc, emit } = await setup();
+  const { slot, rpc, emit, lastState } = await setup();
   await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
   const drawn = page.evaluate.mock.calls.length;
   await emit({ kind: "add", ...sampleNote(), id: "../../etc" });
@@ -225,7 +277,8 @@ it("ignores what the page sends that does not fit", async () => {
   expect(rpc.saveNote).not.toHaveBeenCalled();
   expect(slot.inspection.composer.draft.mentions).toEqual([]);
   // The page drew a pin for the note; drawing the state again removes it.
-  expect(page.evaluate).toHaveBeenCalledTimes(drawn + 3);
+  expect(page.evaluate.mock.calls.length).toBeGreaterThan(drawn);
+  expect(lastState()).toMatchObject({ picking: false, pins: [] });
 });
 
 it("restores the pins of earlier pills on this page only", async () => {
@@ -309,17 +362,15 @@ it("puts the script back after the page reloads", async () => {
   try {
     const { slot } = await setup();
     fireEvent.click(slot.getByRole("button", { name: "Annotate" }));
+    await act(() => vi.advanceTimersByTimeAsync(10));
     // The reloaded page has no script, so the check answers null.
     page.evaluate.mockClear();
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(
-      page.evaluate.mock.calls.map(([expression]) =>
-        String(expression).slice(0, 40),
-      ),
-    ).toEqual([
-      "(globalThis.__bbAnnotate?.sync({}) ?? fa",
-      expect.stringContaining("((function installPage"),
-    ]);
+    const calls = page.evaluate.mock.calls.map(([expression]) =>
+      String(expression),
+    );
+    expect(calls[0]).toBe("(globalThis.__bbAnnotate?.sync({}) ?? false)");
+    expect(calls.at(-1)).toMatch(/^\(\(function installPage/);
   } finally {
     vi.useRealTimers();
   }

@@ -102,6 +102,16 @@ describe("cropBox", () => {
   });
 });
 
+it("explains a step into a shadow root", () => {
+  const note = sampleNote();
+  const inShadow = sampleNote({
+    element: { ...note.element, selector: "x-card >>> button" },
+  });
+  expect(formatNote(inShadow)).toContain(
+    "- Selector: `x-card >>> button`\n  (` >>> ` steps into the open shadow root of the element before it.)",
+  );
+});
+
 it("tells the agent the comment, then the element as page data", () => {
   expect(
     formatNote(sampleNote({ comment: "Make this blue\nand bigger" })),
