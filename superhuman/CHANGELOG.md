@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.23 (2026-10-12)
+
+- On a phone, a thread's bar lays out its buttons as the home page's card
+  does: the first and the last sit at the card's padding, and the rest spread
+  evenly between them. The right panel's button now sits in the same spot in
+  a thread's bar, on the home page, and in the right panel. When the buttons
+  don't fit, other plugins' buttons scroll instead of BB's leaving the screen.
+- Other plugins' buttons on the home page's card keep their own grouping and
+  take the size they have in a thread's bar, so they look the same in both. A
+  plugin that shows no button leaves no gap in either, and buttons in a
+  plugin's drop-down keep their own size.
+
 ## 0.1.22 (2026-10-12)
 
 - On a phone, the home page has a card below its message box, as a thread's

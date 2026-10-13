@@ -95,11 +95,11 @@ html[data-phone-layout] {
   /*
    * The home page has no header, only a button at each top corner. Instead,
    * it gets a card below its message box, as a thread's bar is. The card
-   * holds the right panel's button and what plugins put below the box, such
-   * as Thread Sidebar's running servers. BB pulls the box's block 1rem into
-   * the page's padding and ends it with 1rem of padding of its own, so with
-   * the card at the block's end, the page's padding is the card's distance
-   * from the bottom.
+   * holds the right panel's button and what other plugins put below the
+   * box, with the size and spacing of a thread's bar. BB pulls the box's
+   * block 1rem into the page's padding and ends it with 1rem of padding of
+   * its own, so with the card at the block's end, the page's padding is the
+   * card's distance from the bottom.
    */
   main:has(> div > [aria-label*="right panel"]) {
     --phone-layout-home: 1;
@@ -123,41 +123,51 @@ html[data-phone-layout] {
     }
 
     /*
-     * The card and the plugins' boxes share the row below the message box.
-     * The boxes lie over the card and spread their buttons across it, left of
-     * the right panel's button, as a thread's bar does.
+     * What plugins put below the message box wraps to a line of its own,
+     * which ends with room for the right panel's button. The card lies under
+     * that line, and its items sit at the card's padding and spread across it
+     * as a thread's bar spreads its buttons. The message box keeps its width.
      */
     [data-testid="root-compose-compact-fade"] + div > div {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      row-gap: calc(var(--spacing, 0.25rem) * 3);
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: calc(var(--spacing, 0.25rem) * 3) var(--phone-layout-button-gap);
+      padding-inline: calc(var(--phone-layout-card-inset) + 1px + var(--phone-layout-card-padding));
 
-      &::after,
-      > [data-app-composer] ~ [data-bb-plugin] {
-        grid-area: 2 / 1;
-        height: var(--phone-layout-card-height);
+      > [data-app-composer] {
+        flex: 0 0 calc(100% + 2px + 2 * var(--phone-layout-card-padding));
+        margin-inline: calc(-1px - var(--phone-layout-card-padding));
       }
 
-      &::after {
+      /* Above the card, without the margin a plugin keeps around its box. */
+      > [data-app-composer] ~ :is([data-bb-plugin], [data-bb-plugin-root]) {
+        position: relative;
+        margin: 0;
+      }
+
+      /* A plugin that shows no button here, or nothing at all, leaves no gap. */
+      > [data-app-composer] ~ :is([data-bb-plugin], [data-bb-plugin-root]):not(:has(button, a, [role="button"])) {
+        display: none;
+      }
+
+      &::before {
         content: "";
+        position: absolute;
+        inset: auto var(--phone-layout-card-inset) 0;
+        height: var(--phone-layout-card-height);
         border: 1px solid var(--border);
         border-radius: var(--phone-layout-card-radius, calc(var(--radius) + 4px));
         background-color: var(--background);
         box-shadow: var(--shadow-lift);
       }
 
-      > [data-app-composer] ~ [data-bb-plugin] {
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        justify-content: space-evenly;
-        margin: 0;
-        padding: 0 calc(1px + var(--phone-layout-card-padding) + var(--phone-layout-button-size)) 0
-          calc(1px + var(--phone-layout-card-padding));
-
-        > div:not([popover]) {
-          display: contents;
-        }
+      &::after {
+        content: "";
+        width: var(--phone-layout-button-size);
+        height: var(--phone-layout-card-height);
       }
     }
   }
@@ -174,7 +184,18 @@ html[data-phone-layout] {
    * a tab's buttons are told apart by their parent alone.
    */
   header > [data-testid="app-page-header-content-row"]
-    :is(button, a):not([class*="pointer-coarse:h-9"]) {
+    :is(button, a):not([class*="pointer-coarse:h-9"], [popover] *) {
+    min-width: var(--phone-layout-button-size);
+    min-height: var(--phone-layout-button-size);
+
+    :is(svg, img, [data-plugin-icon-asset]) {
+      width: var(--phone-layout-icon-size);
+      height: var(--phone-layout-icon-size);
+    }
+  }
+
+  [data-testid="root-compose-compact-fade"] + div > div > [data-app-composer] ~ :is([data-bb-plugin], [data-bb-plugin-root])
+    :is(button, a):not([popover] *) {
     min-width: var(--phone-layout-button-size);
     min-height: var(--phone-layout-button-size);
 
@@ -244,23 +265,20 @@ html[data-phone-layout] {
   }
 
   /*
-   * A phone's thread bar has no title, so it holds only buttons, and they
-   * spread evenly across the card: the icons sit as far from the card's sides
-   * as from each other. The boxes BB groups them in give way, so the buttons
-   * share one row, which runs from its end: the right panel's button, the
-   * thread's menu, then the plugins' buttons from the last added, such as New
-   * thread and Snooze. Only the visual order changes;
-   * focus and screen readers keep BB's.
+   * A phone's thread bar has no title, so it holds only buttons. As on the
+   * home page's card, the first and the last sit at the card's padding, and
+   * the rest spread evenly between them. The boxes BB groups them in give
+   * way, so the buttons share one row, which runs from its end: the right
+   * panel's button, the thread's menu, then the plugins' buttons from the last
+   * added, such as New thread and Snooze. Only the visual order changes; focus
+   * and screen readers keep BB's.
    */
   header
     > [data-testid="app-page-header-content-row"]:has(> div > [data-thread-header-workflow-actions]) {
     --phone-layout-thread-bar: 1;
     flex-direction: row-reverse;
-    justify-content: space-evenly;
-    /* With the card's padding, as wide as the room around an icon in its button. */
-    padding-inline: calc(
-      (var(--phone-layout-button-size) - var(--phone-layout-icon-size)) / 2 - var(--phone-layout-card-padding)
-    );
+    justify-content: space-between;
+    padding-inline: 0;
   }
 
   @container style(--phone-layout-thread-bar: 1) {
@@ -287,8 +305,18 @@ html[data-phone-layout] {
         display: none;
       }
 
-      /* A plugin that shows nothing here leaves no gap. */
-      [data-bb-plugin-root] > span[class*="max-h-7"]:empty {
+      /*
+       * When the buttons don't fit, a plugin's box wider than a button gives
+       * up its room and scrolls, instead of BB's buttons leaving the screen.
+       */
+      [data-bb-plugin-root] > span[class*="max-h-7"] {
+        flex-shrink: 1;
+        min-width: var(--phone-layout-button-size);
+        overflow-x: auto;
+      }
+
+      /* A plugin that shows no button here, or nothing at all, leaves no gap. */
+      [data-bb-plugin-root] > span[class*="max-h-7"]:not(:has(button, a, [role="button"])) {
         display: none;
       }
     }
@@ -491,8 +519,9 @@ html[data-phone-layout] {
       aside
       > :has(> [data-testid="thread-secondary-panel-top-chrome"]),
     main > div:has(> [aria-label*="right panel"]),
+    [data-testid="root-compose-compact-fade"] + div > div::before,
     [data-testid="root-compose-compact-fade"] + div > div::after,
-    [data-testid="root-compose-compact-fade"] + div > div > [data-app-composer] ~ [data-bb-plugin] {
+    [data-testid="root-compose-compact-fade"] + div > div > [data-app-composer] ~ :is([data-bb-plugin], [data-bb-plugin-root]) {
       display: none;
     }
 
