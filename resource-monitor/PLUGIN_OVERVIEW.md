@@ -10,8 +10,9 @@ at 85% and red at 95%.
 ## The numbers on hover
 
 Hover the icon. In place of BB's tooltip, a small card shows each percentage
-over a thin bar. Click the icon for a page that adds the CPU model and core
-count, the RAM in use, the GPU name, and how long the server has been up.
+over a thin bar. On a touch screen, tap the icon instead. For the CPU model
+and core count, the RAM in use, the GPU name, and how long the server has been
+up, right-click the icon and choose Open in split.
 
 ## Where the numbers come from
 

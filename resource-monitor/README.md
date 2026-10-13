@@ -18,10 +18,11 @@ rail      hover card
 - **See the load.** The bars fill from the bottom: CPU on the left, RAM in
   the middle, GPU on the right. A bar turns amber at 85% and red at 95%.
 - **See the numbers.** Hover the icon. In place of BB's tooltip, a card shows
-  each percentage over a thin bar.
-- **See the details.** Click the icon. The **Resources** page adds the CPU
-  model and core count, the RAM in use, the GPU name, the server's name, and
-  how long it has been up.
+  each percentage over a thin bar. On a touch screen, tap the icon to show or
+  hide the card. Clicking the icon opens nothing.
+- **See the details.** Right-click the icon and choose **Open in split**. The
+  **Resources** page adds the CPU model and core count, the RAM in use, the
+  GPU name, the server's name, and how long it has been up.
 
 ## How it works
 
@@ -46,11 +47,12 @@ rail      hover card
   BB draws registered icons outside any plugin context, so an always-mounted
   `experimental_appOverlay` receives the readings and shares them with the
   icon.
-- The hover card is the plugin's own. It mutes BB's tooltip on the icon by
-  stopping `pointermove` events on the rail tile before BB's handler sees
-  them.
+- The card is the plugin's own. It mutes BB's tooltip on the icon by stopping
+  `pointermove` events on the rail tile before BB's handler sees them, and it
+  stops clicks on the tile the same way, so they never open the page.
 - A BB update may break `experimental_icons`, `experimental_appOverlay`, the
-  rail's `data-nav-rail-item` attribute, or how BB opens the rail's tooltip.
+  rail's `data-nav-rail-item` attribute, or how BB opens the rail's tooltip
+  and page.
 
 ## Install
 
