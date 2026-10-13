@@ -1,38 +1,31 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
+import { promisify } from "node:util";
 import type { Sample } from "./shared";
 
-type CoreTimes = { busy: number; total: number };
+type CpuTimes = { busy: number; total: number };
 type Gpu = NonNullable<Sample["gpu"]>;
 
-const round = (value: number) => Math.round(value * 10) / 10;
+const run = async (file: string, args: string[]) =>
+  (await promisify(execFile)(file, args, { timeout: 1500 })).stdout;
 
-function coreTimes(): CoreTimes[] {
-  return os.cpus().map(({ times }) => {
-    const total = times.user + times.nice + times.sys + times.idle + times.irq;
-    return { busy: total - times.idle, total };
-  });
+/** Busy and total time of all cores together. */
+function cpuTimes(): CpuTimes {
+  let busy = 0;
+  let total = 0;
+  for (const { times } of os.cpus()) {
+    const all = times.user + times.nice + times.sys + times.idle + times.irq;
+    busy += all - times.idle;
+    total += all;
+  }
+  return { busy, total };
 }
 
-/** Busy share of each core between two readings, 0–100. */
-export function corePercents(
-  before: readonly CoreTimes[],
-  after: readonly CoreTimes[],
-): number[] {
-  return after.map((now, index) => {
-    const then = before[index] ?? { busy: 0, total: 0 };
-    const total = now.total - then.total;
-    return total > 0 ? round((100 * (now.busy - then.busy)) / total) : 0;
-  });
-}
-
-function run(file: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(file, args, { timeout: 1500 }, (error, stdout) =>
-      error ? reject(error) : resolve(stdout),
-    );
-  });
+/** Busy share of all cores between two readings, 0–100. */
+export function cpuPercent(before: CpuTimes, after: CpuTimes): number {
+  const total = after.total - before.total;
+  return total > 0 ? (100 * (after.busy - before.busy)) / total : 0;
 }
 
 /**
@@ -62,7 +55,7 @@ export function parseMemInfo(text: string): number | null {
 async function usedMemory(): Promise<number> {
   try {
     if (process.platform === "darwin") {
-      const used = parseVmStat(await run("vm_stat", []));
+      const used = parseVmStat(await run("/usr/bin/vm_stat", []));
       if (used !== null) return used;
     } else if (process.platform === "linux") {
       const used = parseMemInfo(await readFile("/proc/meminfo", "utf8"));
@@ -78,12 +71,9 @@ async function usedMemory(): Promise<number> {
 export function parseIoreg(text: string): Gpu | null {
   const percent = /"Device Utilization %"=(\d+)/u.exec(text)?.[1];
   if (percent === undefined) return null;
-  const memory = /"In use system memory"=(\d+)/u.exec(text)?.[1];
   return {
     percent: Number(percent),
     name: /"model" = "([^"]+)"/u.exec(text)?.[1] ?? "GPU",
-    memoryUsedBytes: memory === undefined ? null : Number(memory),
-    memoryTotalBytes: null,
   };
 }
 
@@ -93,13 +83,8 @@ export function parseNvidiaSmi(text: string): Gpu | null {
     .trim()
     .split("\n")
     .map((line) => line.split(",").map((cell) => cell.trim()))
-    .filter((cells) => cells.length === 4 && cells[0] !== "")
-    .map(([name, percent, used, total]) => ({
-      name: name ?? "GPU",
-      percent: Number(percent),
-      memoryUsedBytes: Number(used) * 1024 * 1024,
-      memoryTotalBytes: Number(total) * 1024 * 1024,
-    }))
+    .filter((cells) => cells.length === 2 && cells[0] !== "")
+    .map(([name, percent]) => ({ name, percent: Number(percent) }))
     .filter((gpu) => Number.isFinite(gpu.percent));
   if (gpus.length === 0) return null;
   return gpus.reduce((busiest, gpu) =>
@@ -110,43 +95,49 @@ export function parseNvidiaSmi(text: string): Gpu | null {
 async function readGpu(): Promise<Gpu | null> {
   if (process.platform === "darwin") {
     return parseIoreg(
-      await run("ioreg", ["-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"]),
+      await run("/usr/sbin/ioreg", ["-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"]),
     );
   }
   return parseNvidiaSmi(
     await run("nvidia-smi", [
-      "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+      "--query-gpu=name,utilization.gpu",
       "--format=csv,noheader,nounits",
     ]),
   );
 }
 
+/** GPU reads that may fail in a row before the sampler stops asking. */
+const GPU_TRIES = 3;
+
 /** Reads one sample per call; CPU load covers the time since the last call. */
 export function createSampler() {
-  let previous = coreTimes();
-  let gpuMissing = false;
+  const cpus = os.cpus();
+  const model = cpus[0]?.model ?? "CPU";
+  const coreCount = cpus.length;
+  let previous = cpuTimes();
+  let gpuFailures = 0;
+
+  async function gpu(): Promise<Gpu | null> {
+    if (gpuFailures >= GPU_TRIES) return null;
+    try {
+      const reading = await readGpu();
+      gpuFailures = 0;
+      return reading;
+    } catch {
+      gpuFailures += 1;
+      return null;
+    }
+  }
 
   return async function sample(): Promise<Sample> {
-    const now = coreTimes();
-    const cores = corePercents(previous, now);
+    const now = cpuTimes();
+    const percent = cpuPercent(previous, now);
     previous = now;
-    let gpu: Gpu | null = null;
-    if (!gpuMissing) {
-      // A machine with no readable GPU stops asking after the first miss.
-      gpu = await readGpu().catch(() => null);
-      gpuMissing = gpu === null;
-    }
+    const [usedBytes, gpuReading] = await Promise.all([usedMemory(), gpu()]);
     return {
-      at: Date.now(),
-      cpu: {
-        percent: round(
-          cores.reduce((sum, core) => sum + core, 0) / (cores.length || 1),
-        ),
-        coreCount: cores.length,
-        model: os.cpus()[0]?.model ?? "CPU",
-      },
-      memory: { usedBytes: await usedMemory(), totalBytes: os.totalmem() },
-      gpu,
+      cpu: { percent, coreCount, model },
+      memory: { usedBytes, totalBytes: os.totalmem() },
+      gpu: gpuReading,
       hostname: os.hostname(),
       uptimeSeconds: os.uptime(),
     };

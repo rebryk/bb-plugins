@@ -18,9 +18,9 @@
   },
   "bb": {
     "name": "Resource Monitor",
-    "description": "A live CPU, memory, and GPU meter for your BB server in the sidebar. Hover it for details.",
+    "description": "Live CPU, RAM, and GPU bars for the BB server in the sidebar, with the numbers on hover.",
     "branding": {
-      "icon": "ChartColumn"
+      "icon": "./assets/icon.svg"
     },
     "server": "./server.ts",
     "app": "./app.tsx",

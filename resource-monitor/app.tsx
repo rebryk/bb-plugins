@@ -1,60 +1,65 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   definePluginApp,
   useRealtime,
   useRealtimeConnectionState,
-  useRpc,
-  useSettings,
 } from "@get-bb/plugin-sdk/app";
 import "./app.css";
-import { ResourceCard } from "./cards";
-import { ICONS } from "./icons";
-import type { rpcContract } from "./server";
-import {
-  CARD_STYLES,
-  ICON_STYLES,
-  SAMPLE_CHANNEL,
-  lookSchema,
-  sampleSchema,
-  type CardStyle,
-  type IconStyle,
-  type Look,
-} from "./shared";
-import { addSample, setLook, setSamples, useMonitor } from "./store";
+import { LoadColumns, MeterBars } from "./meter";
+import { SAMPLE_CHANNEL, sampleSchema, type Sample } from "./shared";
 
 const ICON_NAME = "resource-monitor/meter";
 
-/** Renders nothing; keeps the store in step with the server. */
+// Host-drawn icons get no plugin context, so SDK hooks throw inside them.
+// SampleFeed has that context; it fills this store, and the icon reads it.
+let latest: Sample | null = null;
+const listeners = new Set<() => void>();
+
+function setLatest(sample: Sample | null) {
+  latest = sample;
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+const useSample = () => useSyncExternalStore(subscribe, () => latest);
+
+/** Renders nothing; passes each new sample to the store. */
 function SampleFeed() {
-  const rpc = useRpc<typeof rpcContract>();
   const connection = useRealtimeConnectionState();
-  const { values } = useSettings();
-  // On mount, and once a dropped connection is back.
+  // Without a connection the last sample goes stale; show none instead.
   useEffect(() => {
-    if (connection !== "connected") return;
-    rpc.call("listResourceSamples", null).then(setSamples, () => {});
-  }, [rpc, connection]);
+    if (connection !== "connected") setLatest(null);
+  }, [connection]);
   useRealtime(SAMPLE_CHANNEL, (payload) => {
     const parsed = sampleSchema.safeParse(payload);
-    if (parsed.success) addSample(parsed.data);
+    if (parsed.success) setLatest(parsed.data);
   });
-  useEffect(() => {
-    const parsed = lookSchema.partial().safeParse(values ?? {});
-    if (parsed.success) setLook(parsed.data);
-  }, [values]);
   return null;
 }
 
-/** The rail tile's box while the pointer rests on it, else null. */
-function useRailHover(icon: React.RefObject<SVGSVGElement | null>) {
+/** The rail tile's box while the mouse rests on it, else null. */
+function useRailHover(icon: RefObject<SVGSVGElement | null>) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   useEffect(() => {
     const tile = icon.current?.closest("[data-nav-rail-item]");
     if (!(tile instanceof HTMLElement)) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const show = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse") return;
+      if (event.pointerType !== "mouse" || event.buttons !== 0) return;
       timer = setTimeout(() => setAnchor(tile.getBoundingClientRect()), 150);
     };
     const hide = () => {
@@ -81,120 +86,65 @@ function useRailHover(icon: React.RefObject<SVGSVGElement | null>) {
 }
 
 function HoverCard({ anchor }: { anchor: DOMRect }) {
-  const { samples, look } = useMonitor();
+  const sample = useSample();
   const card = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(anchor.top);
-  // Keep the card on screen when the tile sits low in the rail.
+  // Center the card on the tile, inside the window.
   useLayoutEffect(() => {
     const height = card.current?.offsetHeight ?? 0;
-    setTop(Math.max(8, Math.min(anchor.top - 8, innerHeight - height - 8)));
-  }, [anchor, samples.length, look.cardStyle]);
+    const centered = anchor.top + (anchor.height - height) / 2;
+    setTop(Math.max(8, Math.min(centered, innerHeight - height - 8)));
+  }, [anchor]);
   return createPortal(
     <div
       ref={card}
-      className="rm-popover"
+      className="rm-card"
       style={{ left: anchor.right + 10, top }}
       role="tooltip"
     >
-      <ResourceCard style={look.cardStyle} samples={samples} />
+      <LoadColumns sample={sample} />
     </div>,
     document.body,
   );
 }
 
-/** The sidebar icon: live load in the chosen style, details on hover. */
+/** The sidebar icon: live load as three bars, the numbers on hover. */
 function RailIcon({ className }: { className?: string }) {
-  const { samples, look } = useMonitor();
+  const sample = useSample();
   const icon = useRef<SVGSVGElement>(null);
   const anchor = useRailHover(icon);
   return (
     <>
       <svg ref={icon} viewBox="0 0 16 16" className={className} fill="currentColor">
-        {ICONS[look.iconStyle](samples)}
+        <MeterBars sample={sample} />
       </svg>
       {anchor && <HoverCard anchor={anchor} />}
     </>
   );
 }
 
-function Choice({
-  selected,
-  label,
-  onPick,
-  children,
-}: {
-  selected: boolean;
-  label: string;
-  onPick: () => void;
-  children: React.ReactNode;
-}) {
-  const [name, hint] = label.split(": ");
-  return (
-    <button
-      type="button"
-      className="rm-choice"
-      aria-pressed={selected}
-      onClick={onPick}
-    >
-      {children}
-      <span className="rm-choice-label">
-        {name}
-        <span className="rm-muted">{selected ? "In use" : "Use"}</span>
-      </span>
-      <span className="rm-muted">{hint}</span>
-    </button>
-  );
-}
-
-/** Every icon and card style, live, to compare and pick from. */
-function GalleryPage() {
-  const rpc = useRpc<typeof rpcContract>();
-  const { samples, look } = useMonitor();
-  const pick = (next: Partial<Look>) => {
-    setLook(next);
-    rpc.call("setResourceLook", next).then(setLook, () => {});
-  };
+function ResourcesPage() {
+  const sample = useSample();
   return (
     <div className="rm-page">
-      <h2>Sidebar icon</h2>
-      <p className="rm-muted">
-        Each style draws the live load. The small copy is the sidebar size.
-      </p>
-      <div className="rm-grid">
-        {(Object.keys(ICON_STYLES) as IconStyle[]).map((style) => (
-          <Choice
-            key={style}
-            selected={look.iconStyle === style}
-            label={ICON_STYLES[style]}
-            onPick={() => pick({ iconStyle: style })}
-          >
-            <span className="rm-icon-previews">
-              <svg viewBox="0 0 16 16" className="rm-icon-large" fill="currentColor">
-                {ICONS[style](samples)}
-              </svg>
-              <svg viewBox="0 0 16 16" className="rm-icon-small" fill="currentColor">
-                {ICONS[style](samples)}
-              </svg>
-            </span>
-          </Choice>
-        ))}
-      </div>
-      <h2>Hover card</h2>
-      <p className="rm-muted">Hover the sidebar icon to see the card in use.</p>
-      <div className="rm-cards">
-        {(Object.keys(CARD_STYLES) as CardStyle[]).map((style) => (
-          <Choice
-            key={style}
-            selected={look.cardStyle === style}
-            label={CARD_STYLES[style]}
-            onPick={() => pick({ cardStyle: style })}
-          >
-            <ResourceCard style={style} samples={samples} />
-          </Choice>
-        ))}
+      {sample && (
+        <p className="rm-detail">
+          {sample.hostname.split(".")[0]} · up {uptime(sample.uptimeSeconds)}
+        </p>
+      )}
+      <div className="rm-columns">
+        <LoadColumns sample={sample} details />
       </div>
     </div>
   );
+}
+
+function uptime(seconds: number) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 export default definePluginApp((app) => {
@@ -205,6 +155,6 @@ export default definePluginApp((app) => {
     title: "Resources",
     icon: ICON_NAME,
     path: "resources",
-    component: GalleryPage,
+    component: ResourcesPage,
   });
 });

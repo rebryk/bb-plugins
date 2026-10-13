@@ -1,23 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  corePercents,
+  cpuPercent,
   parseIoreg,
   parseMemInfo,
   parseNvidiaSmi,
   parseVmStat,
 } from "./stats";
 
-describe("corePercents", () => {
-  it("gives each core's busy share since the last reading", () => {
-    const before = [
-      { busy: 100, total: 1000 },
-      { busy: 0, total: 1000 },
-    ];
-    const after = [
-      { busy: 150, total: 1100 },
-      { busy: 0, total: 1000 },
-    ];
-    expect(corePercents(before, after)).toEqual([50, 0]);
+describe("cpuPercent", () => {
+  it("gives the busy share since the last reading", () => {
+    expect(cpuPercent({ busy: 100, total: 1000 }, { busy: 150, total: 1100 })).toBe(50);
+  });
+
+  it("gives 0 when no time passed", () => {
+    expect(cpuPercent({ busy: 1, total: 10 }, { busy: 1, total: 10 })).toBe(0);
   });
 });
 
@@ -49,12 +45,7 @@ describe("parseMemInfo", () => {
 describe("parseIoreg", () => {
   it("reads the accelerator's utilization and model", () => {
     const text = `"model" = "Apple M4"\n"PerformanceStatistics" = {"Device Utilization %"=13,"In use system memory"=2048}`;
-    expect(parseIoreg(text)).toEqual({
-      percent: 13,
-      name: "Apple M4",
-      memoryUsedBytes: 2048,
-      memoryTotalBytes: null,
-    });
+    expect(parseIoreg(text)).toEqual({ percent: 13, name: "Apple M4" });
   });
 
   it("returns null without utilization", () => {
@@ -64,13 +55,8 @@ describe("parseIoreg", () => {
 
 describe("parseNvidiaSmi", () => {
   it("picks the busiest GPU", () => {
-    const text = "NVIDIA A100, 12, 1024, 40960\nNVIDIA H100, 80, 2048, 81920\n";
-    expect(parseNvidiaSmi(text)).toEqual({
-      name: "NVIDIA H100",
-      percent: 80,
-      memoryUsedBytes: 2048 * 1024 * 1024,
-      memoryTotalBytes: 81920 * 1024 * 1024,
-    });
+    const text = "NVIDIA A100, 12\nNVIDIA H100, 80\n";
+    expect(parseNvidiaSmi(text)).toEqual({ name: "NVIDIA H100", percent: 80 });
   });
 
   it("returns null for empty output", () => {

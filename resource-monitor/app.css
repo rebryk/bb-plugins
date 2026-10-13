@@ -1,6 +1,14 @@
 /* Hover card */
 
-.rm-popover {
+.rm-card {
+  display: flex;
+  gap: 4px;
+  padding: 10px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-lg);
   position: fixed;
   z-index: 60;
   pointer-events: none;
@@ -14,23 +22,6 @@
   }
 }
 
-.rm-card {
-  display: flex;
-  gap: 4px;
-  padding: 10px 8px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--popover);
-  color: var(--popover-foreground);
-  box-shadow: var(--shadow-lg);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.rm-muted {
-  color: var(--muted-foreground);
-}
-
 .rm-column {
   display: flex;
   flex-direction: column;
@@ -39,174 +30,75 @@
   width: 48px;
 }
 
+.rm-value {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* The fill uses the text color; high load tints it inline. */
+.rm-bar {
+  display: flex;
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  overflow: hidden;
+}
+
+.rm-bar i {
+  background: currentColor;
+}
+
 .rm-label {
   color: var(--muted-foreground);
   font-size: 11px;
   line-height: 12px;
 }
 
-.rm-value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+.rm-detail {
+  color: var(--muted-foreground);
+  font-size: 13px;
 }
 
-/* Fills use the text color; high load tints them inline. */
-.rm-vbar,
-.rm-hbar {
-  display: flex;
-  overflow: hidden;
-  background: color-mix(in oklab, currentColor 12%, transparent);
-}
-
-.rm-vbar i,
-.rm-hbar i {
-  background: currentColor;
-}
-
-.rm-vbar {
-  align-items: flex-end;
-  width: 8px;
-  height: 40px;
-  border-radius: 4px;
-}
-
-.rm-vbar i {
-  width: 100%;
-}
-
-.rm-hbar {
-  width: 32px;
-  height: 3px;
-  border-radius: 2px;
-}
-
-.rm-ring {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-}
-
-.rm-ring svg {
-  position: absolute;
-  inset: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.rm-ring .rm-track {
-  stroke: color-mix(in oklab, currentColor 12%, transparent);
-}
-
-.rm-ring .rm-value {
-  font-size: 11px;
-}
-
-.rm-big .rm-value {
-  font-size: 16px;
-  line-height: 20px;
-}
-
-/* Gallery page */
+/* Page */
 
 .rm-page {
   height: 100%;
-  padding: 24px 32px 48px;
+  padding: 24px 32px;
   overflow-y: auto;
 }
 
-.rm-page h2 {
-  margin: 8px 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.rm-page h2 ~ h2 {
-  margin-top: 32px;
-}
-
 .rm-page > p {
-  margin: 0 0 12px;
-  font-size: 13px;
+  margin: 0 0 24px;
 }
 
-.rm-grid,
-.rm-cards {
+.rm-columns {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 48px;
+}
+
+.rm-columns .rm-column {
   align-items: flex-start;
-}
-
-.rm-choice {
-  display: grid;
-  justify-items: start;
-  gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--foreground);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.rm-choice:hover {
-  background: var(--state-hover);
-}
-
-.rm-choice[aria-pressed="true"] {
-  border-color: var(--foreground);
-}
-
-.rm-grid {
-  align-items: stretch;
-}
-
-.rm-grid .rm-choice {
-  width: 176px;
-  align-content: start;
-}
-
-.rm-choice-label {
-  display: flex;
-  justify-content: space-between;
-  align-self: stretch;
   gap: 8px;
+  width: auto;
+}
+
+.rm-columns .rm-value {
+  font-size: 32px;
+  line-height: 36px;
+}
+
+.rm-columns .rm-bar {
+  width: 96px;
+  height: 4px;
+}
+
+.rm-columns .rm-label {
+  color: var(--foreground);
   font-size: 13px;
   font-weight: 600;
-}
-
-.rm-choice-label .rm-muted {
-  font-size: 12px;
-  font-weight: 400;
-}
-
-/* The tile is the frame; the card inside drops its own. */
-.rm-cards .rm-card {
-  padding: 4px 0;
-  border: none;
-  background: none;
-  box-shadow: none;
-}
-
-.rm-icon-previews {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  color: var(--muted-foreground);
-}
-
-.rm-icon-large {
-  width: 48px;
-  height: 48px;
-}
-
-.rm-icon-small {
-  width: 20px;
-  height: 20px;
+  line-height: 16px;
 }
