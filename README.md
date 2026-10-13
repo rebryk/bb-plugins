@@ -13,6 +13,7 @@ bb plugin install bookmarks@sf-plugins
 bb plugin install canvas@sf-plugins
 bb plugin install auto-update@sf-plugins
 bb plugin install storage-cleaner@sf-plugins
+bb plugin install resource-monitor@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
@@ -23,7 +24,7 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All seven suit any BB setup, except that Storage Cleaner needs macOS. With
+All eight suit any BB setup, except that Storage Cleaner needs macOS. With
 Account Pooler, Pool Usage counts every pooled account.
 
 ### [Superhuman](./superhuman)
@@ -65,6 +66,12 @@ A page in Settings that shows what fills the Mac's disk: free space, a bar split
 into BB & agents, dev caches, apps, the Trash, your files, and the system, and
 a treemap explorer. Clean deletes the storage of archived threads, leftover
 worktrees, dev caches, or the Trash, and switches do it every night.
+
+### [Resource Monitor](./resource-monitor)
+
+Three live bars, CPU, RAM, and GPU, as the plugin's icon in the sidebar's
+navigation rail, updated every 2 seconds. Hover the icon for the numbers;
+click it for the CPU model, the RAM in use, and the GPU name.
 
 ### [San Francisco](./san-francisco)
 

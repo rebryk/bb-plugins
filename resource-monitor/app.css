@@ -1,0 +1,104 @@
+/* Hover card */
+
+.rm-card {
+  display: flex;
+  gap: 4px;
+  padding: 10px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-lg);
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  animation: rm-in 120ms ease-out;
+}
+
+@keyframes rm-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+
+.rm-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 48px;
+}
+
+.rm-value {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* The fill uses the text color; high load tints it inline. */
+.rm-bar {
+  display: flex;
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  overflow: hidden;
+}
+
+.rm-bar i {
+  background: currentColor;
+}
+
+.rm-label {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 12px;
+}
+
+.rm-detail {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+/* Page */
+
+.rm-page {
+  height: 100%;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.rm-page > p {
+  margin: 0 0 24px;
+}
+
+.rm-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+}
+
+.rm-columns .rm-column {
+  align-items: flex-start;
+  gap: 8px;
+  width: auto;
+}
+
+.rm-columns .rm-value {
+  font-size: 32px;
+  line-height: 36px;
+}
+
+.rm-columns .rm-bar {
+  width: 96px;
+  height: 4px;
+}
+
+.rm-columns .rm-label {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+}

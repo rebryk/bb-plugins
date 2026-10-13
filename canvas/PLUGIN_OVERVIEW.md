@@ -57,6 +57,8 @@ Canvas is one of the San Francisco Plugins, a family of BB plugins. The others:
   or week.
 - **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived
   threads, worktrees, and caches.
+- **Resource Monitor**: live CPU, RAM, and GPU bars for the BB server in the
+  sidebar, with the numbers on hover.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with
   your pick of the eight macOS accent colors.
 - **Pool Usage**: how much of each provider's capacity is in use and when it

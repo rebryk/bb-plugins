@@ -132,6 +132,8 @@ plugins. The others:
   screenshots your agent can read.
 - [Storage Cleaner](../storage-cleaner): what fills your Mac's disk, and
   cleanup of archived threads, worktrees, and caches.
+- [Resource Monitor](../resource-monitor): live CPU, RAM, and GPU bars for the
+  BB server in the sidebar, with the numbers on hover.
 - [San Francisco](../san-francisco): a quiet macOS-style theme after the Aside
   browser, with your pick of the eight macOS accent colors.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use

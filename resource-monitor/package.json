@@ -1,0 +1,54 @@
+{
+  "name": "bb-plugin-resource-monitor",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Yurii Rebryk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "resource-monitor"
+  },
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/resource-monitor#readme",
+  "engines": {
+    "bb": ">=0.46.0",
+    "bbPluginSdk": ">=0.6.37"
+  },
+  "bb": {
+    "name": "Resource Monitor",
+    "description": "Live CPU, RAM, and GPU bars for the BB server in the sidebar, with the numbers on hover.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": []
+  },
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.37",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cron-parser": "^5.5.0",
+    "hono": "^4.11.9",
+    "jsdom": "^27.0.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  }
+}

@@ -62,6 +62,8 @@ others:
   or week.
 - **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived
   threads, worktrees, and caches.
+- **Resource Monitor**: live CPU, RAM, and GPU bars for the BB server in the
+  sidebar, with the numbers on hover.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 
