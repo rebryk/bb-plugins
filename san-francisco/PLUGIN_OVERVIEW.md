@@ -60,6 +60,8 @@ others:
   agent can read.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,
   or week.
+- **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived
+  threads, worktrees, and caches.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
   frees up, in the sidebar footer.
 
