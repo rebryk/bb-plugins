@@ -26,6 +26,7 @@ it("registers its settings, RPC methods and nightly schedule", async () => {
     "storageClean",
     "storageDelete",
     "storageFolder",
+    "storageOpenFullDiskAccess",
     "storageRescan",
     "storageSnapshot",
   ]);

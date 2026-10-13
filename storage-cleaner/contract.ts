@@ -12,6 +12,7 @@ export const rpcContract = defineRpcContract({
     output: z.object({ path: z.string(), node: z.custom<Node>() }).nullable(),
   },
   storageRescan: { input: z.null(), output: z.null() },
+  storageOpenFullDiskAccess: { input: z.null(), output: z.null() },
   storageDelete: {
     input: z
       .object({ paths: z.array(z.string().max(4096)).min(1).max(1000) })
