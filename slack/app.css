@@ -1,0 +1,86 @@
+.slack-button {
+  /* The badge's bottom-right corner; the dot sits at the badge's center. */
+  --badge-right: 0px;
+  --badge-bottom: 1px;
+  display: inline-flex;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md, 6px);
+  color: var(--subtle-foreground, var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+
+.slack-button:hover {
+  background: var(--state-hover);
+  color: var(--muted-foreground);
+  transition-duration: 0ms;
+}
+
+/* The same box as BB's own header icons. */
+.slack-logo {
+  width: 16px;
+  height: 16px;
+}
+
+/* BB's 16px icons draw a 1px line, and 1.5px on a phone. */
+.slack-logo > * {
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+/* A notification's corner: bottom right, over the glyph's edge. */
+.slack-badge {
+  position: absolute;
+  right: var(--badge-right);
+  bottom: var(--badge-bottom);
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 6.5px;
+  background: var(--destructive);
+  color: var(--destructive-foreground, #fff);
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.slack-dot {
+  position: absolute;
+  right: calc(var(--badge-right) + 3.5px);
+  bottom: calc(var(--badge-bottom) + 3.5px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--foreground);
+}
+
+@media (max-width: 767px) and (pointer: coarse) {
+  /* The phone's bar clips anything past the button. */
+  .slack-button {
+    --badge-right: 4px;
+    --badge-bottom: 4px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .slack-logo {
+    width: 24px;
+    height: 24px;
+  }
+
+  .slack-logo > * {
+    stroke-width: 1.5px;
+  }
+}
+
+/* Slack rejected the session, or none is set. */
+.slack-button[data-signed-out] .slack-logo {
+  opacity: 0.4;
+}

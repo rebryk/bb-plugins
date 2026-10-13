@@ -31,6 +31,9 @@ Switching between a local install and `<id>@sf-plugins` takes
   resource-monitor, san-francisco, pool-usage (setup-specific last). Insert it
   in that order into the root README, the collection's `pluginIds`, and every
   `## More San Francisco Plugins` block.
+- Slack is outside the family: it stays under **Other plugins** in the root
+  README, out of the collection and the family blocks, and its docs name no
+  other plugin.
 
 ## Superhuman
 
