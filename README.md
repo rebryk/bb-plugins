@@ -18,6 +18,7 @@ bb plugin install resource-monitor@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 bb plugin install slack@sf-plugins
+bb plugin install voice-input@sf-plugins
 ```
 
 `bb marketplace refresh sf-plugins` re-reads the catalog; it never installs or
@@ -103,6 +104,13 @@ The catalog also serves plugins outside the San Francisco family.
 A Slack button in every thread's header with your unread direct messages and
 mentions. In the BB app it opens Slack in the thread's right panel; on a phone,
 the Slack app. Needs a Slack session from a browser.
+
+### [Voice Input](./voice-input)
+
+BB's voice input transcribed on the BB server's Mac by the Parakeet Ultra
+speech model on the Neural Engine: 25 languages, no hesitations, and the audio
+never leaves the Mac. Needs a Mac with Apple silicon and macOS 15 or later, the
+Xcode Command Line Tools, and ffmpeg.
 
 ## Layout
 

@@ -357,6 +357,36 @@
           "subdir": "slack"
         }
       }
+    },
+    {
+      "id": "voice-input",
+      "displayName": "Voice Input",
+      "description": "BB's voice input transcribed on the BB server's Mac by Parakeet Ultra on the Neural Engine: 25 languages, no hesitations, and the audio never leaves the Mac.",
+      "icon": {
+        "url": "./voice-input/assets/icon.svg"
+      },
+      "tags": [
+        "voice",
+        "dictation",
+        "speech-to-text",
+        "transcription",
+        "neural-engine"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "thread-content",
+      "screenshots": [],
+      "overview": "Dictate to your agents with a speech model that runs on your own Mac.\n\n## Voice input on the Neural Engine\n\nThe plugin transcribes BB's voice input with the Parakeet Ultra speech model\non the BB server's Neural Engine. The audio never leaves the Mac. A 10-second\ntake turns into text in about 0.3 seconds.\n\n## 25 languages, no hesitations\n\nThe model finds the language on its own, among English, Russian, and 23 more\nEuropean languages, also mixed in one take. The plugin removes hesitations\nsuch as \"um\" and \"э-э\".\n\n## Set up once\n\nThe BB server must run on a Mac with Apple silicon and macOS 15 or later, with\nthe Xcode Command Line Tools and ffmpeg. Pick Parakeet Ultra for voice input in\nSettings → AI services. The plugin downloads the 350 MB model and gets ready on\nits own.\n",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "voice-input"
+        }
+      }
     }
   ]
 }
