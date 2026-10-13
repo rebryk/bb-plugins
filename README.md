@@ -12,6 +12,7 @@ bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
 bb plugin install canvas@sf-plugins
 bb plugin install auto-update@sf-plugins
+bb plugin install storage-cleaner@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
 ```
@@ -22,8 +23,8 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All six suit any BB setup. With Account Pooler, Pool Usage counts every pooled
-account.
+All seven suit any BB setup, except that Storage Cleaner needs macOS. With
+Account Pooler, Pool Usage counts every pooled account.
 
 ### [Superhuman](./superhuman)
 
@@ -57,6 +58,13 @@ A page in Settings that lists your plugins by where they came from, each with
 a switch. BB checks the plugins turned on for updates every hour, 6 hours, day,
 or week, or when you click Check Now, and installs them the way
 `bb plugin update` does.
+
+### [Storage Cleaner](./storage-cleaner)
+
+A page in Settings that shows what fills the Mac's disk: free space, a bar split
+into BB & agents, dev caches, apps, the Trash, your files, and the system, and
+a treemap explorer. Clean deletes the storage of archived threads, leftover
+worktrees, dev caches, or the Trash, and switches do it every night.
 
 ### [San Francisco](./san-francisco)
 

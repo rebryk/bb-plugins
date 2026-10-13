@@ -130,6 +130,8 @@ plugins. The others:
   thread's right panel.
 - [Canvas](../canvas): images, text, and drawing in each thread, with
   screenshots your agent can read.
+- [Storage Cleaner](../storage-cleaner): what fills your Mac's disk, and
+  cleanup of archived threads, worktrees, and caches.
 - [San Francisco](../san-francisco): a quiet macOS-style theme after the Aside
   browser, with your pick of the eight macOS accent colors.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use

@@ -27,9 +27,9 @@ Switching between a local install and `<id>@sf-plugins` takes
 
 - Check that it builds from git alone: `git archive HEAD <id>` into an empty
   directory, then `npm ci`, `npm test`, `npm run typecheck`, `npm run build`.
-- Family order: superhuman, bookmarks, canvas, auto-update, san-francisco,
-  pool-usage (setup-specific last). Insert it in that order into the root
-  README, the collection's `pluginIds`, and every
+- Family order: superhuman, bookmarks, canvas, auto-update, storage-cleaner,
+  san-francisco, pool-usage (setup-specific last). Insert it in that order
+  into the root README, the collection's `pluginIds`, and every
   `## More San Francisco Plugins` block.
 
 ## Superhuman
