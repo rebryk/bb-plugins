@@ -17,8 +17,11 @@ Superhuman-style speed for BB:
   and the sidebar and right panel buttons; their shortcuts still work.
 - **UI Polish.** Icons in one tone and a thread bar without the external editor
   picker, with fixes for Safari's layout and for a Tesla's keyboard.
+- **Brief Replies.** Agents answer in few words of plain English, after Andrej
+  Karpathy's advice, in threads started once it is on.
 
-Settings have a switch for each, all on by default except Hide Title Bar.
+Settings have a switch for each, all on by default except Hide Title Bar and
+Brief Replies.
 Turning Snooze off brings snoozed threads back.
 
 ## Install

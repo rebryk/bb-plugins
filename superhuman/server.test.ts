@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin from "./server";
 
-it("defines a switch for each feature and starts Snooze", async () => {
+it("defines a switch for each feature and starts Snooze and Brief Replies", async () => {
   const { bb, harness } = createFakePluginHost({ pluginId: "superhuman" });
   await plugin(bb);
   const { registrations } = harness.inspection;
@@ -17,6 +17,7 @@ it("defines a switch for each feature and starts Snooze", async () => {
     ["phoneLayout", "boolean", true],
     ["hideTitleBar", "boolean", false],
     ["uiPolish", "boolean", true],
+    ["briefReplies", "boolean", false],
   ]);
   expect(registrations.rpcMethods.sort()).toEqual([
     "listSnoozes",
@@ -26,4 +27,5 @@ it("defines a switch for each feature and starts Snooze", async () => {
   expect(registrations.services.map(({ name }) => name)).toEqual([
     "snooze-wake",
   ]);
+  expect(registrations.instructionProvider).not.toBeNull();
 });

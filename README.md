@@ -35,8 +35,9 @@ finds what the query means in the other keyboard layout, English or Russian;
 a moon that snoozes a thread until a time you pick or until its agent needs
 you, in its header and in every thread menu just before Archive, with an Archive
 button beside it; BB's bars at the bottom of a phone's screen, with swipes from
-its edges and haptics; an option to drop the macOS app's title bar; and one tone
-for BB's icons, with no external editor picker in the thread bar.
+its edges and haptics; an option to drop the macOS app's title bar; one tone
+for BB's icons, with no external editor picker in the thread bar; and an option
+for agents to answer in few words of plain English.
 
 ### [Bookmarks](./bookmarks)
 

@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.21 (2026-10-12)
+
+- New: Brief Replies, off by default, tells agents to answer in few words of
+  plain English: short sentences in the active voice, plain words, a small
+  diagram where structure matters, and no preamble or recap. It follows Andrej
+  Karpathy's advice to ask for ASD-STE100 Simplified Technical English and
+  reaches threads started after you turn it on.
+
 ## 0.1.20 (2026-10-11)
 
 - Superhuman is rebuilt for BB 0.46 and needs it. It has seven features,
