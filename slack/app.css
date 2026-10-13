@@ -1,4 +1,7 @@
 .slack-button {
+  /* The badge's bottom-right corner; the dot sits at the badge's center. */
+  --badge-right: 0px;
+  --badge-bottom: 1px;
   display: inline-flex;
   position: relative;
   width: 28px;
@@ -29,11 +32,11 @@
   vector-effect: non-scaling-stroke;
 }
 
-/* A notification's corner: bottom right, mostly past the glyph. */
+/* A notification's corner: bottom right, over the glyph's edge. */
 .slack-badge {
   position: absolute;
-  right: -2px;
-  bottom: -1px;
+  right: var(--badge-right);
+  bottom: var(--badge-bottom);
   min-width: 13px;
   height: 13px;
   padding: 0 3px;
@@ -50,8 +53,8 @@
 
 .slack-dot {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  right: calc(var(--badge-right) + 3.5px);
+  bottom: calc(var(--badge-bottom) + 3.5px);
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -59,7 +62,10 @@
 }
 
 @media (max-width: 767px) and (pointer: coarse) {
+  /* The phone's bar clips anything past the button. */
   .slack-button {
+    --badge-right: 4px;
+    --badge-bottom: 4px;
     width: 40px;
     height: 40px;
   }
@@ -71,12 +77,6 @@
 
   .slack-logo > * {
     stroke-width: 1.5px;
-  }
-
-  /* The phone's bar clips anything past the button. */
-  .slack-badge {
-    right: 2px;
-    bottom: 2px;
   }
 }
 
