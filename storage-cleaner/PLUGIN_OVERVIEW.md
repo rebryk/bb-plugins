@@ -37,6 +37,8 @@ The others:
   agent can read.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,
   or week.
+- **Resource Monitor**: live CPU, RAM, and GPU bars for the BB server in the
+  sidebar, with the numbers on hover.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with
   your pick of the eight macOS accent colors.
 - **Pool Usage**: how much of each provider's capacity is in use and when it

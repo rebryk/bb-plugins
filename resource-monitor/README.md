@@ -89,6 +89,8 @@ plugins. The others:
   screenshots your agent can read.
 - [Auto Update](../auto-update): updates for the plugins you pick, installed
   every hour, day, or week.
+- [Storage Cleaner](../storage-cleaner): what fills your Mac's disk, and cleanup
+  of archived threads, worktrees, and caches.
 - [San Francisco](../san-francisco): a quiet macOS-style theme after the Aside
   browser, with your pick of the eight macOS accent colors.
 - [Pool Usage](../pool-usage): how much of each provider's capacity is in use

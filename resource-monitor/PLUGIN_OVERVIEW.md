@@ -34,6 +34,8 @@ The others:
   agent can read.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,
   or week.
+- **Storage Cleaner**: what fills your Mac's disk, and cleanup of archived
+  threads, worktrees, and caches.
 - **San Francisco**: a quiet macOS-style theme after the Aside browser, with
   your pick of the eight macOS accent colors.
 - **Pool Usage**: how much of each provider's capacity is in use and when it
