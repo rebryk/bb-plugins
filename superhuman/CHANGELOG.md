@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.22 (2026-10-12)
+
+- On a phone, the home page has a card below its message box, as a thread's
+  bar is, with the right panel's button. What plugins put below the box, such
+  as Thread Sidebar's Running and Shared pages buttons, spreads across the
+  card instead of sitting loose below it, and hides with the card while the
+  keyboard is open.
+
 ## 0.1.21 (2026-10-12)
 
 - New: Brief Replies, off by default, tells agents to answer in few words of

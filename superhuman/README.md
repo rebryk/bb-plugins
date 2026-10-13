@@ -40,7 +40,8 @@ On a phone, Mobile Layout moves BB's bars into cards at the bottom of the
 screen and the sidebar's navigation to its bottom, opens the sidebar and
 the right panel with swipes from the screen's edges, and hides the bars while
 the keyboard is open, leaving a terminal's row of keys above it. A swipe down a
-terminal hides the keyboard.
+terminal hides the keyboard. The home page gets a card too, below the message
+box, for the right panel's button and what plugins put below the box.
 
 UI Polish hides only the editor picker; **Show Git changes and Commit button**
 in BB's settings hides Commit. On a Tesla, whose browser reports a mouse, BB
