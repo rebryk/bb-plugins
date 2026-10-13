@@ -3,10 +3,12 @@ a note, and your agent gets the note with a screenshot of the element.
 
 ## Notes on the page
 
-Choose **Annotate** in the Browser's toolbar and click an element. A note
-opens beside it; **Enter** adds the note. A numbered pin marks the element,
-and a pill such as `1 · Buy Pro` appears in the composer. Add as many notes as
-you need, then send your message. Click a pin to edit or delete its note.
+Press **⇧⌘A** or choose **Annotate** in the Browser's toolbar, then click an
+element. A note opens beside it; **Enter** adds the note and ends the pick. A
+numbered pin marks the element, and a pill such as `1 · Buy Pro` appears in
+the composer. Press the shortcut again for the next note, then send your
+message. Click a pin to edit or delete its note. Change the shortcut in BB's
+keyboard settings.
 Needs the Browser of the BB desktop app, BB 0.46.0 or later.
 
 ## What your agent sees

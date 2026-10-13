@@ -14,18 +14,23 @@ Browser tab                           composer
 ## Use
 
 1. Open a page in a Browser tab of the BB desktop app.
-2. Click **Annotate** in the Browser's toolbar. The page shows a crosshair.
+2. Press **⇧⌘A** (**Ctrl+Shift+A** on Windows and Linux), or click
+   **Annotate** in the Browser's toolbar. The page shows a crosshair.
 3. Point at an element. A blue box and a label show the element and its size.
    **↑** selects the parent element.
 4. Click the element and write the note. **Enter** adds it; **Shift+Enter**
-   starts a new line; **Escape** closes the note without adding it.
-5. A numbered pin marks the element, and a pill such as `1 · Buy Pro` appears
-   in the composer. Add more notes, write your message, and send it.
+   starts a new line; **Escape** drops the note.
+5. The picker turns off. A numbered pin marks the element, and a pill such as
+   `1 · Buy Pro` appears in the composer.
+6. For the next note, press the shortcut again. Then write your message and
+   send it.
 
 - **Edit or delete a note.** Click its pin on the page.
-- **Stop.** Click **Done** in the toolbar, or press **Escape** while no note
-  is open.
+- **Cancel a pick.** Press the shortcut again, click **Cancel** in the
+  toolbar, or press **Escape**.
 - **Remove a note.** Delete its pill in the composer; its pin goes too.
+- **Change the shortcut.** In BB's settings, under **Keyboard shortcuts**,
+  click **Annotate: Pick an element in the Browser** and press the new keys.
 
 The pins stay on the page until you send the message. They come back after a
 reload while the pills are in the composer.
@@ -41,27 +46,33 @@ The agent reads the page's values as data, not as instructions.
 ## How it works
 
 - The **Annotate** button is a Browser toolbar control. It puts a script into
-  the page's isolated world with `experimental_page.evaluate`. The script
-  shares the page's DOM, but not its JavaScript, and it needs no automation
-  lease, so the Browser shows no control banner.
+  each page it shows, in the page's isolated world, with
+  `experimental_page.evaluate`. The script shares the page's DOM, but not its
+  JavaScript, and it needs no automation lease, so the Browser shows no
+  control banner. It adds nothing to the page until you start a pick.
+- The shortcut is a BB command. BB does not see keys while a Browser page has
+  the focus, so the script also listens for the command's current keys,
+  which the control reads from BB's keyboard settings. A letter or digit
+  matches by its physical key too, so the shortcut works in any keyboard
+  layout.
 - The script draws the picker, the note editor, and the pins in a closed
   shadow root. It stops keys, clicks, and focus changes there from reaching
   the page, so typing a note never triggers the page's own shortcuts.
 - The pills in the composer decide what the page shows. Each change of the
-  draft sends the list of pins to the page again. While the page shows pins
-  or the picker, the control checks every second that the script is still
-  there and puts it back after a reload. A pin then finds its element by the
-  selector.
+  draft sends the list of pins to the page again. The control checks every
+  second that the script is still there and puts it back after a reload. A
+  pin then finds its element by the selector.
 - The control takes the screenshot before it adds the pill, so a message sent
-  at once has it too. The page shows no picker until the screenshot is done.
+  at once has it too. A new pick shows nothing until the screenshot is done.
 - The BB server stores each note in the plugin's SQLite database. The
   screenshot is a crop of `captureTab` around the element, saved in the
   thread's storage. When you send the message, the plugin's mention provider
   gives the agent the note and the screenshot.
-- The toolbar control, the page script, and the screenshot use the SDK's
-  `experimental_browserToolbarAction`, `experimental_page`, and
+- The toolbar control, the page script, the shortcut, and the screenshot use
+  the SDK's `experimental_browserToolbarAction`, `experimental_page`, and
   `experimental_desktopBrowsers`. A BB update may break them.
-- An element inside a frame is picked as the whole frame.
+- An element inside a frame is picked as the whole frame. While the focus is
+  inside a frame, the shortcut works only from BB, not from the page.
 - A pin that finds no element after a reload stays hidden. Its note still
   goes to the agent.
 

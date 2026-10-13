@@ -12,17 +12,35 @@ export interface Pin {
   selector: string;
 }
 
-/** What the page shows: the picker, the number of the next note, the pins. */
+/** A key with its modifiers, as `KeyboardEvent` reports them. */
+export interface Shortcut {
+  key: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+}
+
+/**
+ * What the page shows: the picker, the number of the next note, and the pins;
+ * and the shortcut that turns the picker on and off.
+ */
 export interface PageState {
   picking: boolean;
   next: number;
   pins: Pin[];
+  shortcut: Shortcut | null;
 }
 
 /** Installs the page side once per document; later calls do nothing. */
 export function installPage(bb: { postMessage(data: unknown): void }): void {
   const scope = globalThis as unknown as Record<string, unknown>;
   if (scope.__bbAnnotate) return;
+  // An SVG or XML document has no place for the overlay.
+  if (!(document.documentElement instanceof HTMLElement)) {
+    scope.__bbAnnotate = { sync: () => true };
+    return;
+  }
 
   const ATTRIBUTES = [
     "id",
@@ -124,7 +142,6 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   cancel.type = "button";
   const save = make("button", "save", row, "Add");
   save.type = "submit";
-  document.documentElement.appendChild(host);
 
   // Keys, clicks, and focus inside the overlay stay out of the page's own
   // handlers, so typing a note never triggers the page's shortcuts, and the
@@ -145,14 +162,16 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   ])
     host.addEventListener(type, (event) => event.stopPropagation());
 
-  let state: PageState = { picking: false, next: 1, pins: [] };
+  let state: PageState = {
+    picking: false,
+    next: 1,
+    pins: [],
+    shortcut: null,
+  };
   // `pointed` is the element under the pointer; `hovered` is it or, after ↑,
   // one of its ancestors.
   let pointed: Element | null = null;
   let hovered: Element | null = null;
-  // From adding a note until the next pins arrive, the toolbar control takes
-  // the note's screenshot, so the picker shows nothing and takes no clicks.
-  let frozen = false;
   let editing: { id: string | null; target: Element } | null = null;
   const marks = new Map<
     string,
@@ -285,8 +304,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   let tipWidth = 0;
   const layout = () => {
     frame = 0;
-    const target =
-      editing?.target ?? (state.picking && !frozen ? hovered : null);
+    const target = editing?.target ?? (state.picking ? hovered : null);
     const targetRect = target?.isConnected
       ? target.getBoundingClientRect()
       : null;
@@ -371,11 +389,21 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     relayout();
     input.focus({ preventScroll: true });
   };
+  const stopPicking = () => {
+    state = { ...state, picking: false };
+    layer.classList.remove("picking");
+    pointed = hovered = null;
+  };
   const close = () => {
+    const added = editing?.id === null;
     editing = null;
     editor.classList.remove("open");
+    // One pick makes one note: closing a new note's editor ends the pick.
+    if (added && state.picking) {
+      stopPicking();
+      post({ kind: "stop" });
+    } else if (state.picking) shield.focus({ preventScroll: true });
     relayout();
-    if (state.picking) shield.focus({ preventScroll: true });
   };
   const submit = () => {
     const comment = input.value.trim();
@@ -414,8 +442,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     drawPins();
     if (!id) {
       marks.get(message.id)!.element = target;
-      frozen = true;
-      pointed = hovered = null;
+      stopPicking();
     }
     close();
     post(message);
@@ -463,7 +490,7 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     }
   };
   shield.addEventListener("pointermove", (event) => {
-    if (editing || frozen) return;
+    if (editing) return;
     const element = hit(event.clientX, event.clientY);
     if (element === pointed) return;
     pointed = hovered = element;
@@ -477,7 +504,6 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
       else input.focus({ preventScroll: true });
       return;
     }
-    if (frozen) return;
     const element = hit(event.clientX, event.clientY);
     const target = hovered?.contains(element) ? hovered : (element ?? hovered);
     if (target) open(target, null);
@@ -485,7 +511,8 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
   shield.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (event.key === "Escape") {
-      sync({ picking: false });
+      stopPicking();
+      relayout();
       post({ kind: "stop" });
     } else if (event.key === "ArrowUp" && hovered?.parentElement) {
       hovered = hovered.parentElement;
@@ -498,14 +525,13 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
    * tells the toolbar control that the page side is still installed.
    */
   const sync = (next: Partial<PageState>) => {
-    // The page may remove the overlay, for example when it re-renders <html>.
-    if (!host.isConnected) document.documentElement.appendChild(host);
     const wasPicking = state.picking;
     state = { ...state, ...next };
-    if (next.pins) {
-      frozen = false;
-      drawPins();
-    }
+    // The overlay joins the page once it has something to show. The page may
+    // also remove it, for example when it re-renders <html>.
+    if ((state.picking || state.pins.length) && !host.isConnected)
+      document.documentElement.appendChild(host);
+    if (next.pins) drawPins();
     if (
       editing &&
       (editing.id
@@ -520,6 +546,65 @@ export function installPage(bb: { postMessage(data: unknown): void }): void {
     relayout();
     return true;
   };
+
+  // The shortcut also works while the page has the focus, where BB does not
+  // see keys. Keys match the way BB matches them; a key that is no Latin
+  // letter or digit, as in another keyboard layout or with Alt, matches by
+  // its physical key.
+  const SHIFTED: Record<string, string> = {
+    "!": "1",
+    "@": "2",
+    "#": "3",
+    $: "4",
+    "%": "5",
+    "^": "6",
+    "&": "7",
+    "*": "8",
+    "(": "9",
+    ")": "0",
+    _: "-",
+    "+": "=",
+    "{": "[",
+    "}": "]",
+    "|": "\\",
+    ":": ";",
+    '"': "'",
+    "<": ",",
+    ">": ".",
+    "?": "/",
+    "~": "`",
+  };
+  const keyOf = (event: KeyboardEvent) => {
+    if (event.key === " " || event.key === "Spacebar") return "space";
+    const physical = /^[a-z0-9]$/i.test(event.key)
+      ? undefined
+      : /^(?:Key|Digit)(.)$/.exec(event.code)?.[1];
+    if (physical) return physical.toLowerCase();
+    return (
+      event.shiftKey ? (SHIFTED[event.key] ?? event.key) : event.key
+    ).toLowerCase();
+  };
+  addEventListener(
+    "keydown",
+    (event) => {
+      const shortcut = state.shortcut;
+      if (
+        !shortcut ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey !== shortcut.ctrlKey ||
+        event.altKey !== shortcut.altKey ||
+        event.shiftKey !== shortcut.shiftKey ||
+        event.metaKey !== shortcut.metaKey
+      )
+        return;
+      if (keyOf(event) !== shortcut.key.toLowerCase()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      post({ kind: "toggle" });
+    },
+    true,
+  );
 
   scope.__bbAnnotate = { sync, root };
 }

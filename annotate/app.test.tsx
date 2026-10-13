@@ -33,22 +33,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// The default ⇧⌘A, outside a Mac Ctrl+Shift+A.
+const shortcut = {
+  key: "a",
+  ctrlKey: true,
+  altKey: false,
+  shiftKey: true,
+  metaKey: false,
+};
+
 async function setup({
   stored = [] as Note[],
   mentions = [] as ComposerMention[],
   url = "https://example.com/page",
   withPage = true,
+  keybindingOverrides = [] as unknown[],
+  captureNoteTab = async () => ({
+    base64: "",
+    mimeType: "image/jpeg" as const,
+  }),
 } = {}) {
   const app = await loadPluginApp(() => import("./app"));
   const rpc = {
     saveNote: vi.fn(async () => null),
     getNotes: vi.fn(async () => stored),
-    captureNoteTab: vi.fn(async () => ({
-      base64: "",
-      width: 1280,
-      height: 800,
-      mimeType: "image/jpeg" as const,
-    })),
+    captureNoteTab: vi.fn(captureNoteTab),
     saveNoteImage: vi.fn(async () => null),
   };
   const props = {
@@ -60,6 +69,13 @@ async function setup({
   } as unknown as ExperimentalPluginBrowserToolbarActionProps;
   const slot = renderSlot(app.browserToolbarActions[0]!, props, {
     rpc,
+    pluginId: "annotate",
+    sdk: {
+      system: {
+        config: async () => ({ keybindings: [], keybindingOverrides }),
+      },
+      subscribe: () => () => {},
+    } as never,
     composer: {
       text: mentions.map((mention) => mention.label).join(" "),
       mentions,
@@ -83,17 +99,67 @@ it("shows nothing outside the desktop app", async () => {
   expect(slot.container.innerHTML).toBe("");
 });
 
-it("leaves a page alone until there is something to show", async () => {
+it("gives each page the shortcut and starts picking on a click", async () => {
   const { slot, lastState } = await setup();
-  expect(page.evaluate).not.toHaveBeenCalled();
+  await waitFor(() =>
+    expect(lastState()).toEqual({
+      picking: false,
+      next: 1,
+      pins: [],
+      shortcut,
+    }),
+  );
   fireEvent.click(slot.getByRole("button", { name: "Annotate" }));
-  await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
-  expect(lastState()).toEqual({ picking: true, next: 1, pins: [] });
+  await waitFor(() => expect(lastState()).toMatchObject({ picking: true }));
   expect(
     slot
       .getByRole("button", { name: "Stop annotating" })
       .getAttribute("aria-pressed"),
   ).toBe("true");
+});
+
+it("follows the user's binding for this platform", async () => {
+  const keys = (key: string) => ({
+    key,
+    mod: true,
+    shift: false,
+    alt: false,
+    control: false,
+    meta: false,
+  });
+  const command = "plugin:annotate/annotate-element";
+  const { lastState } = await setup({
+    keybindingOverrides: [
+      { command, shortcut: keys("k") },
+      { command, shortcut: keys("j"), platform: "linux" },
+      { command: "plugin:other/x", shortcut: keys("x") },
+    ],
+  });
+  await waitFor(() =>
+    expect(lastState().shortcut).toEqual({
+      ...shortcut,
+      key: "j",
+      shiftKey: false,
+    }),
+  );
+});
+
+it("listens for no shortcut when the user removed it", async () => {
+  const { lastState } = await setup({
+    keybindingOverrides: [
+      { command: "plugin:annotate/annotate-element", shortcut: null },
+    ],
+  });
+  await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
+  expect(lastState().shortcut).toBe(null);
+});
+
+it("turns picking on and off with the shortcut from the page", async () => {
+  const { slot, emit } = await setup();
+  await emit({ kind: "toggle" });
+  expect(slot.getByRole("button", { name: "Stop annotating" })).toBeTruthy();
+  await emit({ kind: "toggle" });
+  expect(slot.getByRole("button", { name: "Annotate" })).toBeTruthy();
 });
 
 it("turns a note from the page into a pill and a pin", async () => {
@@ -116,9 +182,11 @@ it("turns a note from the page into a pill and a pin", async () => {
     threadId: "thr_a",
     tabId: "tab-1",
   });
+  // One pick makes one note.
   expect(lastState()).toEqual({
-    picking: true,
+    picking: false,
     next: 2,
+    shortcut,
     pins: [
       {
         id: note.id,
@@ -130,15 +198,34 @@ it("turns a note from the page into a pill and a pin", async () => {
   });
 });
 
+it("keeps a new note's pin while its screenshot is taken", async () => {
+  const { slot, emit, lastState } = await setup({
+    captureNoteTab: () => new Promise(() => {}),
+  });
+  fireEvent.click(slot.getByRole("button", { name: "Annotate" }));
+  const note = sampleNote({ url: "https://example.com/page" });
+  await emit({ kind: "add", ...note });
+  await waitFor(() =>
+    expect(lastState()).toMatchObject({
+      picking: false,
+      next: 2,
+      pins: [expect.objectContaining({ id: note.id })],
+    }),
+  );
+  expect(slot.inspection.composer.draft.mentions).toEqual([]);
+});
+
 it("ignores what the page sends that does not fit", async () => {
   const { slot, rpc, emit } = await setup();
+  await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
+  const drawn = page.evaluate.mock.calls.length;
   await emit({ kind: "add", ...sampleNote(), id: "../../etc" });
   await emit({ kind: "add", ...sampleNote(), comment: "  " });
   await emit("hello");
   expect(rpc.saveNote).not.toHaveBeenCalled();
   expect(slot.inspection.composer.draft.mentions).toEqual([]);
   // The page drew a pin for the note; drawing the state again removes it.
-  expect(page.evaluate).toHaveBeenCalledTimes(3);
+  expect(page.evaluate).toHaveBeenCalledTimes(drawn + 3);
 });
 
 it("restores the pins of earlier pills on this page only", async () => {
@@ -157,11 +244,14 @@ it("restores the pins of earlier pills on this page only", async () => {
     threadId: "thr_a",
     ids: [here.id, there.id],
   });
-  expect(lastState()).toEqual({
-    picking: false,
-    next: 3,
-    pins: [expect.objectContaining({ id: here.id })],
-  });
+  await waitFor(() =>
+    expect(lastState()).toEqual({
+      picking: false,
+      next: 3,
+      shortcut,
+      pins: [expect.objectContaining({ id: here.id })],
+    }),
+  );
 });
 
 it("edits a note and deletes its pill", async () => {
@@ -180,7 +270,7 @@ it("edits a note and deletes its pill", async () => {
 
   await emit({ kind: "delete", id: note.id });
   expect(slot.inspection.composer.draft.mentions).toEqual([]);
-  expect(lastState()).toEqual({ picking: false, next: 1, pins: [] });
+  expect(lastState()).toMatchObject({ picking: false, next: 1, pins: [] });
 });
 
 it("stops picking when the page says so", async () => {
@@ -210,7 +300,7 @@ it("clears the page's pins when it unmounts", async () => {
   await waitFor(() => expect(page.evaluate).toHaveBeenCalled());
   slot.lifecycle.unmount();
   expect(String(page.evaluate.mock.calls.at(-1)?.[0])).toContain(
-    "sync({ picking: false, pins: [] })",
+    "sync({ picking: false, pins: [], shortcut: null })",
   );
 });
 

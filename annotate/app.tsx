@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import {
   definePluginApp,
+  experimental_usePluginId,
   useComposer,
   useRpc,
+  useSdk,
   type ExperimentalPluginBrowserToolbarActionProps,
 } from "@get-bb/plugin-sdk/app";
 import "./app.css";
 import type { rpcContract } from "./contract";
-import { pageExpression, type Pin } from "./page";
+import { pageExpression, type Pin, type Shortcut } from "./page";
 import {
   PROVIDER,
   cropBox,
@@ -20,6 +22,85 @@ import {
 } from "./shared";
 
 const warn = (error: unknown) => console.warn("[annotate]", error);
+const COMMAND = "annotate-element";
+const DEFAULT_SHORTCUT = {
+  key: "a",
+  mod: true,
+  shift: true,
+  alt: false,
+  control: false,
+  meta: false,
+};
+const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const platform = mac
+  ? "mac"
+  : /Win/.test(navigator.platform)
+    ? "windows"
+    : "linux";
+const toEvent = (shortcut: typeof DEFAULT_SHORTCUT): Shortcut => ({
+  key: shortcut.key.toLowerCase(),
+  ctrlKey: shortcut.control || (shortcut.mod && !mac),
+  altKey: shortcut.alt,
+  shiftKey: shortcut.shift,
+  metaKey: shortcut.meta || (shortcut.mod && mac),
+});
+
+/** The mounted toolbar controls, so the command finds the one on screen. */
+const controls = new Set<{
+  threadId: string;
+  button: { current: HTMLButtonElement | null };
+  toggle(): void;
+}>();
+const visibleControl = (threadId: string | null) =>
+  [...controls].find(
+    (control) =>
+      (threadId === null || control.threadId === threadId) &&
+      !!control.button.current?.getClientRects().length,
+  );
+
+/**
+ * The command's shortcut as the user bound it in BB. The page matches it
+ * itself, because BB does not see keys while a Browser page has the focus.
+ * BB's config lists only the user's changes to plugin commands, so the
+ * shortcut is the change for this platform, else the one for every platform,
+ * else the default. BB leaves a default unbound when one of its own commands
+ * has the same keys.
+ */
+function useShortcut(): Shortcut | null {
+  const sdk = useSdk();
+  const pluginId = experimental_usePluginId();
+  const [shortcut, setShortcut] = useState<Shortcut | null>(null);
+  useEffect(() => {
+    const refresh = () =>
+      sdk.system.config().then((config) => {
+        const command = `plugin:${pluginId}/${COMMAND}`;
+        const changes = config.keybindingOverrides.filter(
+          (change) => change.command === command,
+        );
+        const change =
+          changes.find((item) => item.platform === platform) ??
+          changes.find((item) => item.platform === undefined);
+        const taken = config.keybindings.some(
+          (binding) =>
+            JSON.stringify(toEvent(binding.shortcut)) ===
+            JSON.stringify(toEvent(DEFAULT_SHORTCUT)),
+        );
+        const bound = change
+          ? change.shortcut
+          : taken
+            ? null
+            : DEFAULT_SHORTCUT;
+        setShortcut(bound && toEvent(bound));
+      }, warn);
+    void refresh();
+    const stops = [
+      sdk.subscribe({ event: "system:config-changed", callback: refresh }),
+      sdk.subscribe({ event: "realtime:connection", callback: refresh }),
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [sdk, pluginId]);
+  return shortcut;
+}
 
 /** The part of a viewport screenshot around `element`, as a base64 JPEG. */
 async function cropShot(
@@ -75,7 +156,8 @@ function Icon() {
 /**
  * The Annotate button in the Browser's toolbar. It turns the picker on and
  * off, draws the pins of the draft's notes on the page, and turns what the
- * page sends into note pills in the thread's composer.
+ * page sends into note pills in the thread's composer. One pick makes one
+ * note: the picker turns off when the note is added or dropped.
  */
 function AnnotateAction({
   threadId,
@@ -87,7 +169,11 @@ function AnnotateAction({
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const [picking, setPicking] = useState(false);
+  const shortcut = useShortcut();
+  const button = useRef<HTMLButtonElement>(null);
   const [notes, setNotes] = useState<ReadonlyMap<string, Note>>(new Map());
+  // Notes the page added whose pills are not in the draft yet.
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
   const ids = noteIds(composer.draft);
   const idsKey = ids.join(" ");
   const remember = (note: Note) =>
@@ -109,7 +195,9 @@ function AnnotateAction({
     };
   }, [idsKey, threadId]);
 
-  const drafted = ids.flatMap((id) => notes.get(id) ?? []);
+  const drafted = [...new Set([...ids, ...pending])].flatMap(
+    (id) => notes.get(id) ?? [],
+  );
   const pins: Pin[] = drafted
     .filter((note) => samePage(note.url, url))
     .map(({ id, number, comment, element }) => ({
@@ -119,7 +207,7 @@ function AnnotateAction({
       selector: element.selector,
     }));
   const next = Math.max(0, ...drafted.map((note) => note.number)) + 1;
-  const state = JSON.stringify({ picking, next, pins });
+  const state = JSON.stringify({ picking, next, pins, shortcut });
   // The page handler reads these without subscribing again on every change.
   const latest = useRef({ notes, state });
   latest.current = { notes, state };
@@ -130,19 +218,15 @@ function AnnotateAction({
     page?.evaluate(pageExpression(latest.current.state)).catch(warn);
   };
 
-  // The script goes into a page only once there is something to show there,
-  // and stays until it shows nothing again.
-  const active = picking || pins.length > 0;
-  const shown = useRef(false);
+  // The script goes into each page this control shows. It draws nothing
+  // until there is something to show, but it listens for the shortcut.
   useEffect(() => {
-    if (!page || (!active && !shown.current)) return;
-    shown.current = active;
-    redraw();
+    if (page) redraw();
   }, [page, url, state]);
 
   // A reload, also of the same URL, drops the script: put it back.
   useEffect(() => {
-    if (!page || !active) return;
+    if (!page) return;
     const timer = setInterval(() => {
       page
         .evaluate("(globalThis.__bbAnnotate?.sync({}) ?? false)")
@@ -150,7 +234,15 @@ function AnnotateAction({
         .catch(() => undefined);
     }, 1000);
     return () => clearInterval(timer);
-  }, [page, active]);
+  }, [page]);
+
+  useEffect(() => {
+    const control = { threadId, button, toggle: () => setPicking((on) => !on) };
+    controls.add(control);
+    return () => {
+      controls.delete(control);
+    };
+  }, [threadId]);
 
   useEffect(() => {
     if (!page) return;
@@ -159,6 +251,7 @@ function AnnotateAction({
       if (!parsed.success) return redraw();
       const message = parsed.data;
       if (message.kind === "stop") setPicking(false);
+      else if (message.kind === "toggle") setPicking((on) => !on);
       else if (message.kind === "delete")
         composer.replace((draft) => withoutNote(draft, message.id));
       else if (message.kind === "edit") {
@@ -169,6 +262,16 @@ function AnnotateAction({
         rpc.call("saveNote", { threadId, note: edited }).catch(warn);
       } else {
         const { kind: _, ...note } = message;
+        // The note's pin stays on the page while its pill is on the way.
+        const settle = () =>
+          setPending((current) => {
+            const next = new Set(current);
+            next.delete(note.id);
+            return next;
+          });
+        remember(note);
+        setPending((current) => new Set(current).add(note.id));
+        setPicking(false);
         const screenshot = async () => {
           const shot = await rpc.call("captureNoteTab", { threadId, tabId });
           const base64 = await cropShot(shot, note.element);
@@ -177,7 +280,6 @@ function AnnotateAction({
         };
         void (async () => {
           await rpc.call("saveNote", { threadId, note });
-          remember(note);
           // The screenshot comes before the pill, so a message sent at once
           // has it too; a slow one gives up after 5 seconds.
           await Promise.race([
@@ -188,19 +290,18 @@ function AnnotateAction({
             [{ provider: PROVIDER, id: note.id, label: pillLabel(note) }, " "],
             { at: "end" },
           );
-        })().catch((error: unknown) => {
-          warn(error);
-          redraw();
-        });
+        })()
+          .catch(warn)
+          .finally(settle);
       }
     });
     return () => {
       unsubscribe();
-      // Pins without this control would answer no one; the next mount
-      // draws them again.
+      // Pins and the shortcut without this control would answer no one; the
+      // next mount sets them again.
       void page
         .evaluate(
-          "(globalThis.__bbAnnotate?.sync({ picking: false, pins: [] }), null)",
+          "(globalThis.__bbAnnotate?.sync({ picking: false, pins: [], shortcut: null }), null)",
         )
         .catch(() => undefined);
     };
@@ -211,14 +312,15 @@ function AnnotateAction({
   if (!page) return null;
   return (
     <button
+      ref={button}
       type="button"
       className="an-browser-button"
       aria-pressed={picking}
       aria-label={picking ? "Stop annotating" : "Annotate"}
       title={
         picking
-          ? "Click an element to add a note. ↑ selects its parent; Esc stops."
-          : "Add notes to elements of this page"
+          ? "Click an element to add a note. ↑ selects its parent; Esc cancels."
+          : "Add a note to an element of this page"
       }
       onClick={() => setPicking(!picking)}
       onKeyDown={(event) => {
@@ -226,7 +328,7 @@ function AnnotateAction({
       }}
     >
       <Icon />
-      {!isCompactViewport && <span>{picking ? "Done" : "Annotate"}</span>}
+      {!isCompactViewport && <span>{picking ? "Cancel" : "Annotate"}</span>}
     </button>
   );
 }
@@ -236,5 +338,12 @@ export default definePluginApp((app) => {
     id: "annotate",
     title: "Annotate",
     component: AnnotateAction,
+  });
+  app.commands.register({
+    id: COMMAND,
+    title: "Annotate: Pick an element in the Browser",
+    defaultShortcut: { key: "a", mod: true, shift: true },
+    isAvailable: ({ threadId }) => !!visibleControl(threadId),
+    run: ({ threadId }) => visibleControl(threadId)?.toggle(),
   });
 });

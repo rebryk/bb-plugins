@@ -47,6 +47,7 @@ export const pageMessageSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("delete"), id: noteIdSchema }),
   z.object({ kind: z.literal("stop") }),
+  z.object({ kind: z.literal("toggle") }),
 ]);
 export type PageMessage = z.infer<typeof pageMessageSchema>;
 

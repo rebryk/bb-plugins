@@ -43,7 +43,10 @@ const write = (comment: string) => {
   );
 };
 
-it("installs once per document", () => {
+it("joins the page once, when it has something to show", () => {
+  installPage({ postMessage: () => {} });
+  expect(document.querySelector("bb-annotate")).toBe(null);
+  page().sync({ picking: true });
   installPage({ postMessage: () => {} });
   expect(document.querySelectorAll("bb-annotate")).toHaveLength(1);
 });
@@ -73,7 +76,51 @@ it("adds a note to the clicked element", () => {
     },
   ]);
   expect(find(".pin").textContent).toBe("4");
-  expect(document.querySelector("main > button")).toBe(target);
+  // One pick makes one note.
+  expect(find(".shield").parentElement!.classList.contains("picking")).toBe(
+    false,
+  );
+});
+
+it("ends the pick when a new note is dropped", () => {
+  page().sync({ picking: true });
+  pick();
+  find("textarea").dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  expect(messages).toEqual([{ kind: "stop" }]);
+  expect(find(".shield").parentElement!.classList.contains("picking")).toBe(
+    false,
+  );
+});
+
+it("sends the shortcut from the page, in any keyboard layout", () => {
+  const shortcut = {
+    key: "a",
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: true,
+    metaKey: true,
+  };
+  page().sync({ shortcut });
+  const press = (init: KeyboardEventInit) =>
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      }),
+    );
+  press({ key: "a", code: "KeyA", metaKey: true });
+  expect(messages).toEqual([]);
+  // On AZERTY, the key labelled Q sits where QWERTY has A.
+  press({ key: "Q", code: "KeyA", metaKey: true, shiftKey: true });
+  expect(messages).toEqual([]);
+  press({ key: "Ф", code: "KeyA", metaKey: true, shiftKey: true });
+  expect(messages).toEqual([{ kind: "toggle" }]);
+  page().sync({ shortcut: null });
+  press({ key: "A", code: "KeyA", metaKey: true, shiftKey: true });
+  expect(messages).toHaveLength(1);
 });
 
 it("keeps an empty note from being added", () => {
@@ -157,18 +204,8 @@ it("picks the parent after ↑ while the pointer stays on the element", () => {
   expect(find(".label").textContent).toBe('1 · main "IntroSave"');
 });
 
-it("waits for the next pins before it picks again", () => {
-  page().sync({ picking: true });
-  pick();
-  write("One");
-  pick();
-  expect(find(".editor").classList.contains("open")).toBe(false);
-  page().sync({ pins: [] });
-  pick();
-  expect(find(".editor").classList.contains("open")).toBe(true);
-});
-
 it("puts the overlay back when the page removes it", () => {
+  page().sync({ picking: true });
   document.querySelector("bb-annotate")!.remove();
   expect(page().sync({})).toBe(true);
   expect(document.querySelector("bb-annotate")).not.toBe(null);

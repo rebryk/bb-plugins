@@ -58,7 +58,7 @@ your agent read the elements or see the entire board as a PNG.
 
 ### [Annotate](./annotate)
 
-An Annotate button in the toolbar of the desktop app's Browser. Click an
+An Annotate button and shortcut for the desktop app's Browser. Pick an
 element of the page, write a note, and send it to your agent as a pill with
 the element's details and a screenshot.
 
