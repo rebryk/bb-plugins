@@ -11,9 +11,10 @@ gets a new version. Each version is tagged `superhuman/v<version>`.
   a thread's bar, on the home page, and in the right panel. When the buttons
   don't fit, other plugins' buttons scroll instead of BB's leaving the screen.
 - Other plugins' buttons on the home page's card keep their own grouping and
-  take the size they have in a thread's bar, so they look the same in both. A
-  plugin that shows no button leaves no gap in either, and buttons in a
-  plugin's drop-down keep their own size.
+  look as they do in a thread's bar. In both, only a button that holds just an
+  icon takes the bar's thumb size; one with more, such as a count beside its
+  icon, keeps its plugin's size, and so do buttons in a plugin's drop-down. A
+  plugin that shows no button leaves no gap in either.
 
 ## 0.1.22 (2026-10-12)
 

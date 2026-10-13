@@ -175,7 +175,10 @@ html[data-phone-layout] {
   /*
    * Every button, whoever adds it: BB, this plugin or another. BB's buttons
    * with text and the tabs have their own rules below. A plugin's own icon is
-   * a box that BB paints with the icon's shape.
+   * a box that BB paints with the icon's shape. In a page's bar and on the
+   * home page's card, only a button that holds just an icon grows; one with
+   * more, such as a count beside its icon, keeps its plugin's size. Buttons
+   * in a plugin's drop-down keep theirs too.
    *
    * The browser tries these rules on every button, link, icon and image of
    * the page each time the page restyles, which happens often, as when the
@@ -185,10 +188,12 @@ html[data-phone-layout] {
    */
   header > [data-testid="app-page-header-content-row"]
     :is(button, a):not([class*="pointer-coarse:h-9"], [popover] *) {
-    min-width: var(--phone-layout-button-size);
-    min-height: var(--phone-layout-button-size);
+    &:has(> :is(svg, img, [data-plugin-icon-asset]):only-child) {
+      min-width: var(--phone-layout-button-size);
+      min-height: var(--phone-layout-button-size);
+    }
 
-    :is(svg, img, [data-plugin-icon-asset]) {
+    > :is(svg, img, [data-plugin-icon-asset]):only-child {
       width: var(--phone-layout-icon-size);
       height: var(--phone-layout-icon-size);
     }
@@ -196,10 +201,12 @@ html[data-phone-layout] {
 
   [data-testid="root-compose-compact-fade"] + div > div > [data-app-composer] ~ :is([data-bb-plugin], [data-bb-plugin-root])
     :is(button, a):not([popover] *) {
-    min-width: var(--phone-layout-button-size);
-    min-height: var(--phone-layout-button-size);
+    &:has(> :is(svg, img, [data-plugin-icon-asset]):only-child) {
+      min-width: var(--phone-layout-button-size);
+      min-height: var(--phone-layout-button-size);
+    }
 
-    :is(svg, img, [data-plugin-icon-asset]) {
+    > :is(svg, img, [data-plugin-icon-asset]):only-child {
       width: var(--phone-layout-icon-size);
       height: var(--phone-layout-icon-size);
     }
