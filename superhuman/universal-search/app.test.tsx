@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import { asPluginApp } from "../testing";
+import { asPluginApp, bbVersion } from "../testing";
 import { searchCache } from "./host";
 import { installThreadSearch } from "./threads";
 import { installPaletteSearch } from "./palette";
@@ -11,12 +11,7 @@ vi.mock("./host", () => ({ searchCache: vi.fn() }));
 vi.mock("./threads", () => ({ installThreadSearch: vi.fn() }));
 vi.mock("./palette", () => ({ installPaletteSearch: vi.fn() }));
 const invalidate = vi.fn(), stopThreads = vi.fn(), stopPalette = vi.fn();
-const versionData = {
-  currentVersion: "0.46.0", currentCommit: null, installKind: "npm" as const,
-  isDevelopment: false, latestVersion: null, source: "npm" as const,
-  updateAvailable: false, upgradeCommand: "",
-};
-const version = vi.fn(async () => versionData);
+const version = vi.fn(async () => bbVersion());
 
 beforeEach(() => {
   vi.mocked(searchCache).mockReturnValue(invalidate);
@@ -52,7 +47,7 @@ it("does not touch native search when switched off", async () => {
 });
 
 it("leaves an unverified BB version unchanged", async () => {
-  version.mockResolvedValueOnce({ ...versionData, currentVersion: "0.45.0" });
+  version.mockResolvedValueOnce(bbVersion("0.45.0"));
   await mount();
   await Promise.resolve();
   expect(installThreadSearch).not.toHaveBeenCalled();
@@ -66,11 +61,11 @@ it("rolls back a partially installed adapter", async () => {
 });
 
 it("does not install after the overlay has gone away", async () => {
-  let resolve!: (value: typeof versionData) => void;
+  let resolve!: (value: ReturnType<typeof bbVersion>) => void;
   version.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
   const slot = await mount();
   slot.lifecycle.unmount();
-  resolve(versionData);
+  resolve(bbVersion());
   await Promise.resolve();
   expect(installThreadSearch).not.toHaveBeenCalled();
 });

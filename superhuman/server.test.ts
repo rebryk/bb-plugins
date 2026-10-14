@@ -22,6 +22,7 @@ it("defines a switch for each feature and starts Snooze and Brief Replies", asyn
   ]);
   expect(registrations.rpcMethods.sort()).toEqual([
     "listSnoozes",
+    "searchSnoozes",
     "snooze",
     "unsnooze",
   ]);
