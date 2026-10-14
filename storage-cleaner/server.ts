@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -64,8 +64,17 @@ async function disk(): Promise<Disk> {
   };
 }
 
+/** Whether BB has Full Disk Access: only then may it read the TCC database. */
+function fullDiskAccess(): Promise<boolean> {
+  return open("/Library/Application Support/com.apple.TCC/TCC.db").then(
+    (file) => file.close().then(() => true),
+    () => false,
+  );
+}
+
 /** Run the scanner at low priority and read its result. */
 async function scanDisk(): Promise<Scan> {
+  const access = await fullDiskAccess();
   const dir = await mkdtemp(join(tmpdir(), "bb-storage-cleaner-"));
   try {
     const script = join(dir, "scan.py");
@@ -97,6 +106,7 @@ async function scanDisk(): Promise<Scan> {
     });
     const scan = JSON.parse(await readFile(out, "utf8")) as Scan;
     scan.used = (await disk()).used;
+    scan.fullDiskAccess = access;
     return scan;
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -269,7 +279,16 @@ export default function plugin(bb: BbPluginApi): void {
 
   bb.rpc.register(rpcContract, {
     async storageSnapshot() {
-      return snapshot(load() ?? null, await context(), { scanning, error });
+      const access = await fullDiskAccess();
+      const current = load();
+      // Once BB has Full Disk Access, scan what it couldn't read before. After
+      // a failed scan, wait for Rescan, so a failing scan doesn't repeat.
+      if (access && current && !current.fullDiskAccess && !error) void rescan();
+      return snapshot(current, await context(), {
+        scanning,
+        error,
+        fullDiskAccess: access,
+      });
     },
     async storageFolder({ path }) {
       const ctx = await context();
@@ -279,6 +298,12 @@ export default function plugin(bb: BbPluginApi): void {
     },
     storageRescan() {
       void rescan();
+      return null;
+    },
+    async storageOpenFullDiskAccess() {
+      await run("open", [
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+      ]);
       return null;
     },
     storageDelete({ paths }) {

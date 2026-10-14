@@ -102,6 +102,38 @@ export function FreeSpace() {
   );
 }
 
+/** Without Full Disk Access, macOS keeps Mail, Photos, and more from the scan. */
+export function FullDiskAccess() {
+  const { snapshot, rpc } = useStorage();
+  if (!snapshot || snapshot.fullDiskAccess) return null;
+  return (
+    <div className="flex gap-2.5 rounded-lg bg-muted/60 px-3 py-2.5">
+      <Icon
+        name="Lock"
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+      />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2.5">
+        <div className="min-w-0 flex-1 basis-56">
+          <p className="text-sm font-medium text-foreground">
+            Give BB Full Disk Access to see everything
+          </p>
+          <p className="mt-0.5 text-xs leading-snug text-subtle-foreground/75">
+            macOS keeps Mail, Photos, Messages, the Trash, and browser profiles
+            from the scan. Turn on bb in the list, then reopen BB.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void rpc.call("storageOpenFullDiskAccess")}
+        >
+          Open System Settings
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** One category: color, name, size, a Clean button, a list that unfolds. */
 function CategoryRow({
   group,

@@ -39,6 +39,8 @@ export interface Scan {
   topFiles: [number, number, number, string, number][];
   /** Bytes in use on the volume when the scan ran. */
   used?: number;
+  /** Whether BB had Full Disk Access when the scan ran. */
+  fullDiskAccess?: boolean;
 }
 
 export interface ThreadInfo {
@@ -643,7 +645,7 @@ function staleFolders(scan: Scan, ctx: Context): Entry[] {
 export function snapshot(
   scan: Scan | null,
   ctx: Context,
-  status: { scanning: boolean; error: string | null },
+  status: { scanning: boolean; error: string | null; fullDiskAccess: boolean },
 ): Snapshot {
   const base = { ...status, total: ctx.disk.total, free: ctx.disk.free };
   if (!scan) {
@@ -706,7 +708,9 @@ export function snapshot(
     fixed(
       "Not readable",
       unreadable,
-      "Mail, Photos, browser profiles; needs Full Disk Access",
+      scan.fullDiskAccess
+        ? "Spotlight index, system databases; only macOS reads them"
+        : "Mail, Photos, browser profiles; needs Full Disk Access",
     ),
     fixed("macOS files on the data volume", t.system),
   ];

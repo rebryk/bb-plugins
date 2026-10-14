@@ -50,6 +50,8 @@ export interface Entry {
 export interface Snapshot {
   scanning: boolean;
   error: string | null;
+  /** Whether BB has Full Disk Access, without which macOS hides Mail and more. */
+  fullDiskAccess: boolean;
   scannedAt: number | null;
   total: number;
   free: number;

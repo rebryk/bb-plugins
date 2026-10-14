@@ -13,6 +13,7 @@ Clean stale archived threads                                       [off]
 Storage
 31.5 GB free of 494.4 GB                                        [Rescan]
 [■■■■■■■■ BB ■■■■■■ Dev ■ Apps ■■■■ Your files ■■■ System ░░░ free ]
+Give BB Full Disk Access to see everything        [Open System Settings]
 
 > ● BB & agents  Clean: archived threads, leftover worktrees  175 GB [Clean]
 > ● Dev caches   Clean: DerivedData, caches, builds, logs     128 GB [Clean]
@@ -39,6 +40,11 @@ Open **Settings → Storage Cleaner**. To keep it in the sidebar, choose
   caches, Apps, Trash, Your files, System, and free space; hovering a part
   shows its size. Each category row unfolds into its biggest items, five at
   first, and **Show all** lets the list scroll on.
+- **See everything.** Without Full Disk Access, macOS keeps Mail, Photos,
+  Messages, the Trash, and browser profiles from the scan, and a notice under
+  the bar asks for it. **Open System Settings** opens the Full Disk Access list
+  on the Mac BB runs on: turn on **bb**, then reopen BB. Storage Cleaner then
+  scans again on its own.
 - **Clean a category.** Every **Clean** asks first and lists what it deletes:
   - **BB & agents**: the storage of every archived or deleted thread, every
     worktree whose thread is archived or deleted, uncommitted changes
@@ -89,9 +95,14 @@ part no other file shares.
   days and go only without uncommitted changes.
 - Build folders go only inside a project's git repository, not one at the home
   folder, and only when `git check-ignore` says git ignores them.
+- BB has Full Disk Access when it can open macOS's privacy database,
+  `/Library/Application Support/com.apple.TCC/TCC.db`. The page checks this
+  each time it loads. When BB first has access after a scan made without
+  access, Storage Cleaner scans again.
 - The Trash is emptied directly when BB has Full Disk Access, and through
-  Finder otherwise. Without Full Disk Access, macOS also keeps Mail, Photos,
-  and browser profiles from the scan; System counts them as not readable.
+  Finder otherwise. System counts what macOS keeps from the scan as not
+  readable. With Full Disk Access, only folders macOS keeps to itself, such as
+  the Spotlight index, stay unread.
 - A schedule wakes every hour and does the nightly work in the hour that starts
   at 00:00 UTC.
 - The page is a `settingsSection` slot on the plugin's settings page and a
@@ -102,8 +113,8 @@ part no other file shares.
 
 Needs macOS, BB 0.46.0 or later, and `python3`, which the Xcode Command Line
 Tools provide. Storage Cleaner scans the Mac its BB server runs on. Give BB
-Full Disk Access in System Settings → Privacy & Security to measure the Trash,
-Mail, and Photos too.
+Full Disk Access in System Settings → Privacy & Security so the scan sees
+everything; **Open System Settings** on the page opens that list.
 
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main

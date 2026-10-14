@@ -2,16 +2,17 @@
 // that Customize rail can put in the sidebar.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { Explorer } from "./explorer";
-import { Categories, FreeSpace } from "./overview";
+import { Categories, FreeSpace, FullDiskAccess } from "./overview";
 import { StorageProvider } from "./ui";
 
-/** Free space and categories, then the explorer. */
+/** Free space, the Full Disk Access request, and categories, then the explorer. */
 function StorageSection() {
   return (
     <StorageProvider>
       <div className="space-y-10">
         <div className="space-y-5">
           <FreeSpace />
+          <FullDiskAccess />
           <Categories />
         </div>
         <Explorer />

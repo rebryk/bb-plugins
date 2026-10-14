@@ -177,7 +177,11 @@ describe("snapshot", () => {
     const scan = scanOf(tree);
     const ctx = context();
     assignGroups(scan, ctx);
-    const snap = snapshot(scan, ctx, { scanning: false, error: null });
+    const snap = snapshot(scan, ctx, {
+      scanning: false,
+      error: null,
+      fullDiskAccess: true,
+    });
     const bytes = Object.fromEntries(snap.groups.map((g) => [g.id, g.bytes]));
     expect(bytes.apps).toBe(2e9);
     expect(bytes.dev).toBe(4e9);
@@ -194,6 +198,19 @@ describe("snapshot", () => {
       inClean: false,
     });
     expect(snap.apps.map((a) => a.name)).toEqual(["Big"]);
+  });
+
+  it("asks for Full Disk Access only when the scan ran without it", () => {
+    const status = { scanning: false, error: null, fullDiskAccess: false };
+    const unreadable = (scan: Scan) =>
+      snapshot(scan, context(), status).system.find(
+        (i) => i.name === "Not readable",
+      )?.meta;
+    const scan = scanOf(dir("", [file("a", 1e9)]));
+    expect(unreadable(scan)).toMatch(/needs Full Disk Access/);
+    expect(unreadable({ ...scan, fullDiskAccess: true })).toMatch(
+      /only macOS reads them/,
+    );
   });
 });
 
