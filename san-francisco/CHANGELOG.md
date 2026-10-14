@@ -3,6 +3,11 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `san-francisco/v<version>`.
 
+## 0.1.5 (2026-10-13)
+
+- The child threads card above the composer looks like the background work
+  card: the same fill, 14 px text and colors, with no outlined box inside.
+
 ## 0.1.4 (2026-10-11)
 
 - Needs BB 0.46.0. In BB's Mac app the window keeps BB's own frame; the

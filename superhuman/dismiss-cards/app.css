@@ -40,6 +40,19 @@
   }
 }
 
+/*
+ * BB's background and child threads cards may fill their top row with a
+ * lighter box, outlined at its edge, and the button sits past that edge. The
+ * row takes the box's fill, and the box loses its outline.
+ */
+[data-app-composer] section:is([aria-label^="Background "], [aria-label="Child threads"]) > div:has(> .ring-1 ~ .superhuman-card-close) {
+  background-color: var(--background);
+}
+
+[data-app-composer] section:is([aria-label^="Background "], [aria-label="Child threads"]) > div > .ring-1:has(~ .superhuman-card-close) {
+  box-shadow: none;
+}
+
 /* The button's margin sets its place, whatever padding a theme gives the row. */
 [data-app-composer] section[aria-label] > div:has(> .superhuman-card-close) {
   padding-right: 0;

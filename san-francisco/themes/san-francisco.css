@@ -559,15 +559,16 @@ main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\
 
 /* ───────────────────────── above the composer ───────────────────────── */
 
-/* Background work (commands, agents or both): one outlined card of flat rows.
-   With several items the toggle heads the card like a row. */
-[data-scroll-footer] section[aria-label^="Background "] {
+/* Background work (commands, agents or both) and child threads: one outlined
+   card of flat rows. A toggle, if any, heads the card like a row. */
+[data-scroll-footer] section:is([aria-label^="Background "], [aria-label="Child threads"]) {
   border-color: var(--border);
   border-radius: 12px;
   background-color: var(--background);
 }
 
 #thread-background-commands-card-toggle,
+#thread-prompt-banner-child-threads-toggle,
 [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"]) {
   min-height: 34px;
   gap: 8px;
@@ -582,11 +583,11 @@ main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\
   border-top: 1px solid var(--border-seam);
 }
 
-:is(#thread-background-commands-card-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .text-muted-foreground:not(.tabular-nums) {
+:is(#thread-background-commands-card-toggle, #thread-prompt-banner-child-threads-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .text-muted-foreground:not(.tabular-nums) {
   color: var(--foreground);
 }
 
-:is(#thread-background-commands-card-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .font-medium {
+:is(#thread-background-commands-card-toggle, #thread-prompt-banner-child-threads-toggle, [data-scroll-footer] section[aria-label^="Background "] :is([aria-label^="Background command:"], [aria-label^="Background agent:"])) .font-medium {
   color: var(--sf-strong);
 }
 
@@ -595,10 +596,10 @@ main[data-sidebar="inset"] header p.overflow-visible:not(.text-muted-foreground\
   border-radius: 12px;
 }
 
-/* Its step list and the background card's open list: bb's rows and scroll
-   fades paint the canvas color over a popover fill, which in bb is the same
-   color. */
-[data-scroll-footer] section:is([aria-label="Workflow"], [aria-label^="Background "]) .bg-popover {
+/* Its step list and the background and child threads cards' open lists: bb's
+   rows and scroll fades paint the canvas color over a popover fill, which in
+   bb is the same color. */
+[data-scroll-footer] section:is([aria-label="Workflow"], [aria-label^="Background "], [aria-label="Child threads"]) .bg-popover {
   background-color: var(--background);
 }
 
