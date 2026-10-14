@@ -30,3 +30,14 @@ it("offers Parakeet Ultra for voice input, without hesitations", async () => {
   );
   expect(engine.transcribe).toHaveBeenCalledWith(audio, signal);
 });
+
+it("defines a Microphone setting, Automatic by default", () => {
+  const { bb, harness } = createFakePluginHost({ pluginId: "voice-input" });
+  plugin(bb);
+  const { microphone } = harness.inspection.registrations.settingsDescriptors;
+  expect(microphone).toMatchObject({
+    type: "select",
+    options: ["automatic", "built-in"],
+    default: "automatic",
+  });
+});

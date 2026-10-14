@@ -3,6 +3,22 @@ import { createEngine } from "./engine";
 import { stripHesitations } from "./hesitations";
 
 export default function plugin(bb: BbPluginApi): void {
+  // BB records in the browser, so app.tsx reads this setting.
+  bb.settings.define({
+    microphone: {
+      type: "select",
+      label: "Microphone",
+      description:
+        "Automatic uses the microphone BB picks on each device. Built-in records with the Mac's, iPhone's, or iPad's own microphone, even with AirPods on. A microphone you picked in Settings → General → Voice Input wins.",
+      options: ["automatic", "built-in"],
+      experimental_optionLabels: {
+        automatic: "Automatic",
+        "built-in": "Built-in",
+      },
+      default: "automatic",
+    },
+  });
+
   const engine = createEngine((message) => bb.log.info(message));
   bb.onDispose(() => engine.close());
 

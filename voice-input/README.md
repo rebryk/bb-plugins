@@ -21,6 +21,16 @@ composer       ◀──text──────
   languages. A take can mix them.
 - **Fast.** On an M4, a 10-second take takes about 0.3 seconds, a 40-second
   take 0.8 seconds, and a 20-minute take 24 seconds.
+- **Built-in microphone.** Under **Settings** → **Plugins** → **Voice Input**,
+  set **Microphone** to **Built-in**, or run
+  `bb plugin config voice-input set microphone built-in`
+  (`automatic` undoes it). BB's voice input then records with your Mac's,
+  iPhone's, or iPad's own microphone, even with AirPods or other headphones
+  connected. The setting works with any service that transcribes BB's voice
+  input.
+- **Automatic.** The default. BB keeps its own choice: **System default**, or
+  the microphone you picked under **Settings** → **General** → **Voice Input**.
+  That pick also wins over **Built-in**.
 
 ## Set up
 
@@ -39,8 +49,8 @@ bb settings ai-services set voice parakeet --plugin voice-input
 BB's **Automatic** choice always tries bb cloud first, so the plugin works
 only when you pick it.
 
-On its first load the plugin gets ready on its own, and **Settings** → **AI
-services** shows each step until it is ready:
+On its first load the plugin gets ready on its own, and **Settings** →
+**AI services** shows each step until it is ready:
 
 1. It downloads the model, 350 MB, from
    `https://d390utbf6y9hg4.cloudfront.net/audio/v3` to
@@ -77,6 +87,21 @@ To go back to bb cloud, run `bb settings ai-services set voice automatic`.
   behind it.
 - The recognizer's Swift source is in `recognizer.ts`. The server builds it
   once per version of that source.
+- The plugin's frontend, an `experimental_appOverlay` slot, runs in every BB
+  page: the Mac app, a browser, and the iPhone. While **Microphone** is
+  **Built-in**, it wraps the browser's `getUserMedia`. A request for audio
+  alone that names no microphone then opens the built-in one. A request that
+  names a microphone, such as the one you picked in BB's settings, passes
+  through unchanged.
+- The frontend finds the built-in microphone by name. Chromium marks it
+  "(Built-in)", and Safari names it after the MacBook, iMac, iPhone, or iPad. A
+  Mac can list a nearby iPhone's microphone, so the iPhone and iPad names count
+  only on a touch screen. If it finds none, or opening it fails, BB gets the
+  default microphone. Only a denied permission stops the take.
+- A browser names its microphones only after the page has opened one, and
+  Safari again on every page load. The plugin saves the built-in microphone's
+  id in the site's local storage and uses it meanwhile. Only the first take on
+  a site opens the default microphone first, then the built-in one.
 - Parakeet Ultra is Moondream's post-training of NVIDIA's Parakeet TDT 0.6B
   v3. The plugin runs a Core ML build of it, with the encoder in 4-bit
   palettes. The model is licensed under
