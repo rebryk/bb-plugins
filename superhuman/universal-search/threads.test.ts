@@ -22,10 +22,11 @@ const untilAborted: typeof fetch = (_input, options) => new Promise((_resolve, r
 
 it("searches both layouts, preserves options and merges IDs per lifecycle", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>()
-    .mockResolvedValueOnce(Response.json(result(["both", "ru"], ["archive"])))
+    .mockResolvedValueOnce(Response.json(result(["both", "ru"], ["archive"]), { headers: { etag: "x" } }))
     .mockResolvedValueOnce(Response.json(result(["both", "en"], ["archive", "other"])));
   const host = setup(fetch);
   const response = await host.fetch(endpoint + "руддщ", { credentials: "same-origin" });
+  expect(response.headers.get("etag")).toBeNull();
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(new URL(String(fetch.mock.calls[1]![0])).searchParams.get("query")).toBe("hello");
   expect(fetch.mock.calls[1]![1]?.credentials).toBe("same-origin");
@@ -55,7 +56,7 @@ it.each(["network", "http", "invalid"])("keeps native results when the alternate
   expect(await setup(fetch).fetch(endpoint + "hello")).toBe(first);
 });
 
-it("leaves other origins, methods, endpoints and non-text queries alone", async () => {
+it("leaves other origins, methods, endpoints, short or long and non-text queries alone", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({}));
   const host = setup(fetch);
   await host.fetch("https://other.test/api/v1/threads/search?query=hello");
@@ -63,7 +64,20 @@ it("leaves other origins, methods, endpoints and non-text queries alone", async 
   await host.fetch("https://bb.test/api/v1/threads?query=hello");
   await host.fetch(endpoint + "123");
   await host.fetch(endpoint + "h");
-  expect(fetch).toHaveBeenCalledTimes(5);
+  await host.fetch(endpoint + " h ");
+  await host.fetch(endpoint + "h".repeat(257));
+  expect(fetch).toHaveBeenCalledTimes(7);
+});
+
+it("stays in place under a later wrapper, passing requests through", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(result(["a"])));
+  const host = setup(fetch);
+  const later = vi.fn<typeof globalThis.fetch>(host.fetch);
+  host.fetch = later;
+  stop();
+  expect(host.fetch).toBe(later);
+  await host.fetch(endpoint + "hello");
+  expect(fetch).toHaveBeenCalledOnce();
 });
 
 it.each([false, true])("disabling cancels the alternate and discards late results (abortable: %s)", async (abortable) => {
@@ -78,6 +92,13 @@ it.each([false, true])("disabling cancels the alternate and discards late result
   expect(fetch.mock.calls[1]![1]!.signal!.aborted).toBe(true);
   expect(await pending).toBe(first);
   expect(host.fetch).toBe(fetch);
+});
+
+it("does not start the alternate for a query cancelled already", async () => {
+  const first = Response.json(result(["original"]));
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => first);
+  expect(await setup(fetch).fetch(endpoint + "hello", { signal: AbortSignal.abort() })).toBe(first);
+  expect(fetch).toHaveBeenCalledOnce();
 });
 
 it("forwards a cancelled query to both requests", async () => {

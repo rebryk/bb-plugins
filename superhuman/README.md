@@ -62,6 +62,11 @@ search it reads the palette's React row handlers and wraps its thread-search
 requests. That is verified for BB 0.46.0 and turns itself off on other
 versions until checked again; the snoozed-thread filter works on any version.
 
+BB's thread search leaves out the threads a snooze hides, so Snooze adds them,
+matched by title the way BB matches titles, and in both layouts while
+Universal Search is on. It wraps the same thread-search requests and follows
+the same version check.
+
 ```sh
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins

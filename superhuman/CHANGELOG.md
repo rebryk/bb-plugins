@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.25 (2026-10-14)
+
+- BB's thread search now finds snoozed threads, and the child threads their
+  snooze hid, by title. They sit among BB's own results, title matches first,
+  highlighted as BB highlights titles. With Universal Search on, a query typed
+  in the other keyboard layout finds them too. Like Universal Search, it works
+  on BB 0.46.0 and stays off on other versions until checked again.
+
 ## 0.1.24 (2026-10-13)
 
 - New: Dismiss Cards, on by default, puts a close button on the cards above a

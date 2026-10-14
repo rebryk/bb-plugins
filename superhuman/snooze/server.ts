@@ -1,5 +1,6 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { matchTitle } from "./search";
 import { CHANGED_CHANNEL } from "./shared";
 import type { Choice } from "./time";
 
@@ -58,6 +59,30 @@ export const rpcContract = defineRpcContract({
   unsnooze: {
     input: z.object({ threadId: threadIdSchema }).strict(),
     output: z.null(),
+  },
+  searchSnoozes: {
+    input: z
+      .object({ queries: z.array(z.string().min(1).max(256)).min(1).max(2) })
+      .strict(),
+    output: z.object({
+      /** Hidden threads whose title matches, as BB's search returns them. */
+      results: z.array(
+        z.object({
+          /** The thread's row in BB's thread list. */
+          thread: z.looseObject({ id: z.string(), updatedAt: z.number() }),
+          matches: z.array(
+            z.object({
+              sourceKind: z.enum(["title", "title_fallback"]),
+              text: z.string(),
+              highlightRanges: z.array(
+                z.object({ start: z.number(), end: z.number() }),
+              ),
+              sourceSeq: z.null(),
+            }),
+          ),
+        }),
+      ),
+    }),
   },
 });
 
@@ -192,6 +217,54 @@ export default async function registerSnoozeServer(
     async unsnooze({ threadId }) {
       await serial(() => wake(threadId, false));
       return null;
+    },
+    async searchSnoozes({ queries }) {
+      const snoozes = Object.values(await load());
+      const ids = new Set(snoozes.flatMap(({ hidden }) => hidden));
+      // BB's search returns thread list rows; each list is read once.
+      const lists = new Map<string, ReturnType<typeof threads.list>>();
+      const results = await Promise.all(
+        [...ids].map(async (threadId) => {
+          const thread = await threads.get({ threadId }).catch(() => null);
+          if (
+            thread === null ||
+            thread.archivedAt !== null ||
+            thread.deletedAt !== null ||
+            thread.visibility !== "hidden"
+          ) {
+            return [];
+          }
+          const text = thread.title || thread.titleFallback || "";
+          const highlightRanges = matchTitle(text, queries);
+          if (highlightRanges === null) return [];
+          const { parentThreadId, environmentId, projectId } = thread;
+          // The smallest list that holds the thread.
+          const scope =
+            parentThreadId !== null
+              ? { parentThreadId }
+              : environmentId !== null
+                ? { environmentId, hasParent: false }
+                : { projectId, hasParent: false };
+          const key = JSON.stringify(scope);
+          let list = lists.get(key);
+          if (list === undefined) {
+            list = threads
+              .list({ ...scope, includeHidden: true, archived: false })
+              .catch(() => []);
+            lists.set(key, list);
+          }
+          const row = (await list).find((row) => row.id === threadId);
+          if (row === undefined) return [];
+          const match = {
+            sourceKind: thread.title ? "title" : "title_fallback",
+            text,
+            highlightRanges,
+            sourceSeq: null,
+          } as const;
+          return [{ thread: row, matches: [match] }];
+        }),
+      );
+      return { results: results.flat() };
     },
   });
 

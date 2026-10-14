@@ -33,11 +33,13 @@ import { useIsCompactViewport } from "../components/ui/hooks/use-compact-viewpor
 import { Icon } from "../components/ui/icon";
 import { usePortalScopeProps } from "../lib/portal-scope";
 import { cn } from "../lib/utils";
+import { useSearchAdapter } from "../universal-search/app";
 import { layoutFilter } from "../universal-search/layout";
 import type { Snooze, rpcContract } from "./server";
 import "./app.css";
 import { CHANGED_CHANNEL } from "./shared";
 import { nextThread, sidebarThreadIds } from "./sidebar";
+import { installSnoozedSearch } from "./thread-search";
 import {
   fmtUntil,
   fmtWhen,
@@ -220,6 +222,27 @@ function useMenuData() {
     }),
     [on, rpc, snoozes],
   );
+}
+
+/**
+ * Adds the threads snoozes hide to BB's thread search, which leaves hidden
+ * threads out, while Snooze is on and has any. Returns the anchor to render.
+ */
+function useSnoozedSearch(rpc: SnoozeRpc, on: boolean, snoozes: Snooze[]) {
+  const layouts = useSettings().values?.universalSearch !== false;
+  const install = useCallback(
+    (disposers: (() => void)[]) => {
+      disposers.push(
+        installSnoozedSearch(window, layouts, (queries) =>
+          rpc
+            .call("searchSnoozes", { queries })
+            .then(({ results }) => results),
+        ),
+      );
+    },
+    [rpc, layouts],
+  );
+  return useSearchAdapter(on && snoozes.length > 0, install, snoozes);
 }
 
 function unsnooze(rpc: SnoozeRpc, threadId: string) {
@@ -472,6 +495,7 @@ function SnoozeDialogs() {
   const context = useBbContext();
   const navigate = useBbNavigate();
   const on = useSnoozeOn();
+  const anchor = useSnoozedSearch(rpc, on, snoozes);
   useEffect(() => {
     snoozeOn = on;
     if (!on && open) closeDialog();
@@ -517,6 +541,7 @@ function SnoozeDialogs() {
 
   return (
     <>
+      <span ref={anchor} hidden aria-hidden="true" />
       <PaletteDialog kind="snooze" title="Snooze thread">
         {dialog?.kind === "snooze" && (
           <Picker

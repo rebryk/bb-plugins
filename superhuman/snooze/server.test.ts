@@ -11,6 +11,10 @@ type Visibility = "visible" | "hidden";
 interface FakeThread {
   parentThreadId: string | null;
   visibility: Visibility;
+  title?: string;
+  titleFallback?: string;
+  archivedAt?: number;
+  environmentId?: string;
 }
 
 // Saturday, September 26, 2026, 2:30 PM.
@@ -32,7 +36,10 @@ async function setup(threads = family()) {
   const response = (id: string) =>
     makeThreadResponse({
       id,
-      title: `Thread ${id}`,
+      title: threads[id]?.title ?? `Thread ${id}`,
+      titleFallback: threads[id]?.titleFallback ?? null,
+      archivedAt: threads[id]?.archivedAt ?? null,
+      environmentId: threads[id]?.environmentId ?? null,
       parentThreadId: threads[id]?.parentThreadId ?? null,
       visibility: threads[id]?.visibility ?? "visible",
     });
@@ -40,12 +47,17 @@ async function setup(threads = family()) {
     pluginId: "superhuman",
     sdk: {
       threads: {
-        get: (async ({ threadId }: { threadId: string }) =>
-          response(threadId)) as never,
-        list: (async ({ parentThreadId }: { parentThreadId: string }) =>
+        get: (async ({ threadId }: { threadId: string }) => {
+          if (!threads[threadId]) throw new Error("Thread not found");
+          return response(threadId);
+        }) as never,
+        // Rows of the thread list carry more than `get` returns.
+        list: (async (args: { parentThreadId?: string }) =>
           Object.keys(threads)
-            .filter((id) => threads[id]?.parentThreadId === parentThreadId)
-            .map(response)) as never,
+            .filter(
+              (id) => threads[id]?.parentThreadId === (args.parentThreadId ?? null),
+            )
+            .map((id) => ({ ...response(id), queuedWork: "none" }))) as never,
         update: (async (args: { threadId: string; visibility: Visibility }) => {
           const thread = threads[args.threadId];
           if (thread) thread.visibility = args.visibility;
@@ -299,5 +311,82 @@ describe("the Snooze setting", () => {
     await harness.behavior.setSettings({ snooze: true });
     await snooze("x", NOW + HOUR);
     expect(visibility().x).toBe("hidden");
+  });
+});
+
+describe("searching snoozed threads", () => {
+  type Results = {
+    results: { thread: { id: string }; matches: unknown[] }[];
+  };
+
+  /** Snoozes `a`, which hides `a`, `b` and `c`; `d` and `x` match but aren't hidden by it. */
+  async function snoozeTitled() {
+    const threads = family();
+    threads.a!.title = "Fix flaky deploy";
+    threads.a!.environmentId = "env-1";
+    threads.b!.title = "";
+    threads.b!.titleFallback = "Flaky child";
+    threads.c!.title = "Other work";
+    threads.d!.title = "Flaky but hidden by hand";
+    threads.x!.title = "Flaky but visible";
+    const { harness, snooze } = await setup(threads);
+    await snooze("a", NOW + HOUR);
+    const search = async (queries: string[]) =>
+      (await harness.behavior.callRpc("searchSnoozes", { queries })) as Results;
+    return { threads, harness, snooze, search };
+  }
+
+  it("finds the threads snoozes hide by title, as list rows with BB's matches", async () => {
+    const { harness, snooze, search } = await snoozeTitled();
+    await snooze("x", NOW + HOUR);
+    const lists = () => harness.inspection.sdk.callsTo("threads.list");
+    const listed = lists().length;
+    const match = (kind: string, text: string, start: number, end: number) => [
+      {
+        sourceKind: kind,
+        text,
+        highlightRanges: [{ start, end }],
+        sourceSeq: null,
+      },
+    ];
+    expect((await search(["zzz", "flak"])).results).toEqual([
+      {
+        thread: expect.objectContaining({ id: "a", queuedWork: "none" }),
+        matches: match("title", "Fix flaky deploy", 4, 8),
+      },
+      {
+        thread: expect.objectContaining({ id: "b", queuedWork: "none" }),
+        matches: match("title_fallback", "Flaky child", 0, 4),
+      },
+      {
+        thread: expect.objectContaining({ id: "x", queuedWork: "none" }),
+        matches: match("title", "Flaky but visible", 0, 4),
+      },
+    ]);
+    // The smallest list that holds each: its parent's, else its environment's
+    // or its project's roots.
+    const scope = { includeHidden: true, archived: false };
+    expect(lists().slice(listed).map(([args]) => args)).toEqual([
+      { environmentId: "env-1", hasParent: false, ...scope },
+      { parentThreadId: "a", ...scope },
+      { projectId: "project-1", hasParent: false, ...scope },
+    ]);
+    await harness.lifecycle.dispose();
+  });
+
+  it("needs every word and skips threads no longer hidden, archived, or gone", async () => {
+    const { threads, harness, search } = await snoozeTitled();
+    const ids = async (queries: string[]) =>
+      (await search(queries)).results.map(({ thread }) => thread.id);
+    expect(await ids(["flak dep"])).toEqual(["a"]);
+    expect(await ids(["flak zzz"])).toEqual([]);
+    expect(await ids(["oth"])).toEqual(["c"]);
+
+    threads.b!.visibility = "visible";
+    threads.a!.archivedAt = NOW;
+    delete threads.c;
+    expect(await ids(["flak"])).toEqual([]);
+    expect(await ids(["oth"])).toEqual([]);
+    await harness.lifecycle.dispose();
   });
 });
