@@ -13,6 +13,13 @@
   are keyed by it) or the marketplace name `sf-plugins`.
 - Default command keys use Cmd, Ctrl, or Alt, or F1–F24; BB silently leaves a
   taken key unbound. Handle bare keys like `/` with a keydown listener.
+- Never write `A:has(B) C` or `A:has(B) > C` in CSS: Chrome then restyles the
+  page on every DOM change. Mark with `A:has(B) { --m: 1; }` and style with
+  `@container style(--m: 1) { A C {} }`.
+- Wrap hand-written `:hover` rules in `@media (hover: hover)`, as BB does, or
+  they stick after a tap.
+- Finish work with subagent reviews (correctness, minimal code, these rules),
+  apply their fixes, then open a PR without asking.
 
 ## Testing
 
@@ -22,6 +29,12 @@ Switching between a local install and `<id>@sf-plugins` takes
 `bb plugin remove <id>`, which wipes its settings: save
 `bb plugin config <id>` first and restore them after. Switch back to
 `<id>@sf-plugins` once merged.
+
+Test on a disposable thread (`bb thread create … --send-at 30d`, deleted
+after) and your own `bb terminal`; leave the user's threads, drafts,
+terminals, theme, and accent alone. For the phone layout in Aside, load BB in
+a same-origin 390×844 iframe and stub `matchMedia` on its `contentWindow`
+right after appending it, before BB's scripts run.
 
 ## New plugin
 
@@ -41,3 +54,12 @@ Switching between a local install and `<id>@sf-plugins` takes
   not `list`).
 - A feature's on/off setting lives in the root `server.ts`, on by default
   unless the feature takes something away.
+- Superhuman holds BB behavior, San Francisco only styling. Decide per feature
+  whether it joins Superhuman or ships as its own plugin.
+
+## San Francisco
+
+- One palette with an `accent` setting; never split it into separate themes.
+- Before removing a rule, diff computed styles under the old and new CSS on
+  live BB pages (desktop, phone, Mac app). Keep any rule that still changes
+  what users see.
