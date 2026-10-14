@@ -14,6 +14,7 @@ it("defines a switch for each feature and starts Snooze and Brief Replies", asyn
     ["universalSearch", "boolean", true],
     ["snooze", "boolean", true],
     ["archiveButton", "boolean", true],
+    ["dismissCards", "boolean", true],
     ["phoneLayout", "boolean", true],
     ["hideTitleBar", "boolean", false],
     ["uiPolish", "boolean", true],

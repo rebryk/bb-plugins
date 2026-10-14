@@ -20,10 +20,10 @@ status and code colors are brighter to match.
 In the sidebar, rows are a soft black and the open thread is a white pill.
 Thread and panel headers lose their dividers. The composer gets larger corners,
 a soft shadow and one round send button with an up arrow; Stop is the same
-circle with a square. Above the composer, background work becomes one outlined
-card, and queued messages a sheet tucked behind the composer. Right-panel tabs
-become quiet pills, and an empty new tab centers its hint above outlined
-buttons.
+circle with a square. Above the composer, background work and child threads
+each become one outlined card, and queued messages a sheet tucked behind the
+composer. Right-panel tabs become quiet pills, and an empty new tab centers its
+hint above outlined buttons.
 
 ## Settings like a document
 

@@ -11,6 +11,9 @@ Superhuman-style speed for BB:
   from the moon in its header or any thread menu; **Show snoozed threads** lists
   them.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
+- **Dismiss Cards.** A close button on the cards above a thread's message box
+  for background work, child threads, and the pull request; a card stays
+  hidden in its thread until its words change.
 - **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
   fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
 - **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
@@ -42,6 +45,10 @@ the right panel with swipes from the screen's edges, and hides the bars while
 the keyboard is open, leaving a terminal's row of keys above it. A swipe down a
 terminal hides the keyboard. The home page gets a card too, below the message
 box, for the right panel's button and what plugins put below the box.
+
+Dismiss Cards keeps a card hidden through a new count or running time, and
+only in the browser where you hid it. The background card comes back when
+another kind of work starts, such as an agent beside commands.
 
 UI Polish hides only the editor picker; **Show Git changes and Commit button**
 in BB's settings hides Commit. On a Tesla, whose browser reports a mouse, BB

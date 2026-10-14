@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.24 (2026-10-13)
+
+- New: Dismiss Cards, on by default, puts a close button on the cards above a
+  thread's message box for background work, child threads, and the pull
+  request. A hidden card stays hidden in its thread, in that browser, until
+  its words change; a new count or running time doesn't bring it back, and
+  the background card comes back only for another kind of work.
+
 ## 0.1.23 (2026-10-12)
 
 - On a phone, a thread's bar lays out its buttons as the home page's card

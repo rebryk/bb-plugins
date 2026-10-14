@@ -18,8 +18,8 @@ The theme restyles:
   an up arrow, gray while there is nothing to send and black once there is.
   Stop, the voice button and the recording check are the same circle, one
   size in every state.
-- **Above the composer**: background work becomes one outlined card, and
-  queued messages a sheet tucked behind the composer.
+- **Above the composer**: background work and child threads each become one
+  outlined card, and queued messages a sheet tucked behind the composer.
 - **Right panel**: quiet tabs, and a new tab that centers its hint above
   outlined buttons.
 - **Settings**: a Settings › Page breadcrumb, a large page title, small-caps
