@@ -1,5 +1,6 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import registerArchiveButton from "./archive-button/app";
+import registerDismissCards from "./dismiss-cards/app";
 import registerHotkeys from "./hotkeys/app";
 import registerPhoneLayout from "./phone-layout/app";
 import registerSnooze from "./snooze/app";
@@ -16,4 +17,5 @@ export default definePluginApp((app) => {
   registerUiPolish(app);
   registerPhoneLayout(app);
   registerTitleBar(app);
+  registerDismissCards(app);
 });

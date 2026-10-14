@@ -34,6 +34,13 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
+    dismissCards: {
+      type: "boolean",
+      label: "Dismiss Cards",
+      description:
+        "A close button on the cards above a thread's message box for background work, child threads, and the pull request. A card stays hidden until its words change.",
+      default: true,
+    },
     phoneLayout: {
       type: "boolean",
       label: "Mobile Layout",

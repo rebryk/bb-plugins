@@ -9,6 +9,9 @@ Superhuman-style speed for BB:
   from the moon in its header or any thread menu; **Show snoozed threads** lists
   them.
 - **Archive Button.** Archive a thread from its header, next to Snooze.
+- **Dismiss Cards.** A close button on the cards above a thread's message box
+  for background work, child threads, and the pull request; a card stays
+  hidden in its thread until its words change.
 - **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
   fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
 - **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,

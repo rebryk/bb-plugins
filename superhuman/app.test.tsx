@@ -34,6 +34,7 @@ it("registers every feature under an id of its own", async () => {
       "ui-polish-switch",
       "phone-layout",
       "title-bar-switch",
+      "dismiss-cards",
     ],
     commands: ["snooze-thread", "show-snoozed-threads"],
   });
