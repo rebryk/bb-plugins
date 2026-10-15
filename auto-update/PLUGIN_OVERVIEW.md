@@ -16,6 +16,13 @@ every 6 hours, every day, or every week. **Check Now** checks every listed
 plugin right away and installs the updates of those turned on. The page shows
 when the last check ran.
 
+An automatic install requires a change to the plugin's package version.
+Commits to other plugins in the same repository do not reinstall an unchanged
+version. The page shows **Version unchanged** for those candidates. If the
+version cannot be verified, the update is skipped and the page shows why.
+Authors must change their package version to ship an automatic update.
+BB's own update badges and manual updates still use BB's update rules.
+
 ## See what happened
 
 The list opens at once with what BB last knew, then each row checks its plugin

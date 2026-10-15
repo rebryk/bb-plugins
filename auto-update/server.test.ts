@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, { type Overview } from "./server";
+import { readCandidateVersion } from "./candidate-version";
+
+vi.mock("./candidate-version", () => ({ readCandidateVersion: vi.fn() }));
+const CANDIDATE = "a".repeat(40);
+const candidate = { version: CANDIDATE, display: "candidate" };
 
 type Installed = Record<string, unknown> & { id: string };
 const HOUR = 3_600_000;
@@ -9,6 +14,7 @@ const installed = (o: Installed) => ({
   name: o.id,
   version: "0.1.0",
   source: `git:https://x/${o.id}.git@main`,
+  rootDir: `/installed/${o.id}`,
   provenance: "catalog",
   catalogMarketplaceName: "bb-community",
   publisherLabel: "BB Community",
@@ -30,14 +36,14 @@ const PLUGINS = [
     name: "Bookmarks",
     catalogMarketplaceName: "sf-plugins",
     publisherLabel: "San Francisco Plugins",
-    updateState: { outcome: "update-available" },
+    updateState: { outcome: "update-available", availableVersion: CANDIDATE },
   }),
   installed({
     id: "fluently",
     name: "Fluently",
     catalogMarketplaceName: "stasbel",
     publisherLabel: "stasbel/bb-plugins",
-    updateState: { outcome: "update-available" },
+    updateState: { outcome: "update-available", availableVersion: CANDIDATE },
   }),
   installed({
     id: "pr",
@@ -73,19 +79,45 @@ async function setup(
   } = {},
 ) {
   const avail = new Set(["bookmarks", "fluently"]);
+  const plugins = (o.plugins ?? structuredClone(PLUGINS)) as Installed[];
   const { bb, harness } = createFakePluginHost({
     pluginId: "auto-update",
     settings: o.settings,
     sdk: {
       plugins: {
-        list: (async () => ({ plugins: o.plugins ?? PLUGINS })) as never,
-        checkUpdates: (o.checkUpdates ??
-          (async ({ pluginId }: { pluginId: string }) => [
-            {
-              id: pluginId,
-              outcome: avail.has(pluginId) ? "update-available" : "current",
-            },
-          ])) as never,
+        list: (async () => ({ plugins })) as never,
+        checkUpdates: (async ({ pluginId }: { pluginId: string }) => {
+          const entries = (
+            o.checkUpdates
+              ? await o.checkUpdates({ pluginId })
+              : [
+                  {
+                    id: pluginId,
+                    outcome: avail.has(pluginId)
+                      ? "update-available"
+                      : "current",
+                    candidate,
+                  },
+                ]
+          ) as {
+            id: string;
+            outcome: string;
+            candidate?: { version: string };
+          }[];
+          for (const e of entries) {
+            const p = plugins.find((p) => p.id === e.id);
+            if (p)
+              p.updateState = {
+                outcome: e.outcome,
+                availableVersion:
+                  e.outcome === "update-available"
+                    ? e.candidate?.version
+                    : undefined,
+                lastCheckAt: Date.now(),
+              };
+          }
+          return entries;
+        }) as never,
         applyUpdate: (o.applyUpdate ??
           (async () => ({
             applied: true,
@@ -93,6 +125,9 @@ async function setup(
             from: { display: "", version: "" },
           }))) as never,
         experimental_startUpdate: (async () => ({})) as never,
+        getSource: (async ({ pluginId }: { pluginId: string }) => ({
+          requested: `git:https://x/${pluginId}.git@main`,
+        })) as never,
       },
     },
   });
@@ -118,6 +153,7 @@ async function setup(
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
+  vi.mocked(readCandidateVersion).mockReset().mockResolvedValue("0.1.1");
 });
 afterEach(() => vi.useRealTimers());
 
@@ -193,7 +229,7 @@ it("updates itself last via startUpdate", async () => {
       installed({ id: "auto-update", updateState: { outcome: "current" } }),
     ],
     checkUpdates: async ({ pluginId }) => [
-      { id: pluginId, outcome: "update-available" },
+      { id: pluginId, outcome: "update-available", candidate },
     ],
   });
   await toggle("auto-update", true);
@@ -222,7 +258,7 @@ it("opening the page checks stale plugins once, shows checking at once, never in
     checkUpdates: ({ pluginId }) =>
       new Promise((resolve) =>
         releases.set(pluginId, () =>
-          resolve([{ id: pluginId, outcome: "update-available" }]),
+          resolve([{ id: pluginId, outcome: "update-available", candidate }]),
         ),
       ),
   });
@@ -271,4 +307,137 @@ it("Check Now checks all listed with switches off, one run at a time", async () 
   await vi.waitFor(async () => expect((await overview()).checking).toBe(false));
   expect(ids("plugins.checkUpdates")).toHaveLength(6);
   expect(ids("plugins.applyUpdate")).toEqual([]);
+});
+
+it("skips a new commit with the same package version and remembers that candidate", async () => {
+  vi.mocked(readCandidateVersion).mockResolvedValue("0.1.0");
+  const { toggle, ids, tick, rows } = await setup();
+  await toggle("bookmarks", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+  expect((await rows()).find((p) => p.id === "bookmarks")?.update).toBe(
+    "unchanged",
+  );
+  vi.setSystemTime(NOW + HOUR);
+  await tick();
+  expect(readCandidateVersion).toHaveBeenCalledTimes(1);
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+});
+
+it("skips an unverifiable version, reports why, and retries the next check", async () => {
+  vi.mocked(readCandidateVersion).mockRejectedValueOnce(
+    new Error("Cannot read package.json."),
+  );
+  const { toggle, ids, tick, rows } = await setup();
+  await toggle("bookmarks", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+  expect((await rows()).find((p) => p.id === "bookmarks")).toMatchObject({
+    update: "unavailable",
+    versionCheckError: "Cannot read package.json.",
+  });
+  vi.setSystemTime(NOW + HOUR);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual(["bookmarks"]);
+});
+
+it("does not update itself for a commit without a package version change", async () => {
+  vi.mocked(readCandidateVersion).mockResolvedValue("0.1.0");
+  const { toggle, ids, tick } = await setup({
+    plugins: [installed({ id: "auto-update" })],
+    checkUpdates: async ({ pluginId }) => [
+      { id: pluginId, outcome: "update-available", candidate },
+    ],
+  });
+  await toggle("auto-update", true);
+  await tick();
+  expect(ids("plugins.experimental_startUpdate")).toEqual([]);
+});
+
+it("does not reinstall a version another update installed during the check", async () => {
+  const p = installed({ id: "bookmarks" });
+  vi.mocked(readCandidateVersion).mockImplementation(async () => {
+    p.version = "0.1.1";
+    return "0.1.1";
+  });
+  const { toggle, ids, tick } = await setup({ plugins: [p] });
+  await toggle("bookmarks", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+});
+
+it("respects a switch turned off while the version check is running", async () => {
+  const { toggle, ids, tick } = await setup();
+  vi.mocked(readCandidateVersion).mockImplementation(async () => {
+    await toggle("bookmarks", false);
+    return "0.1.1";
+  });
+  await toggle("bookmarks", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+});
+
+it("verifies a candidate when BB recently checked it but Auto Update has not", async () => {
+  vi.mocked(readCandidateVersion).mockResolvedValue("0.1.0");
+  const { harness, rows, ids } = await setup({
+    plugins: [
+      installed({
+        id: "bookmarks",
+        updateState: {
+          outcome: "update-available",
+          availableVersion: CANDIDATE,
+          lastCheckAt: NOW,
+        },
+      }),
+    ],
+  });
+  await harness.behavior.callRpc("refreshAutoUpdates", null);
+  await vi.waitFor(async () =>
+    expect((await rows())[0]?.update).toBe("unchanged"),
+  );
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+});
+
+it("shows the skip reason when BB omits the candidate version", async () => {
+  const { toggle, ids, tick, rows } = await setup({
+    checkUpdates: async ({ pluginId }) => [
+      { id: pluginId, outcome: "update-available" },
+    ],
+  });
+  await toggle("bookmarks", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual([]);
+  expect((await rows()).find((p) => p.id === "bookmarks")).toMatchObject({
+    update: "unavailable",
+    versionCheckError: "BB did not report the versions to compare.",
+  });
+});
+
+it("keeps the subdirectory for raw HTTPS Git sources", async () => {
+  const source = {
+    requested: "https://example.com/plugins.git@main",
+    subdirectory: "bookmarks",
+  };
+  const { harness, toggle, tick } = await setup({
+    plugins: [installed({ id: "bookmarks", source: source.requested })],
+  });
+  harness.sdk.stub("plugins.getSource", async () => source);
+  await toggle("bookmarks", true);
+  await tick();
+  expect(readCandidateVersion).toHaveBeenCalledWith(source, CANDIDATE);
+});
+
+it("does not update a later queued plugin switched off during an earlier install", async () => {
+  let disableLater: () => Promise<unknown>;
+  const { toggle, ids, tick } = await setup({
+    applyUpdate: async () => {
+      await disableLater();
+      return {};
+    },
+  });
+  disableLater = () => toggle("fluently", false);
+  await toggle("bookmarks", true);
+  await toggle("fluently", true);
+  await tick();
+  expect(ids("plugins.applyUpdate")).toEqual(["bookmarks"]);
 });
