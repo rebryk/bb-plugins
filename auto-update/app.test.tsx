@@ -16,6 +16,7 @@ const row = (name: string, extra: Partial<PluginRow> = {}): PluginRow => ({
   autoUpdate: false,
   update: "current",
   lastFailure: null,
+  versionCheckError: null,
   checking: false,
   updating: false,
   ...extra,
@@ -87,6 +88,28 @@ it("lists plugins under their source with a switch each", async () => {
   expect(switchOf(slot, "Bookmarks").getAttribute("aria-checked")).toBe("true");
   expect(switchOf(slot, "Chime").getAttribute("aria-checked")).toBe("false");
   expect(slot.getByText("Not checked yet.")).toBeTruthy();
+});
+
+it("explains why a candidate was skipped", async () => {
+  const slot = await renderPage({
+    listAutoUpdates: () =>
+      overview([
+        {
+          ...GROUPS[1]!,
+          plugins: [
+            row("Bookmarks", { update: "unchanged" }),
+            row("Canvas", {
+              update: "unavailable",
+              versionCheckError: "Cannot read package.json.",
+            }),
+          ],
+        },
+      ]),
+  });
+  expect(slot.getByText("0.1.0 · Version unchanged")).toBeTruthy();
+  expect(
+    slot.getByText("0.1.0 · Update skipped: Cannot read package.json."),
+  ).toBeTruthy();
 });
 
 it("shows the list at once, then each row checks until the server says it's done", async () => {

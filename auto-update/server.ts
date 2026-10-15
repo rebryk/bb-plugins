@@ -1,6 +1,7 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { CHANGED_CHANNEL } from "./shared";
+import { readCandidateVersion } from "./candidate-version";
 
 type Installed = Awaited<
   ReturnType<BbPluginApi["sdk"]["plugins"]["list"]>
@@ -16,6 +17,14 @@ const FREQUENCIES: Record<string, [label: string, hours: number]> = {
 /** One kv key per plugin whose switch is on. */
 const ON = "on:";
 const LAST_RUN_KEY = "lastRunAt";
+
+type VersionCheck = {
+  source: string;
+  candidate: string;
+  version?: string;
+  error?: string;
+};
+const sourceKey = (p: Installed) => JSON.stringify([p.source, p.rootDir]);
 
 /** Built-in plugins update with BB; pinned and local ones never update. */
 const takesUpdates = (p: Installed) =>
@@ -33,6 +42,7 @@ function toRow(
   autoUpdate: boolean,
   checking: boolean,
   updating: boolean,
+  checked?: VersionCheck,
 ) {
   const { outcome, lastFailure } = p.updateState;
   return {
@@ -42,7 +52,12 @@ function toRow(
     icon: p.icon,
     iconUrl: p.iconUrl,
     autoUpdate,
-    update: outcome ?? null,
+    update: checked?.error
+      ? "unavailable"
+      : checked?.version === p.version
+        ? "unchanged"
+        : (outcome ?? null),
+    versionCheckError: checked?.error ?? null,
     /** Why the last update BB tried was rolled back; BB records it itself. */
     lastFailure: lastFailure?.detail ?? null,
     checking,
@@ -94,26 +109,73 @@ export default async function plugin(bb: BbPluginApi) {
     new Set((await kv.list(ON)).map((key) => key.slice(ON.length)));
 
   const checks = new Map<string, Promise<boolean>>();
+  // One immutable candidate per plugin; a new source or commit invalidates it.
+  const versions = new Map<string, VersionCheck>();
+  const checkedVersion = (p: Installed) => {
+    const checked = versions.get(p.id);
+    return checked?.source === sourceKey(p) &&
+      checked.candidate === (p.updateState.availableVersion ?? "")
+      ? checked
+      : undefined;
+  };
   let running: Promise<void> | null = null;
   let updating: string | null = null;
 
   // One check per plugin, side by side: BB's check of every plugin runs them
   // one after another and outlasts the SDK's request timeout.
-  function check(pluginId: string) {
+  function check(p: Installed) {
+    const pluginId = p.id;
     let pending = checks.get(pluginId);
     if (pending === undefined) {
       pending = bb.sdk.plugins
         .checkUpdates({ pluginId })
-        .then(
-          (entries) =>
-            entries.some(
-              (e) => e.id === pluginId && e.outcome === "update-available",
-            ),
-          (error) => {
-            bb.log.warn(`Could not check ${pluginId}: ${error}`);
+        .then(async (entries) => {
+          const entry = entries.find((e) => e.id === pluginId);
+          if (entry?.outcome !== "update-available") {
+            versions.delete(pluginId);
             return false;
-          },
-        )
+          }
+          const candidate = entry.candidate?.version;
+          const source = sourceKey(p);
+          try {
+            if (!candidate || !p.version.trim())
+              throw new Error("BB did not report the versions to compare.");
+            let checked = versions.get(pluginId);
+            if (
+              checked?.source !== source ||
+              checked.candidate !== candidate ||
+              checked.version === undefined
+            ) {
+              const origin = p.source.startsWith("npm:")
+                ? { requested: p.source }
+                : await bb.sdk.plugins.getSource({ pluginId });
+              checked = {
+                source,
+                candidate,
+                version: await readCandidateVersion(origin, candidate),
+              };
+              versions.set(pluginId, checked);
+            }
+            return checked.version !== p.version;
+          } catch (error) {
+            const detail =
+              error instanceof Error ? error.message : "Unknown error.";
+            versions.set(pluginId, {
+              source,
+              candidate: candidate ?? "",
+              error: detail,
+            });
+            bb.log.warn(
+              `Skipped ${pluginId}: could not verify its package version. ${detail}`,
+            );
+            return false;
+          }
+        })
+        .catch((error) => {
+          versions.delete(pluginId);
+          bb.log.warn(`Could not check ${pluginId}: ${error}`);
+          return false;
+        })
         .finally(() => {
           checks.delete(pluginId);
           publish();
@@ -123,10 +185,22 @@ export default async function plugin(bb: BbPluginApi) {
     return pending;
   }
 
-  function checkAll(pluginIds: string[]) {
-    const all = Promise.all(pluginIds.map(check));
+  function checkAll(plugins: Installed[]) {
+    const all = Promise.all(plugins.map(check));
     publish();
     return all;
+  }
+
+  async function shouldInstall(pluginId: string) {
+    const [plugins, on] = await Promise.all([updatable(), readOn()]);
+    const p = plugins.find((p) => p.id === pluginId);
+    const checked = p && checkedVersion(p);
+    return (
+      p !== undefined &&
+      on.has(pluginId) &&
+      checked?.version !== undefined &&
+      checked.version !== p.version
+    );
   }
 
   /** Check, then install the updates of plugins switched on; one run at a time. */
@@ -134,12 +208,14 @@ export default async function plugin(bb: BbPluginApi) {
     running ??= (async () => {
       await kv.set(LAST_RUN_KEY, Date.now());
       const on = await readOn();
-      const ids = (await updatable())
-        .map((p) => p.id)
-        .filter((id) => !onlySwitchedOn || on.has(id));
-      const available = await checkAll(ids);
-      const install = ids.filter((id, i) => available[i] && on.has(id));
+      const plugins = (await updatable()).filter(
+        (p) => !onlySwitchedOn || on.has(p.id),
+      );
+      const available = await checkAll(plugins);
+      const install = plugins.filter((_, i) => available[i]).map((p) => p.id);
       for (const pluginId of install.filter((id) => id !== bb.pluginId)) {
+        // Earlier installs can take minutes; recheck immediately before each one.
+        if (!(await shouldInstall(pluginId))) continue;
         updating = pluginId;
         publish();
         await bb.sdk.plugins
@@ -149,7 +225,7 @@ export default async function plugin(bb: BbPluginApi) {
           );
       }
       // Updating this plugin reloads it, so it goes last, as a job BB runs on.
-      if (install.includes(bb.pluginId)) {
+      if (install.includes(bb.pluginId) && (await shouldInstall(bb.pluginId))) {
         await bb.sdk.plugins.experimental_startUpdate({
           pluginId: bb.pluginId,
         });
@@ -184,7 +260,13 @@ export default async function plugin(bb: BbPluginApi) {
         groups
           .get(id)!
           .plugins.push(
-            toRow(p, on.has(p.id), checks.has(p.id), updating === p.id),
+            toRow(
+              p,
+              on.has(p.id),
+              checks.has(p.id),
+              updating === p.id,
+              checkedVersion(p),
+            ),
           );
       }
       return {
@@ -203,9 +285,12 @@ export default async function plugin(bb: BbPluginApi) {
     async refreshAutoUpdates() {
       const since = Date.now() - 2 * 60 * 1000;
       const stale = (await updatable()).filter(
-        (p) => (p.updateState.lastCheckAt ?? 0) < since,
+        (p) =>
+          (p.updateState.lastCheckAt ?? 0) < since ||
+          (p.updateState.outcome === "update-available" &&
+            checkedVersion(p) === undefined),
       );
-      void checkAll(stale.map((p) => p.id));
+      void checkAll(stale);
       return null;
     },
     checkForUpdates() {

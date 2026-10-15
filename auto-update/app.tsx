@@ -14,6 +14,7 @@ const UPDATE_STATUS: Partial<Record<string, string>> = {
   "update-available": "Update available",
   incompatible: "Update needs a newer BB",
   unavailable: "Can't check for updates",
+  unchanged: "Version unchanged",
 };
 
 const when = (at: number) =>
@@ -25,9 +26,16 @@ const when = (at: number) =>
   });
 
 /** What a row says after its version, most pressing first. */
-function statusOf({ updating, checking, update, lastFailure }: PluginRow) {
+function statusOf({
+  updating,
+  checking,
+  update,
+  lastFailure,
+  versionCheckError,
+}: PluginRow) {
   if (updating) return "Updating…";
   if (checking) return "Checking…";
+  if (versionCheckError) return `Update skipped: ${versionCheckError}`;
   if (update === "update-available" && lastFailure !== null) {
     return `Update failed: ${lastFailure}`;
   }
@@ -202,7 +210,8 @@ export default definePluginApp((app) => {
   app.slots.settingsSection({
     id: "autoUpdates",
     title: "Plugins",
-    description: "Turn on the plugins BB should keep up to date.",
+    description:
+      "Turn on the plugins BB should keep up to date. Installs only when their version changes.",
     component: AutoUpdates,
   });
 });

@@ -3,7 +3,9 @@
 Auto Update keeps the plugins you pick up to date. Its page,
 **Settings → Auto Update**, lists every installed plugin that can take updates,
 each with a switch, and BB installs the updates of the plugins turned on every
-hour, every 6 hours, every day, or every week.
+hour, every 6 hours, every day, or every week. It installs only when the
+candidate's package version differs from the installed version. A commit to
+another plugin in the same repository does not reinstall unchanged versions.
 
 ```text
 Check for Updates                                          [Every hour]
@@ -54,6 +56,11 @@ name, version, and switch, and a status when there is one:
   arrives.
 - **Update available**: a newer version is out. With the switch on, the next
   check installs it.
+- **Version unchanged**: the repository has a new commit, but the plugin's
+  package version is unchanged. Auto Update skips the install.
+- **Update skipped**, with the reason: Auto Update could not verify the
+  candidate's package version. It leaves the installed plugin running and
+  retries on the next check.
 - **Updating…**: BB is installing it now.
 - **Update failed**, with the reason: the newer version didn't start, and BB
   kept the one you had. The next check tries again.
@@ -79,6 +86,19 @@ folder, which never update.
   one, built-in plugins included, and takes minutes. A plugin is never checked
   twice at once. `bb.sdk.plugins.applyUpdate` then installs the updates of the
   plugins turned on, one at a time, and one such run goes at a time.
+- Before installing, Auto Update compares the installed package version with
+  the candidate's. npm candidates already report a package version. For Git,
+  it fetches the exact candidate commit into a temporary bare repository and
+  reads the plugin's `package.json`, including its repository subdirectory.
+  This does not check out files, install dependencies, or run package scripts.
+  Git uses the server's existing credentials. The temporary repository is
+  deleted after the check; successful results are reused for that candidate
+  until Auto Update reloads. An unreadable version prevents installation.
+- This filter applies to Auto Update's scheduled runs and **Check Now**.
+  BB's own update badges and manual `bb plugin update` still compare Git
+  commits. Authors must change `package.json`'s version to ship an automatic
+  update. BB resolves the source again when installing, so a branch that
+  moves between the version check and installation can select another commit.
 - Auto Update updates itself last, through
   `bb.sdk.plugins.experimental_startUpdate`, since installing its own update
   reloads it.
