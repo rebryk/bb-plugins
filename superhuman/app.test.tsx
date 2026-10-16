@@ -31,6 +31,7 @@ it("registers every feature under an id of its own", async () => {
       "hotkeys-bridge",
       "universal-search",
       "snooze-dialogs",
+      "search-actions",
       "ui-polish-switch",
       "phone-layout",
       "title-bar-switch",

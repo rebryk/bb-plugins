@@ -1,4 +1,4 @@
-const object = (value: unknown): value is Record<string, unknown> =>
+export const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 /** Read only the DOM node's React ancestors, with a bounded, checked walk. */
@@ -30,7 +30,7 @@ export function commandRow(element: HTMLElement) {
   return null;
 }
 
-export function searchCache(anchor: HTMLElement): (() => void) | null {
+export function searchCache(anchor: HTMLElement): (() => Promise<void>) | null {
   for (const props of ancestors(anchor)) {
     const client = props.client ?? props.value;
     if (!object(client) || typeof client.getQueryCache !== "function"
@@ -39,9 +39,8 @@ export function searchCache(anchor: HTMLElement): (() => void) | null {
     if (!object(cache) || typeof cache.find !== "function"
       || !cache.find({ queryKey: ["systemConfig"], exact: true })) continue;
     const invalidate = client.invalidateQueries.bind(client);
-    return () => {
-      void Promise.resolve(invalidate({ queryKey: ["threadSearch"] })).catch(() => {});
-    };
+    // Settles once BB has the refetched results.
+    return () => Promise.resolve(invalidate({ queryKey: ["threadSearch"] })).then(() => {}, () => {});
   }
   return null;
 }

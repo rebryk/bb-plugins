@@ -3,6 +3,7 @@ import registerArchiveButton from "./archive-button/app";
 import registerDismissCards from "./dismiss-cards/app";
 import registerHotkeys from "./hotkeys/app";
 import registerPhoneLayout from "./phone-layout/app";
+import registerSearchActions from "./search-actions/app";
 import registerSnooze from "./snooze/app";
 import registerTitleBar from "./title-bar/app";
 import registerUiPolish from "./ui-polish/app";
@@ -14,6 +15,7 @@ export default definePluginApp((app) => {
   registerUniversalSearch(app);
   registerSnooze(app);
   registerArchiveButton(app);
+  registerSearchActions(app);
   registerUiPolish(app);
   registerPhoneLayout(app);
   registerTitleBar(app);

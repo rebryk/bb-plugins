@@ -15,7 +15,7 @@ export function asPluginApp(load: () => Promise<{ default: PluginAppSetup }>) {
 }
 
 /** What `sdk.system.version()` answers on a BB of this version. */
-export function bbVersion(currentVersion = "0.46.0") {
+export function bbVersion(currentVersion = "0.46.1") {
   return {
     currentVersion,
     currentCommit: null,

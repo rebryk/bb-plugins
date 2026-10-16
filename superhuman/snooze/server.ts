@@ -188,14 +188,19 @@ export default async function registerSnoozeServer(
   }
 
   /** Wake the snooze of `threadId`, or with `orHidden` also the one hiding it. */
-  function wakeOn(threadId: string, orHidden: boolean) {
+  function wakeWith(threadId: string, orHidden: boolean) {
     return serial(async () => {
       for (const [id, snooze] of Object.entries(await load())) {
         if (id === threadId || (orHidden && snooze.hidden.includes(threadId))) {
           await wake(id, false);
         }
       }
-    }).catch((error: unknown) =>
+    });
+  }
+
+  /** As `wakeWith`, logging a failure. */
+  function wakeOn(threadId: string, orHidden: boolean) {
+    return wakeWith(threadId, orHidden).catch((error: unknown) =>
       warn(`Could not wake thread ${threadId}`, error),
     );
   }
@@ -215,7 +220,7 @@ export default async function registerSnoozeServer(
       return result;
     },
     async unsnooze({ threadId }) {
-      await serial(() => wake(threadId, false));
+      await wakeWith(threadId, true);
       return null;
     },
     async searchSnoozes({ queries }) {
