@@ -31,6 +31,7 @@
     [data-testid="app-window-title-bar"],
     [data-testid="app-nav-rail"],
     [data-testid="app-sidebar-top-reserve-row"],
+    [data-testid="sidebar-footer-row"],
     [data-sidebar="footer"]
   ) {
   --superhuman-icon-bar: 1;
