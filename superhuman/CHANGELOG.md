@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.27 (2026-10-16)
+
+- On a phone, Settings, which BB 0.46.1 puts below the navigation rail, sits
+  on the sidebar's background like the rail, with the rail's line beside it,
+  instead of on a gray patch in the sidebar's bottom left corner.
+- On BB 0.46.1, UI Polish again gives the Settings icon the same gray as the
+  rail's other icons, on every device.
+
 ## 0.1.26 (2026-10-16)
 
 - On BB 0.46.1, BB's thread search finds snoozed threads again, and Universal
