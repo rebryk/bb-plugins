@@ -190,6 +190,38 @@ describe("snoozing", () => {
     expect((await list()).snoozes).toEqual([]);
     await harness.lifecycle.dispose();
   });
+
+  it("unsnoozes a thread an ancestor's snooze hid by waking that snooze", async () => {
+    const { harness, snooze, list, visibility } = await setup();
+    await snooze("a", NOW + HOUR);
+    await snooze("x", NOW + HOUR);
+    await harness.behavior.callRpc("unsnooze", { threadId: "c" });
+
+    expect((await list()).snoozes.map((row) => row.threadId)).toEqual(["x"]);
+    expect(visibility()).toMatchObject({
+      a: "visible",
+      b: "visible",
+      c: "visible",
+      x: "hidden",
+    });
+    await harness.lifecycle.dispose();
+  });
+
+  it("brings back a snoozed thread an ancestor's snooze hides in one call", async () => {
+    const { harness, snooze, list, visibility } = await setup();
+    await snooze("a", NOW + HOUR);
+    // Snoozed while hidden, so its own snooze hides nothing.
+    await snooze("c", NOW + 2 * HOUR);
+    await harness.behavior.callRpc("unsnooze", { threadId: "c" });
+
+    expect((await list()).snoozes).toEqual([]);
+    expect(visibility()).toMatchObject({
+      a: "visible",
+      b: "visible",
+      c: "visible",
+    });
+    await harness.lifecycle.dispose();
+  });
 });
 
 describe("waking on activity", () => {

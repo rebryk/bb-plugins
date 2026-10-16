@@ -5,15 +5,18 @@ import { installThreadSearch } from "./threads";
 import { searchCache } from "./host";
 
 /** BB versions whose palette and thread search the adapters were checked on. */
-const VERIFIED = ["0.46.0"];
+const VERIFIED = ["0.46.0", "0.46.1"];
 
 /**
  * While `enabled`, on a verified BB, runs `install`, which adds the disposers
- * of what it installs, and refetches BB's thread searches, again whenever
- * `changes` changes. Returns the anchor of a hidden span to render.
+ * of what it installs and gets `invalidate`, which refetches BB's thread
+ * searches. Refetches them at once, and again whenever `changes` changes.
+ * Returns the anchor of a hidden span to render.
  */
 export function useSearchAdapter(
-  enabled: boolean, install: (disposers: (() => void)[]) => void, changes?: unknown,
+  enabled: boolean,
+  install: (disposers: (() => void)[], invalidate: () => Promise<void>) => void,
+  changes?: unknown,
 ) {
   const sdk = useSdk();
   const anchor = useRef<HTMLSpanElement>(null);
@@ -33,9 +36,9 @@ export function useSearchAdapter(
         const invalidate = searchCache(anchor.current);
         if (!invalidate) return;
         disposers.push(invalidate, () => { refresh.current = () => {}; });
-        install(disposers);
+        install(disposers, invalidate);
         refresh.current = invalidate;
-        invalidate();
+        void invalidate();
       })
       .catch(stop);
     return () => {
@@ -43,7 +46,7 @@ export function useSearchAdapter(
       stop();
     };
   }, [sdk, enabled, install]);
-  useEffect(() => refresh.current(), [changes]);
+  useEffect(() => { refresh.current(); }, [changes]);
   return anchor;
 }
 

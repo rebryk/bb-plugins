@@ -34,6 +34,13 @@ export default async function plugin(bb: BbPluginApi) {
       description: "An Archive button next to Snooze.",
       default: true,
     },
+    searchActions: {
+      type: "boolean",
+      label: "Search Actions",
+      description:
+        "In thread search, ⌘↵ (Ctrl+↵) unsnoozes a snoozed thread or unarchives an archived one instead of opening it in split.",
+      default: true,
+    },
     dismissCards: {
       type: "boolean",
       label: "Dismiss Cards",

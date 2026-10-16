@@ -3,6 +3,18 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.26 (2026-10-16)
+
+- On BB 0.46.1, BB's thread search finds snoozed threads again, and Universal
+  Search works again; both had turned themselves off on a version they hadn't
+  been checked on. They now run on BB 0.46.0 and 0.46.1.
+- New: Search Actions, on by default. In BB's thread search, **⌘↵** (**Ctrl+↵**
+  on Windows and Linux) unsnoozes a snoozed thread or unarchives an archived one
+  instead of opening it in split, and the row's hint says which. Archived
+  threads show once you tick **Archived** in the search's **Filter and sort**
+  menu. On a thread hidden by a parent's snooze, **⌘↵** wakes that snooze, which
+  brings the parent back too.
+
 ## 0.1.25 (2026-10-14)
 
 - BB's thread search now finds snoozed threads, and the child threads their

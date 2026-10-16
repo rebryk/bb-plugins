@@ -154,7 +154,7 @@ function showToast(card: Omit<ToastCardProps, "id">) {
   });
 }
 
-function showError(title: string, error: unknown) {
+export function showError(title: string, error: unknown) {
   showToast({
     tone: "error",
     title,
