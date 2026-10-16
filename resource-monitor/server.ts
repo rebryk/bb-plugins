@@ -1,11 +1,15 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { rpcContract } from "./contract";
+import { createProcessMonitor } from "./processes";
 import { SAMPLE_CHANNEL } from "./shared";
 import { createSampler } from "./stats";
 
 const SAMPLE_EVERY_MS = 2000;
 
 export default function plugin(bb: BbPluginApi): void {
+  bb.rpc.register(rpcContract, createProcessMonitor());
+
   bb.background.service("sampler", {
     async start(signal) {
       const sample = createSampler();

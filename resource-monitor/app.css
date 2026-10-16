@@ -64,24 +64,31 @@
 
 /* Page */
 
+/* Padded inside the scroller, so the process header sticks to its top. */
 .rm-page {
   height: 100%;
-  padding: 24px 32px;
   overflow-y: auto;
+  container-type: inline-size;
 }
 
-.rm-page > p {
+.rm-page > div {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.rm-page > div > p {
   margin: 0 0 24px;
 }
 
 .rm-columns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 48px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
 }
 
 .rm-columns .rm-column {
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
   width: auto;
 }
@@ -92,8 +99,12 @@
 }
 
 .rm-columns .rm-bar {
-  width: 96px;
+  width: auto;
   height: 4px;
+}
+
+.rm-columns .rm-detail {
+  overflow-wrap: anywhere;
 }
 
 .rm-columns .rm-label {
@@ -101,4 +112,27 @@
   font-size: 13px;
   font-weight: 600;
   line-height: 16px;
+}
+
+/* Narrow: less padding and smaller numbers. */
+@container (width < 480px) {
+  .rm-page > div {
+    padding: 16px;
+  }
+
+  .rm-columns {
+    gap: 16px;
+  }
+
+  .rm-columns .rm-value {
+    font-size: 24px;
+    line-height: 28px;
+  }
+}
+
+/* Room to scroll the last rows clear of BB's floating page bar on phones. */
+@media (width < 48rem) {
+  .rm-page > div {
+    padding-bottom: 6rem;
+  }
 }

@@ -2,27 +2,59 @@
 
 Resource Monitor shows how busy the BB server is. Its icon in the sidebar's
 navigation rail is three live bars, CPU, RAM, and GPU, that move every 2
-seconds. Hover the icon for the numbers.
+seconds. Hover the icon for the numbers. Click it for the **Resources** page,
+with the server's processes to sort, filter, and quit.
 
 ```text
 rail      hover card
 ┌─────┐   ┌───────────────────┐
 │ ▂█▁ │ → │  21%   74%   13%  │
 └─────┘   │  ━──   ━━─   ───  │
-          │  CPU   RAM   GPU  │
-          └───────────────────┘
+   │      │  CPU   RAM   GPU  │
+   │      └───────────────────┘
+   ↓ click
+Resources page
+┌────────────────────────────────────────────────────┐
+│    mac-studio · up 3d 4h                           │
+│                                                    │
+│    21%            74%            13%               │
+│    ━━━─────────── ━━━━━━━━━━──── ━━────────────    │
+│    CPU            RAM            GPU               │
+│                                                    │
+│    [Filter processes          ]   212 processes    │
+│    Name                 PID   CPU % ▼    Memory    │
+│    node                4182     104.2    1.2 GB    │
+│    Chrome               911      12.0    2.4 GB    │
+└────────────────────────────────────────────────────┘
 ```
 
 ## Use
 
 - **See the load.** The bars fill from the bottom: CPU on the left, RAM in
   the middle, GPU on the right. A bar turns amber at 85% and red at 95%.
-- **See the numbers.** Hover the icon. In place of BB's tooltip, a card shows
-  each percentage over a thin bar. On a touch screen, tap the icon to show or
-  hide the card. Clicking the icon opens nothing.
-- **See the details.** Right-click the icon and choose **Open in split**. The
-  **Resources** page adds the CPU model and core count, the RAM in use, the
-  GPU name, the server's name, and how long it has been up.
+- **See the numbers.** Hover the icon with a mouse. In place of BB's tooltip,
+  a card shows each percentage over a thin bar.
+- **See the details.** Click or tap the icon to open the **Resources** page.
+  It shows the server's name, how long it has been up, and the three numbers
+  with the CPU model and core count, the RAM in use, and the GPU name.
+- **See the processes.** The page lists the server's processes, like Activity
+  Monitor, and refreshes them every 2 seconds. **CPU %** is the share of one
+  core since the last reading, as in Activity Monitor and `top`, so a process
+  on several cores can pass 100%. **Memory** is resident memory (RSS).
+- **Sort and filter.** Click a column header to sort by it, and click it
+  again to flip the order. The list starts sorted by **CPU %**, highest first.
+  Type in **Filter processes** to match a name, a command line, or a PID. A
+  count shows how many processes match.
+- **Quit a process.** Click the circled × at the end of its row. With a
+  mouse, it shows on hover; on a touch screen, it always shows. With a filter
+  typed, **Quit N matching** quits every process the filter shows. A dialog asks
+  first: **Quit** sends `SIGTERM`, so apps can save and close, and
+  **Force Quit** sends `SIGKILL`. A toast then tells how many quit and why the
+  others couldn't, for example **Not permitted** for another user's processes.
+- **BB stays up.** BB's own processes, its server, app, helpers, and host
+  daemon, have no quit button, and **Quit N matching** skips them. PID 1,
+  launchd or init, is protected too. Agents and the programs they start can
+  still be quit.
 
 ## How it works
 
@@ -40,6 +72,13 @@ rail      hover card
 - A reading takes about 10 ms: on macOS, it runs `vm_stat` and `ioreg` once
   each. After 3 failed GPU reads in a row, it stops reading the GPU until the
   plugin reloads.
+- The server lists processes only while a **Resources** page asks for them:
+  every 2 seconds while the page is open and visible. On macOS, it runs `ps`;
+  on Linux, it reads `/proc`. Each process's CPU is the change in its CPU time
+  between two readings at least half a second apart. It cuts each command line
+  to its first 200 characters, so the filter matches only those. It keeps a
+  list for about a second, so several open windows share one reading. Nothing
+  is stored.
 - While BB has no connection to the server, the bars and the card are empty
   rather than frozen at the last reading.
 - The icon is a component registered with `app.experimental_icons.register()`
@@ -48,8 +87,7 @@ rail      hover card
   `experimental_appOverlay` receives the readings and shares them with the
   icon.
 - The card is the plugin's own. It mutes BB's tooltip on the icon by stopping
-  `pointermove` events on the rail tile before BB's handler sees them, and it
-  stops clicks on the tile the same way, so they never open the page.
+  `pointermove` events on the rail tile before BB's handler sees them.
 - A BB update may break `experimental_icons`, `experimental_appOverlay`, the
   rail's `data-nav-rail-item` attribute, or how BB opens the rail's tooltip
   and page.
