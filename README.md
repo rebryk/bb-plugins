@@ -81,8 +81,8 @@ worktrees, dev caches, or the Trash, and switches do it every night.
 ### [Resource Monitor](./resource-monitor)
 
 Three live bars, CPU, RAM, and GPU, as the plugin's icon in the sidebar's
-navigation rail, updated every 2 seconds. Hover the icon, or tap it on a touch
-screen, for the numbers.
+navigation rail, updated every 2 seconds. Hover the icon for the numbers.
+Click it for the server's processes, to sort, filter, and quit them.
 
 ### [San Francisco](./san-francisco)
 

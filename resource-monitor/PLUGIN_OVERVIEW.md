@@ -10,17 +10,30 @@ at 85% and red at 95%.
 ## The numbers on hover
 
 Hover the icon. In place of BB's tooltip, a small card shows each percentage
-over a thin bar. On a touch screen, tap the icon instead. For the CPU model
-and core count, the RAM in use, the GPU name, and how long the server has been
-up, right-click the icon and choose Open in split.
+over a thin bar.
+
+## A page of processes
+
+Click or tap the icon for the Resources page. It shows the server's name and
+uptime, the CPU model and core count, the RAM in use, and the GPU name. Below,
+a list like Activity Monitor's shows the server's processes, with name, PID,
+CPU, and memory. Click a column to sort by it, and filter by name, command
+line, or PID.
+
+## Quit what you don't need
+
+Quit one process, or every process the filter shows. A dialog asks first, and
+Force Quit stops a process that won't quit. BB's own processes are never
+quit.
 
 ## Where the numbers come from
 
 The BB server reads its own load every 2 seconds. RAM counts what Activity
 Monitor calls Memory Used on macOS, and everything but available memory on
 Linux. GPU load comes from macOS itself, or from `nvidia-smi` on machines with
-NVIDIA GPUs. Nothing is stored, and no external account or service is
-required.
+NVIDIA GPUs. Processes come from `ps` on macOS and `/proc` on Linux, only
+while the Resources page is open. Nothing is stored, and no external account
+or service is required.
 
 ## More San Francisco Plugins
 

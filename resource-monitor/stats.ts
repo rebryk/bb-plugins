@@ -7,8 +7,15 @@ import type { Sample } from "./shared";
 type CpuTimes = { busy: number; total: number };
 type Gpu = NonNullable<Sample["gpu"]>;
 
-const run = async (file: string, args: string[]) =>
-  (await promisify(execFile)(file, args, { timeout: 1500 })).stdout;
+/** A program's output; `ps` command lines can pass Node's 1 MB default. */
+export async function run(
+  file: string,
+  args: string[],
+  timeout = 1500,
+): Promise<string> {
+  const options = { timeout, maxBuffer: 64 << 20 };
+  return (await promisify(execFile)(file, args, options)).stdout;
+}
 
 /** Busy and total time of all cores together. */
 function cpuTimes(): CpuTimes {
