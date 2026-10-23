@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import registerBriefRepliesServer from "./brief-replies/server";
 import registerSnoozeServer from "./snooze/server";
+import registerUiPolishServer from "./ui-polish/server";
 
 export default async function plugin(bb: BbPluginApi) {
   // The browser reads these: Shortcuts in hotkeys/controller.ts, the rest in
@@ -66,7 +67,7 @@ export default async function plugin(bb: BbPluginApi) {
       type: "boolean",
       label: "UI Polish",
       description:
-        "Icons in one tone, a thread bar without the external editor picker, and fixes for Safari and Tesla.",
+        "Icons in one tone, a thread bar without the external editor picker, and fixes for Safari, Tesla, and inline visualizations in BB's iOS app.",
       default: true,
     },
     briefReplies: {
@@ -79,4 +80,5 @@ export default async function plugin(bb: BbPluginApi) {
   });
   await registerSnoozeServer(bb, settings);
   await registerBriefRepliesServer(bb, settings);
+  registerUiPolishServer(bb);
 }

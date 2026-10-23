@@ -95,9 +95,12 @@ function tap(target: Element, element = field()) {
   focusDuring(new MouseEvent("mousedown", { bubbles: true }), target, element);
 }
 
-it("mounts one content script", async () => {
+it("mounts its two content scripts", async () => {
   await mount();
-  expect(mounted!.inspection.mountedIds).toEqual(["ui-polish"]);
+  expect(mounted!.inspection.mountedIds).toEqual([
+    "ui-polish",
+    "ui-polish-inline-vis",
+  ]);
 });
 
 it("keeps BB from focusing the field by itself in a Tesla's browser", async () => {
