@@ -24,7 +24,7 @@ it("registers every feature under an id of its own", async () => {
     commands: ids(commands(app)),
   };
   expect(registered).toEqual({
-    contentScripts: ["hotkeys", "ui-polish"],
+    contentScripts: ["hotkeys", "ui-polish", "ui-polish-inline-vis"],
     threadActions: ["snooze"],
     threadHeaderActions: ["snooze-moon", "archive", "new-thread"],
     appOverlays: [

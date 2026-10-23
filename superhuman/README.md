@@ -21,7 +21,8 @@ Superhuman-style speed for BB:
 - **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
   and the sidebar and right panel buttons; their shortcuts still work.
 - **UI Polish.** Icons in one tone and a thread bar without the external editor
-  picker, with fixes for Safari's layout and for a Tesla's keyboard.
+  picker, with fixes for Safari's layout, for a Tesla's keyboard, and for inline
+  visualizations in BB's iOS app.
 - **Brief Replies.** Agents answer in few words of plain English, after Andrej
   Karpathy's advice, in threads started once it is on.
 

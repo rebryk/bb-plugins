@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.28 (2026-10-22)
+
+- In BB's iOS app, inline visualizations show their content again. The app
+  leaves the `srcdoc` frame blank, so UI Polish loads the page from the plugin
+  instead. Other platforms are unchanged.
+
 ## 0.1.27 (2026-10-16)
 
 - On a phone, Settings, which BB 0.46.1 puts below the navigation rail, sits
