@@ -14,12 +14,15 @@
       "node"
     ],
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
     "skipLibCheck": false
   },
   "include": [
     "*.ts",
     "*.tsx",
     "components",
-    "lib"
+    "lib",
+    "guard"
   ]
 }

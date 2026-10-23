@@ -3,6 +3,20 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `resource-monitor/v<version>`.
 
+## 0.1.3 (2026-10-23)
+
+- **Guard**, on macOS, keeps BB responsive when the Mac is overloaded. It is
+  a small separate process that macOS starts at login, so it keeps working
+  when BB is slow. It is on by default; turn it off in the plugin's settings.
+- Everything BB starts, agents and what they run, runs at a lower priority
+  than BB itself. Under sustained load, the busy ones run only on the
+  efficiency cores.
+- When BB's server or host daemon piles up three or more copies of the same
+  busy command, Guard stops all but the newest.
+- **Pause all** on the **Resources** page stops BB's agents, what they run,
+  and BB's terminals, from any device, until **Resume all**. The page also
+  shows what Guard is doing and its last actions.
+
 ## 0.1.2 (2026-10-15)
 
 - Clicking or tapping the icon opens the **Resources** page again, without

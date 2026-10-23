@@ -26,14 +26,25 @@ Quit one process, or every process the filter shows. A dialog asks first, and
 Force Quit stops a process that won't quit. BB's own processes are never
 quit.
 
+## Guard keeps BB responsive
+
+On macOS, everything BB starts, agents and what they run, runs at a lower
+priority than BB itself, so the app and the connection to your phone stay
+quick when the Mac is overloaded. Under heavy load the busy ones run only on
+the efficiency cores, and copies of the same command piling up are stopped.
+Pause all on the Resources page stops BB's agents, what they run, and BB's
+terminals until you resume them, from any device. Guard is a small separate
+process that keeps working when BB is slow; turn it off in the plugin's
+settings.
+
 ## Where the numbers come from
 
 The BB server reads its own load every 2 seconds. RAM counts what Activity
 Monitor calls Memory Used on macOS, and everything but available memory on
 Linux. GPU load comes from macOS itself, or from `nvidia-smi` on machines with
 NVIDIA GPUs. Processes come from `ps` on macOS and `/proc` on Linux, only
-while the Resources page is open. Nothing is stored, and no external account
-or service is required.
+while the Resources page is open. Guard reads `ps` every 2 seconds and keeps
+its state in its own folder. No external account or service is required.
 
 ## More San Francisco Plugins
 
