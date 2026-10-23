@@ -67,9 +67,9 @@ export function formatMemory(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
-const count = (n: number) => n.toLocaleString("en-US");
+export const count = (n: number) => n.toLocaleString("en-US");
 
-const plural = (n: number) =>
+export const plural = (n: number) =>
   `${count(n)} ${n === 1 ? "process" : "processes"}`;
 
 /** "Quit 2 processes; 1 couldn’t be quit: Not permitted". */
@@ -80,13 +80,12 @@ export function quitMessage({ quit, failed }: Outcome) {
   return `Quit ${plural(quit)}; ${failed.length} couldn’t be quit: ${reasons}`;
 }
 
-const errorText = (cause: unknown) =>
+export const errorText = (cause: unknown) =>
   cause instanceof Error ? cause.message : String(cause);
 
-/** The processes every 2 s while the page shows; `refetch` reads them now. */
-function useProcesses() {
-  const rpc = useRpc<typeof rpcContract>();
-  const [processes, setProcesses] = useState<ProcessInfo[] | null>(null);
+/** What `read` answers, every 2 s while the page shows; `refetch` reads now. */
+export function usePolling<T>(read: () => Promise<T>) {
+  const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
@@ -98,9 +97,9 @@ function useProcesses() {
       if (busy || stopped || document.hidden) return;
       busy = true;
       try {
-        const next = await rpc.call("listProcesses");
+        const next = await read();
         if (stopped) return;
-        setProcesses(next);
+        setData(next);
         setError(null);
       } catch (cause) {
         if (!stopped) setError(errorText(cause));
@@ -117,8 +116,15 @@ function useProcesses() {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", resume);
     };
-  }, [rpc, nonce]);
+  }, [read, nonce]);
   const refetch = useCallback(() => setNonce((n) => n + 1), []);
+  return { data, error, refetch, setData };
+}
+
+function useProcesses() {
+  const rpc = useRpc<typeof rpcContract>();
+  const read = useCallback(() => rpc.call("listProcesses"), [rpc]);
+  const { data: processes, error, refetch } = usePolling(read);
   return { processes, error, refetch };
 }
 

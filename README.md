@@ -83,7 +83,10 @@ worktrees, dev caches, or the Trash, and switches do it every night.
 
 Three live bars, CPU, RAM, and GPU, as the plugin's icon in the sidebar's
 navigation rail, updated every 2 seconds. Hover the icon for the numbers.
-Click it for the server's processes, to sort, filter, and quit them.
+Click it for the server's processes, to sort, filter, and quit them. On
+macOS, Guard keeps BB responsive when the Mac is overloaded: what BB starts
+runs at a lower priority, moves to the efficiency cores under load, and
+**Pause all** stops it from any device, the phone too.
 
 ### [San Francisco](./san-francisco)
 

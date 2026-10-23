@@ -3,7 +3,9 @@
 Resource Monitor shows how busy the BB server is. Its icon in the sidebar's
 navigation rail is three live bars, CPU, RAM, and GPU, that move every 2
 seconds. Hover the icon for the numbers. Click it for the **Resources** page,
-with the server's processes to sort, filter, and quit.
+with the server's processes to sort, filter, and quit. On macOS, **Guard**
+keeps BB responsive when the Mac is overloaded, and **Pause all** stops its
+agents and terminals from any device.
 
 ```text
 rail      hover card
@@ -20,6 +22,8 @@ Resources page
 │    21%            74%            13%               │
 │    ━━━─────────── ━━━━━━━━━━──── ━━────────────    │
 │    CPU            RAM            GPU               │
+│                                                    │
+│    Guard Normal                     [Pause all]    │
 │                                                    │
 │    [Filter processes          ]   212 processes    │
 │    Name                 PID   CPU % ▼    Memory    │
@@ -56,6 +60,31 @@ Resources page
   launchd or init, is protected too. Agents and the programs they start can
   still be quit.
 
+## Guard
+
+Guard keeps BB itself responsive, the app, the server, and the connection to
+your phone, whatever the agents and programs it starts do. It runs on macOS,
+is on by default, and turns off with the plugin's **Guard** setting.
+
+- **BB first.** Everything BB starts, agents and what they run, gets a lower
+  priority (nice 10). On an idle Mac this changes nothing; when the CPU is
+  short, BB gets it first.
+- **Efficiency cores under load.** When all cores stay over 85% busy for 5
+  seconds, the processes BB started that use 10% of a core or more run only
+  on the efficiency cores, with throttled disk, until the CPU stays under
+  60% for 20 seconds.
+- **Pile-ups stop.** When BB's server or host daemon runs three or more
+  copies of the same busy command, the oldest for 30 seconds or more, Guard
+  stops all but the newest.
+- **Pause all.** The button on the **Resources** page stops everything BB
+  started, agents, what they run, and BB's terminals, from any device, until
+  **Resume all**. BB's own helpers keep running, so BB stays usable.
+- **See it act.** The **Resources** page shows Guard's state and its last
+  actions.
+
+Guard never touches BB's own processes or processes BB did not start, such
+as your apps and macOS's own services.
+
 ## How it works
 
 - The server reads the load every 2 seconds and sends each reading to every
@@ -91,6 +120,23 @@ Resources page
 - A BB update may break `experimental_icons`, `experimental_appOverlay`, the
   rail's `data-nav-rail-item` attribute, or how BB opens the rail's tooltip
   and page.
+- Guard is a separate process, so it keeps working when the BB server is
+  slow or stuck. The server copies the scripts in `guard/` to
+  `~/Library/Application Support/bb-resource-monitor/guard/` and runs them with
+  BB's own Node runtime through the LaunchAgent
+  `app.getbb.resource-monitor.guard`, which macOS starts at login and
+  restarts after a crash. macOS may notify you that BB added a background
+  item.
+- Every 2 seconds, Guard reads `ps`. BB's own processes are those whose
+  program lives inside BB's app bundle; the processes BB started are their
+  descendants. Guard acts with `setpriority`, `taskpolicy -b` and `-B`,
+  `SIGSTOP`, `SIGCONT`, `SIGTERM`, and `SIGKILL`, without administrator
+  rights, and writes what it does to `status.json`, which the page reads.
+- Turning the setting off makes Guard resume what it paused, move processes
+  back from the efficiency cores, and remove its LaunchAgent. The server
+  rewrites a `heartbeat` file every 10 seconds: without it for 10 minutes,
+  Guard ignores **Pause all**, and after a day it removes itself. Lowered
+  priorities stay, since only an administrator can raise them again.
 
 ## Install
 
