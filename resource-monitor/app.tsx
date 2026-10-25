@@ -13,6 +13,7 @@ import {
   useRealtimeConnectionState,
 } from "@get-bb/plugin-sdk/app";
 import "./app.css";
+import { GuardView } from "./guard-view";
 import { LoadColumns, MeterBars } from "./meter";
 import { ProcessesView } from "./processes-view";
 import { SAMPLE_CHANNEL, sampleSchema, type Sample } from "./shared";
@@ -22,10 +23,13 @@ const ICON_NAME = "resource-monitor/meter";
 // Host-drawn icons get no plugin context, so SDK hooks throw inside them.
 // SampleFeed has that context; it fills this store, and the icon reads it.
 let latest: Sample | null = null;
+// Kept through a dropped connection, so Pause all stays when it matters most.
+let guardSupported = false;
 const listeners = new Set<() => void>();
 
 function setLatest(sample: Sample | null) {
   latest = sample;
+  if (sample) guardSupported = sample.guard === true;
   for (const listener of listeners) listener();
 }
 
@@ -37,6 +41,8 @@ function subscribe(listener: () => void) {
 }
 
 const useSample = () => useSyncExternalStore(subscribe, () => latest);
+const useGuardSupported = () =>
+  useSyncExternalStore(subscribe, () => guardSupported);
 
 /** Renders nothing; passes each new sample to the store. */
 function SampleFeed() {
@@ -128,6 +134,8 @@ function RailIcon({ className }: { className?: string }) {
 
 function ResourcesPage() {
   const sample = useSample();
+  // Older servers send no `guard`; Guard needs BB's app on macOS.
+  const guard = useGuardSupported();
   return (
     <div className="rm-page">
       <div>
@@ -139,6 +147,7 @@ function ResourcesPage() {
         <div className="rm-columns">
           <LoadColumns sample={sample} details />
         </div>
+        {guard && <GuardView />}
         <ProcessesView />
       </div>
     </div>

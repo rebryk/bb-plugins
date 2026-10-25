@@ -113,6 +113,12 @@ describe("protection", () => {
     ]);
   });
 
+  it("guards Guard's daemon by its script", () => {
+    const script = "/Users/x/Library/Application Support/bb-resource-monitor/guard/guard.mjs";
+    const daemon = { ...proc(95, 1), command: `/Applications/bb.app/Contents/MacOS/bb ${script}` };
+    expect(protection([...procs, daemon], 70)(95)).toBe("Part of BB");
+  });
+
   it("stops at a loop in the parents", () => {
     const guard = protection([proc(5, 6), proc(6, 5)], 5);
     expect(guard(6)).toBe("Part of BB");

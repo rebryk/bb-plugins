@@ -23,6 +23,8 @@ const FRESH_MS = 1000;
 const MIN_SPAN_MS = 500;
 /** A reading older than this is too old to measure CPU against. */
 const STALE_MS = 10_000;
+/** Guard's daemon runs under launchd, outside BB's tree, but is part of BB. */
+const GUARD_SCRIPT = "/bb-resource-monitor/guard/guard.mjs";
 /** `ps` may be slow under heavy load, just when quitting matters most. */
 const PS_TIMEOUT_MS = 5000;
 /** Linux counts CPU time in ticks of 1/100 s (CLK_TCK). */
@@ -130,7 +132,9 @@ export function protection(
     ancestors.add(pid);
   }
   const ours = new Set([self, ...ancestors]);
-  for (const proc of procs) if (ancestors.has(proc.ppid)) ours.add(proc.pid);
+  for (const proc of procs)
+    if (ancestors.has(proc.ppid) || proc.command.includes(GUARD_SCRIPT))
+      ours.add(proc.pid);
   return (pid) =>
     pid <= 1 ? "System process" : ours.has(pid) ? "Part of BB" : null;
 }
@@ -214,5 +218,8 @@ export function createProcessMonitor() {
       list = null;
       return { quit: unique.length - failed.length, failed };
     },
-  } satisfies PluginRpcHandlers<typeof rpcContract>;
+  } satisfies Pick<
+    PluginRpcHandlers<typeof rpcContract>,
+    "listProcesses" | "quitProcesses"
+  >;
 }
