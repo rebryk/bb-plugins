@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-superhuman",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/rebryk/bb-plugins/tree/main/superhuman#readme",
   "engines": {
-    "bb": ">=0.46.0",
+    "bb": ">=0.47.0",
     "bbPluginSdk": ">=0.6.37"
   },
   "bb": {

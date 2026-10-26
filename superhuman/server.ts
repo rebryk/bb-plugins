@@ -60,7 +60,7 @@ export default async function plugin(bb: BbPluginApi) {
       type: "boolean",
       label: "Hide Title Bar",
       description:
-        "In the macOS desktop app, no top row with back, forward, and the sidebar and right panel buttons. Their shortcuts still work.",
+        "In the macOS desktop app, no top row with back, forward, and the sidebar button. Their shortcuts still work.",
       default: false,
     },
     uiPolish: {

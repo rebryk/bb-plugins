@@ -5,7 +5,7 @@ import { installThreadSearch } from "./threads";
 import { searchCache } from "./host";
 
 /** BB versions whose palette and thread search the adapters were checked on. */
-const VERIFIED = ["0.46.0", "0.46.1", "0.47.0", "0.47.1"];
+const VERIFIED = ["0.47.0", "0.47.1"];
 
 /**
  * While `enabled`, on a verified BB, runs `install`, which adds the disposers
