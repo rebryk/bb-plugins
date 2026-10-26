@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.31 (2026-10-26)
+
+- On phones with BB 0.47, the navigation rail runs from the bottom again:
+  Home lowest, level with New thread, and the plugins above it. BB 0.47 draws
+  the rail without the element Mobile Layout turned over.
+
 ## 0.1.30 (2026-10-26)
 
 - On BB 0.47, Hide Title Bar shows a page's header and the right panel's tabs

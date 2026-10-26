@@ -451,10 +451,9 @@ html[data-phone-layout] {
   /*
    * Phones turn the navigation rail upside down, so its destinations are
    * within reach of the thumb: Home and the rest stack up from the bottom,
-   * Home lowest in the rail, and Settings, where BB keeps it in the rail,
-   * goes to the top. New thread moves down to the footer, and the thread list
-   * starts at the top. Only the visual order changes; focus and screen
-   * readers keep BB's.
+   * Home lowest in the rail, level with New thread, which moves down to the
+   * footer, and the thread list starts at the top. Only the visual order
+   * changes; focus and screen readers keep BB's.
    *
    * The rail sits on the sidebar's own background, as the thread list does,
    * with a line between them. So does the cell below it, where BB puts
@@ -466,30 +465,9 @@ html[data-phone-layout] {
     border-right: 1px solid var(--sidebar-border, var(--border));
   }
 
-  [data-testid="app-nav-rail"] {
-    /* The room it keeps for the sidebar's top row, which moves down. */
-    > [aria-hidden="true"] {
-      display: none;
-    }
-
-    > nav,
-    > nav > div {
-      flex-direction: column-reverse;
-    }
-
-    /*
-     * Home sits 8px above the rail's bottom, as the footer's buttons, which
-     * are as big, sit above the footer's: with the list's own 2px, the rail's
-     * room below it. Settings, in the rail, sits level with the first row of
-     * Settings' list, 4px below the top.
-     */
-    > nav {
-      padding-top: calc(
-        var(--spacing, 0.25rem) +
-          (var(--bb-sidebar-row-height-coarse, 2.5rem) - var(--bb-sidebar-control-size, 36px)) / 2
-      );
-      padding-bottom: calc(var(--spacing, 0.25rem) * 1.5);
-    }
+  [data-testid="app-nav-rail"],
+  [data-testid="app-nav-rail"] > div {
+    flex-direction: column-reverse;
   }
 
   [data-testid="app-sidebar-body"] {
