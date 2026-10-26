@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `san-francisco/v<version>`.
 
+## 0.1.6 (2026-10-26)
+
+- Only bb's own switches take the larger accent-colored look. A plugin's
+  switch with other markup, such as Thread Sidebar's Hide running, keeps its
+  own design instead of collapsing into a gray box.
+
 ## 0.1.5 (2026-10-13)
 
 - The child threads card above the composer looks like the background work
