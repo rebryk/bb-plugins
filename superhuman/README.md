@@ -62,9 +62,9 @@ Universal Search supports US English and Russian ЙЦУКЕН in both directions
 keeps the input unchanged, and combines matches without duplicate rows. BB has
 no way for plugins to extend its search, so in the command palette and thread
 search it reads the palette's React row handlers and wraps its thread-search
-requests. That is verified for BB 0.46.0 and 0.46.1 and turns itself off on
-other versions until checked again; the snoozed-thread filter works on any
-version.
+requests. That is verified for BB 0.46.0, 0.46.1, 0.47.0 and 0.47.1 and turns
+itself off on other versions until checked again; the snoozed-thread filter
+works on any version.
 
 BB's thread search leaves out the threads a snooze hides, so Snooze adds them,
 matched by title the way BB matches titles, and in both layouts while

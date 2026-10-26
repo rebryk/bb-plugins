@@ -28,9 +28,9 @@ Shortcuts work on desktop, outside text fields, by key position, so **H** is
 **H** in a Russian layout too. Snooze sits before Archive in every thread menu.
 To snooze from a sidebar row in one click, add it in the row menu's
 **Customize row actions**. Universal Search and Search Actions are verified for
-BB 0.46.0 and 0.46.1 and turn themselves off on other versions. Settings have a
-switch for each feature, all on by default except Hide Title Bar and Brief
-Replies; turning Snooze off brings snoozed threads back.
+BB 0.46.0, 0.46.1, 0.47.0 and 0.47.1 and turn themselves off on other versions.
+Settings have a switch for each feature, all on by default except Hide Title
+Bar and Brief Replies; turning Snooze off brings snoozed threads back.
 
 ## More San Francisco Plugins
 

@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.29 (2026-10-26)
+
+- On BB 0.47, Universal Search, Search Actions, and snoozed threads in BB's
+  thread search work again. They turn themselves off on BB versions they
+  weren't checked on, and now run on BB 0.47.0 and 0.47.1 too.
+
 ## 0.1.28 (2026-10-22)
 
 - In BB's iOS app, inline visualizations show their content again. The app
