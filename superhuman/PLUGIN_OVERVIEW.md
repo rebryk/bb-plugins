@@ -17,7 +17,7 @@ Superhuman-style speed for BB:
 - **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
   fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
 - **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
-  and the sidebar and right panel buttons; their shortcuts still work.
+  and the sidebar button; their shortcuts still work.
 - **UI Polish.** Icons in one tone and a thread bar without the external editor
   picker, with fixes for Safari's layout, for a Tesla's keyboard, and for inline
   visualizations in BB's iOS app.
@@ -28,9 +28,9 @@ Shortcuts work on desktop, outside text fields, by key position, so **H** is
 **H** in a Russian layout too. Snooze sits before Archive in every thread menu.
 To snooze from a sidebar row in one click, add it in the row menu's
 **Customize row actions**. Universal Search and Search Actions are verified for
-BB 0.46.0, 0.46.1, 0.47.0 and 0.47.1 and turn themselves off on other versions.
-Settings have a switch for each feature, all on by default except Hide Title
-Bar and Brief Replies; turning Snooze off brings snoozed threads back.
+BB 0.47.0 and 0.47.1 and turn themselves off on other versions. Settings have a
+switch for each feature, all on by default except Hide Title Bar and Brief
+Replies; turning Snooze off brings snoozed threads back.
 
 ## More San Francisco Plugins
 

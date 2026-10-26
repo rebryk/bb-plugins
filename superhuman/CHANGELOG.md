@@ -3,6 +3,15 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.30 (2026-10-26)
+
+- On BB 0.47, Hide Title Bar shows a page's header and the right panel's tabs
+  again. BB 0.47 lifts both into the top row, so hiding the row pushed them
+  above the window. Now the frame starts at its lip with the header and the
+  tabs at the top of the card, the window drags from the lip, and the rail
+  and New thread clear the window's buttons again.
+- Needs BB 0.47.0 or later.
+
 ## 0.1.29 (2026-10-26)
 
 - On BB 0.47, Universal Search, Search Actions, and snoozed threads in BB's

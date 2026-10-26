@@ -19,7 +19,7 @@ Superhuman-style speed for BB:
 - **Mobile Layout.** Bottom bars, edge swipes, and haptics on phones, with a
   fixed interface scale and pinch-to-zoom images. Thread titles stay hidden.
 - **Hide Title Bar.** In the macOS desktop app, no top row with back, forward,
-  and the sidebar and right panel buttons; their shortcuts still work.
+  and the sidebar button; their shortcuts still work.
 - **UI Polish.** Icons in one tone and a thread bar without the external editor
   picker, with fixes for Safari's layout, for a Tesla's keyboard, and for inline
   visualizations in BB's iOS app.
@@ -32,7 +32,7 @@ Turning Snooze off brings snoozed threads back.
 
 ## Install
 
-Needs bb 0.46.0 or later. Install the plugin on every server you open, since a
+Needs bb 0.47.0 or later. Install the plugin on every server you open, since a
 BB page loads only its own server's plugins.
 
 Shortcuts work on desktop, outside text fields, by key position, so **H** is
@@ -62,9 +62,9 @@ Universal Search supports US English and Russian ЙЦУКЕН in both directions
 keeps the input unchanged, and combines matches without duplicate rows. BB has
 no way for plugins to extend its search, so in the command palette and thread
 search it reads the palette's React row handlers and wraps its thread-search
-requests. That is verified for BB 0.46.0, 0.46.1, 0.47.0 and 0.47.1 and turns
-itself off on other versions until checked again; the snoozed-thread filter
-works on any version.
+requests. That is verified for BB 0.47.0 and 0.47.1 and turns itself off on
+other versions until checked again; the snoozed-thread filter works on any
+version.
 
 BB's thread search leaves out the threads a snooze hides, so Snooze adds them,
 matched by title the way BB matches titles, and in both layouts while
