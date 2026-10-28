@@ -26,6 +26,8 @@ others:
   any keyboard layout, snoozed threads, and a phone layout.
 - **Bookmarks**: save any chat message and jump back to it from the thread's
   right panel.
+- **To-do**: a Notes-style to-do list on the New thread screen and in the
+  right panel; snooze a to-do or start a thread from it.
 - **Canvas**: images, text, and drawing in each thread, with screenshots your
   agent can read.
 - **Auto Update**: updates for the plugins you pick, installed every hour, day,

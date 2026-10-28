@@ -10,6 +10,7 @@ them.
 bb marketplace add git:https://github.com/rebryk/bb-plugins.git@main
 bb plugin install superhuman@sf-plugins
 bb plugin install bookmarks@sf-plugins
+bb plugin install todo@sf-plugins
 bb plugin install canvas@sf-plugins
 bb plugin install annotate@sf-plugins
 bb plugin install auto-update@sf-plugins
@@ -27,7 +28,7 @@ updates a plugin on its own. The catalog tracks `main`, so
 
 ## Plugins
 
-All nine suit any BB setup, except that Annotate needs the desktop app and
+All ten suit any BB setup, except that Annotate needs the desktop app and
 Storage Cleaner needs macOS. With Account Pooler, Pool Usage counts every
 pooled account.
 
@@ -52,6 +53,13 @@ English.
 A bookmark button on every chat message and a Bookmarks tab in the thread's
 right panel that lists the saved messages across threads; clicking one opens
 its thread scrolled to the message.
+
+### [To-do](./todo)
+
+A Notes-style to-do list under the composer on the New thread screen and in a
+To-do tab in the right panel. Check to-dos off, drag them into order, snooze
+them until later, and start a thread from one with its arrow button. One list
+per BB server, the same on desktop and phone.
 
 ### [Canvas](./canvas)
 

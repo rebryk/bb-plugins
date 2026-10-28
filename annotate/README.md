@@ -114,6 +114,8 @@ plugins. The others:
   search in any keyboard layout, snoozed threads, and a phone layout.
 - [Bookmarks](../bookmarks): save any chat message and jump back to it from the
   thread's right panel.
+- [To-do](../todo): a Notes-style to-do list on the New thread screen and in
+  the right panel; snooze a to-do or start a thread from it.
 - [Canvas](../canvas): images, text, and drawing in each thread, with
   screenshots your agent can read.
 - [Auto Update](../auto-update): updates for the plugins you pick, installed

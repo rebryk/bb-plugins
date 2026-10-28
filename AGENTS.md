@@ -40,7 +40,7 @@ right after appending it, before BB's scripts run.
 
 - Check that it builds from git alone: `git archive HEAD <id>` into an empty
   directory, then `npm ci`, `npm test`, `npm run typecheck`, `npm run build`.
-- Family order: superhuman, bookmarks, canvas, annotate, auto-update,
+- Family order: superhuman, bookmarks, todo, canvas, annotate, auto-update,
   storage-cleaner, resource-monitor, san-francisco, pool-usage (setup-specific
   last). Insert it in that order into the root README, the collection's
   `pluginIds`, and every `## More San Francisco Plugins` block.

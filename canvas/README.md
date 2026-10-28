@@ -162,6 +162,8 @@ plugins. The others:
   search in any keyboard layout, snoozed threads, and a phone layout.
 - [Bookmarks](../bookmarks): save any chat message and jump back to it from the
   thread's right panel.
+- [To-do](../todo): a Notes-style to-do list on the New thread screen and in
+  the right panel; snooze a to-do or start a thread from it.
 - [Annotate](../annotate): notes on the elements of a page in BB's Browser,
   sent to your agent with a screenshot.
 - [Auto Update](../auto-update): updates for the plugins you pick, installed
