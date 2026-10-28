@@ -1,0 +1,193 @@
+/* BB's theme tokens; San Francisco's accent wins when set. Buttons and inputs
+   start from BB's Tailwind reset: no border, padding or background. */
+/* The snooze menu sits on the body on phones, outside .td. */
+.td,
+.td-pop {
+  --td-accent: var(--sf-accent, var(--primary));
+  font-size: 13px;
+}
+
+/* BB lists plugin homepage sections by plugin id; this one goes first. */
+[data-testid="plugin-homepage-sections"] {
+  display: flex;
+  flex-direction: column;
+}
+section[id^="plugin-homepage:"][id$=":todo-list"] {
+  order: -1;
+  margin-block: 0 1.5rem;
+}
+.td-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border-radius: var(--radius-md);
+}
+.td-row.is-back {
+  background: color-mix(in srgb, var(--td-accent) 10%, var(--background));
+}
+.td-row.is-dragging,
+.td-pop {
+  background: var(--popover);
+  box-shadow: var(--shadow-lg);
+}
+.td-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin: 0 6px;
+  border: 1.5px solid var(--sf-check-border, var(--input));
+  border-radius: 50%;
+}
+span.td-check {
+  opacity: 0.5;
+}
+.is-done .td-check,
+.td-pop form button {
+  border-color: var(--td-accent);
+  background: var(--td-accent);
+  color: var(--sf-on-accent, var(--primary-foreground));
+}
+.td-text {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  outline: 0;
+  line-height: 32px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.td-text::placeholder,
+.td-note,
+details .td-text,
+.td-when,
+.td-pop span,
+.td summary {
+  color: var(--muted-foreground);
+}
+.is-done .td-text {
+  text-decoration: line-through;
+}
+.td-back,
+.td-when,
+.td-pop span,
+.td-clear,
+.td summary {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.td-back,
+.td-clear {
+  color: var(--sf-accent-text, var(--td-accent));
+  font-weight: 500;
+}
+.td-act {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  color: var(--muted-foreground);
+  opacity: 0;
+}
+.td-row:focus-within .td-act,
+.td-act[aria-expanded="true"],
+details .td-act {
+  opacity: 1;
+}
+.td-ic {
+  width: 15px;
+  height: 15px;
+}
+.td-check .td-ic {
+  width: 11px;
+  height: 11px;
+}
+.td-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.td-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  width: 260px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--popover-foreground);
+}
+.td-pop button,
+.td-pop input,
+.td-clear,
+.td summary {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+}
+.td-pop > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+.td-pop form {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.td-pop input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--input);
+}
+.td summary {
+  line-height: 30px;
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .td-row:hover .td-act {
+    opacity: 1;
+  }
+  .td-act:hover,
+  .td-pop > button:hover,
+  .td-clear:hover,
+  .td summary:hover {
+    background: var(--state-hover);
+    color: var(--foreground);
+  }
+}
+@media (hover: none) {
+  .td-text,
+  .td-pop button,
+  .td-pop input {
+    height: 44px;
+    line-height: 44px;
+    font-size: 16px;
+  }
+  .td-act {
+    width: 36px;
+    height: 36px;
+    opacity: 0.5;
+  }
+}
+
+/* Narrow screens: the snooze menu is a bottom sheet. */
+@media (max-width: 640px) {
+  .td-pop {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 50;
+    width: auto;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}

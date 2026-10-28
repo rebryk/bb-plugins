@@ -1,0 +1,51 @@
+{
+  "name": "bb-plugin-todo",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Yurii Rebryk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rebryk/bb-plugins.git",
+    "directory": "todo"
+  },
+  "bugs": {
+    "url": "https://github.com/rebryk/bb-plugins/issues"
+  },
+  "homepage": "https://github.com/rebryk/bb-plugins/tree/main/todo#readme",
+  "engines": {
+    "bb": ">=0.47.0",
+    "bbPluginSdk": ">=0.6.79"
+  },
+  "bb": {
+    "name": "To-do",
+    "description": "A Notes-style to-do list under the New thread composer and in the right panel: check off, sort, and snooze to-dos, and start a thread from one.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": []
+  },
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.79",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cron-parser": "^5.5.0",
+    "hono": "^4.11.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  }
+}
