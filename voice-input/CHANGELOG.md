@@ -6,9 +6,10 @@ gets a new version. Each version is tagged `voice-input/v<version>`.
 ## 0.1.2 (2026-11-02)
 
 - Faster: the plugin streams each take of BB's voice input to the server while
-  you speak, and decodes it as it comes in. The text is ready about as soon as
-  you stop, however long the take: a 25-second take now reaches the composer
-  0.27 seconds after Stop instead of 0.66.
+  you speak, and decodes it as it comes in. The text is in the composer about
+  as soon as you stop, however long the take: 0.05 seconds after Stop when
+  you pause before it, 0.14 seconds mid-word, instead of 0.66. BB's composer
+  no longer plays its transition before the text goes in.
 - Fixed: the plugin downloads the speech model from its new address. The old
   one stopped working, so new installs could not get ready.
 

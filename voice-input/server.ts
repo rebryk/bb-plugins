@@ -47,7 +47,8 @@ export default function plugin(bb: BbPluginApi): void {
   };
 
   // The browser streams each take while it is spoken (stream.ts): binary
-  // messages of 16 kHz 16-bit samples, then "end" when the take stops.
+  // messages of 16 kHz 16-bit samples, "size:<bytes>" for BB's recording of
+  // it, then "end" when the take stops.
   bb.http.experimental_websocket("/stream", () => {
     let take: Stream | null = null;
     return {
@@ -63,6 +64,7 @@ export default function plugin(bb: BbPluginApi): void {
       onMessage(_socket, data) {
         if (typeof data !== "string") take?.add(data);
         else if (data === "end") take?.end();
+        else if (data.startsWith("size:")) take?.size(Number(data.slice(5)));
       },
       onClose: () => take?.abandon(),
       onError: () => take?.abandon(),

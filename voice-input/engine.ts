@@ -38,11 +38,6 @@ const HOME = join(
 const CLAIM_MS = 60_000;
 /** How long BB's request waits for the stream of its take to end. */
 const END_MS = 2_000;
-/**
- * How far a stream's length may be off its recording's: the two start a few
- * milliseconds apart.
- */
-const SLACK_SECONDS = 0.5;
 /** A second of streamed samples. */
 const BYTES_PER_SECOND = 32_000;
 /**
@@ -55,6 +50,8 @@ const MIN_BYTES = BYTES_PER_SECOND / 2;
 export type Stream = {
   /** 16 kHz 16-bit little-endian samples, in order. */
   add(samples: Uint8Array): void;
+  /** The size in bytes of the recording BB made of the take. */
+  size(bytes: number): void;
   /** The take is over: its text gets ready for BB's request. */
   end(): void;
   /** The stream broke off; BB's recording is decoded instead. */
@@ -63,26 +60,11 @@ export type Stream = {
 
 type Streamed = {
   bytes: number;
+  /** The size of BB's recording of the take, which identifies it. */
+  size: number | null;
   text: Promise<string> | null;
   ended: Promise<void>;
 };
-
-/** How long a recording runs, read from its container without decoding it. */
-async function duration(
-  ffmpeg: string,
-  file: string,
-  signal: AbortSignal,
-): Promise<number | null> {
-  const args = ["-v", "error", "-nostdin", "-progress", "pipe:1", "-i", file];
-  const copy = ["-map", "0:a:0", "-c", "copy", "-f", "null", "-"];
-  try {
-    const { stdout } = await run(ffmpeg, [...args, ...copy], { signal });
-    const last = [...stdout.matchAll(/out_time_us=(\d+)/g)].at(-1);
-    return last ? Number(last[1]) / 1e6 : null;
-  } catch {
-    return null;
-  }
-}
 
 /** `promise`, or the reason `signal` aborts first. */
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -186,25 +168,23 @@ export function createEngine(log: (message: string) => void) {
   const streams = new Map<string, Streamed>();
 
   /**
-   * The text of the newest streamed take, if it is the recording BB asks
-   * about: BB uploads a recording once it stops, before the next take starts.
-   * A take serves one request at most, so a retried recording is decoded.
+   * The text of the newest streamed take, if `audio` is BB's recording of it:
+   * BB uploads a recording once it stops, before the next take starts, and
+   * the browser reports the recording's size. A take serves one request at
+   * most, so a retried recording is decoded.
    */
   async function streamed(
-    seconds: Promise<number | null>,
+    audio: File,
     signal: AbortSignal,
   ): Promise<string | null> {
     const [id, take] = [...streams].at(-1) ?? [];
     if (!id || !take) return null;
     streams.delete(id);
     if (!take.text) await Promise.race([take.ended, delay(END_MS)]);
-    const length = take.bytes / BYTES_PER_SECOND;
-    const recording = await seconds;
-    log(`Streamed ${length.toFixed(1)} s of a ${recording ?? "?"} s recording`);
-    if (!take.text) return null;
-    if (recording !== null && Math.abs(length - recording) > SLACK_SECONDS)
-      return null;
-    return abortable(take.text, signal);
+    const seconds = (take.bytes / BYTES_PER_SECOND).toFixed(1);
+    const same = take.size === audio.size;
+    log(`Streamed ${seconds} s, ${same ? "the" : "not the"} recording`);
+    return take.text && same ? abortable(take.text, signal) : null;
   }
 
   const start = () =>
@@ -263,6 +243,7 @@ export function createEngine(log: (message: string) => void) {
       let done = () => {};
       const take: Streamed = {
         bytes: 0,
+        size: null,
         text: null,
         ended: new Promise((resolve) => (done = resolve)),
       };
@@ -273,6 +254,9 @@ export function createEngine(log: (message: string) => void) {
           if (over) return;
           take.bytes += samples.length;
           recognizer.append(id, samples);
+        },
+        size(bytes) {
+          take.size = bytes;
         },
         end() {
           if (over) return;
@@ -294,20 +278,20 @@ export function createEngine(log: (message: string) => void) {
     },
 
     async transcribe(audio: File, signal: AbortSignal): Promise<string> {
+      try {
+        const text = await streamed(audio, signal);
+        // Silence, or a stream that heard nothing: the recording may say more.
+        if (text) return text;
+      } catch (error) {
+        if (signal.aborted) throw error;
+        log(`Decoding the recording: ${(error as Error).message}`);
+      }
       const { recognizer, ffmpeg } = await start();
       const dir = await mkdtemp(join(tmpdir(), "bb-voice-input-"));
       try {
         const take = join(dir, "take");
         const wav = join(dir, "take.wav");
         await writeFile(take, Buffer.from(await audio.arrayBuffer()));
-        try {
-          const text = await streamed(duration(ffmpeg, take, signal), signal);
-          // Silence, or a stream that heard nothing: the recording may say more.
-          if (text) return text;
-        } catch (error) {
-          if (signal.aborted) throw error;
-          log(`Decoding the recording: ${(error as Error).message}`);
-        }
         const decode = ["-v", "error", "-nostdin", "-i", take, "-ac", "1"];
         await run(ffmpeg, [...decode, "-c:a", "pcm_f32le", wav], { signal });
         return await recognizer.transcribe(wav, signal);

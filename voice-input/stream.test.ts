@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { streamMicrophone } from "./stream";
+import { streamTakes } from "./stream";
 
 class Track {
   stopped = vi.fn();
@@ -56,6 +56,24 @@ class Context {
   close = async () => {};
 }
 
+class Recorder extends EventTarget {
+  constructor(readonly stream: MediaStream) {
+    super();
+  }
+  record(...sizes: number[]) {
+    for (const size of sizes)
+      this.dispatchEvent(Object.assign(new Event("dataavailable"), { data: { size } }));
+    this.dispatchEvent(new Event("stop"));
+  }
+}
+
+class Query {
+  constructor(readonly media: string) {}
+  get matches() {
+    return false;
+  }
+}
+
 let media: MediaDevices;
 let undo = () => {};
 beforeEach(() => {
@@ -70,15 +88,19 @@ beforeEach(() => {
       getAudioTracks = () => this.tracks;
     },
   );
+  vi.stubGlobal("MediaRecorder", Recorder);
+  vi.stubGlobal("MediaQueryList", Query);
   URL.createObjectURL = () => "blob:tap";
   URL.revokeObjectURL = () => {};
   const getUserMedia = async () => new MediaStream([new Track() as never]);
   media = Object.create({ getUserMedia });
-  undo = streamMicrophone(media, "ws://bb/stream");
+  undo = streamTakes(media, "ws://bb/stream");
 });
 afterEach(() => {
   undo();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 const tracks = (stream: MediaStream) =>
@@ -130,6 +152,30 @@ it("drops a take whose new microphone it cannot hear", async () => {
   await media.getUserMedia({ audio: { deviceId: "usb" } });
   expect(Socket.all[0]!.sent).toEqual([]);
   expect(Socket.all[0]!.readyState).toBe(3);
+});
+
+it("reports the size of BB's recording of the take", async () => {
+  const stream = await media.getUserMedia({ audio: true });
+  Socket.all[0]!.open();
+  const recorder = new MediaRecorder(stream) as unknown as Recorder;
+  recorder.record(100, 50);
+  expect(Socket.all[0]!.sent).toEqual(["size:150"]);
+  tracks(stream)[0]!.stop();
+});
+
+it("has BB see reduced motion right after a streamed recording", async () => {
+  // Takes in earlier tests ended moments ago.
+  vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 60_000 });
+  const motion = new Query("(prefers-reduced-motion: reduce)");
+  const dark = new Query("(prefers-color-scheme: dark)");
+  expect(motion.matches).toBe(false);
+  const stream = await media.getUserMedia({ audio: true });
+  Socket.all[0]!.open();
+  (new MediaRecorder(stream) as unknown as Recorder).record(10);
+  expect(motion.matches).toBe(true);
+  expect(dark.matches).toBe(false);
+  undo();
+  expect(motion.matches).toBe(false);
 });
 
 it("leaves video calls alone", async () => {

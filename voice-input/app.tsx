@@ -5,7 +5,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import { preferBuiltInMicrophone } from "./microphone";
-import { streamMicrophone } from "./stream";
+import { streamTakes } from "./stream";
 
 /**
  * Streams each take to the server while it is spoken, and has BB record with
@@ -21,7 +21,7 @@ function Microphone() {
     const path = `/api/v1/plugins/${pluginId}/http/stream`;
     const url = new URL(path, location.href);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    const unstream = streamMicrophone(media, url.href);
+    const unstream = streamTakes(media, url.href);
     const unprefer = builtIn ? preferBuiltInMicrophone(media) : () => {};
     return () => {
       unprefer();

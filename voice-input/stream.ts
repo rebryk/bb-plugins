@@ -1,11 +1,20 @@
 // Streams BB's voice recordings to the plugin's server while they are spoken,
-// so the server has decoded most of a take by the time it stops.
+// so the server has decoded most of a take by the time it stops, and has BB
+// put the text in as soon as it comes.
 
 const RATE = 16_000;
 /** 80 ms, one frame of Parakeet's encoder. */
 const CHUNK = 1_280;
 /** How long the worklet may take to hand over its last samples. */
 const FLUSH_MS = 500;
+/**
+ * Under this query BB's composer puts a transcript in at once. Otherwise it
+ * first plays a 180 ms transition, after the text has come.
+ */
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+/** How long after BB stops recording a streamed take it sees reduced motion. */
+const HURRY_MS = 2_000;
+let hurryUntil = 0;
 
 /**
  * Turns the microphone into 16-bit samples at 16 kHz and posts them in chunks
@@ -55,6 +64,10 @@ type Take = {
   input: GainNode;
   /** The microphone tracks still recording. */
   live: Set<MediaStreamTrack>;
+  /** Tells the server the size of BB's recording of the take. */
+  size(bytes: number): void;
+  /** Whether the server still takes the stream. */
+  streaming(): boolean;
   /** Ends the take once its last samples are out. */
   end(): void;
   /** Drops the take: the server decodes BB's recording instead. */
@@ -128,6 +141,8 @@ function startTake(context: AudioContext, url: string): Take {
     context,
     input,
     live: new Set(),
+    size: (bytes) => send(`size:${bytes}`),
+    streaming: () => socket.readyState !== WebSocket.CLOSED,
     end() {
       if (!worklet) return finish();
       worklet.port.postMessage("flush");
@@ -182,10 +197,58 @@ function tap(stream: MediaStream, url: string): void {
 }
 
 /**
- * Has every microphone that BB opens stream to `url` too, and returns a
- * function that undoes it. The stream BB gets is untouched.
+ * Has each recorder BB makes during a take report its recording's size, and
+ * the page see reduced motion right after a streamed recording stops.
  */
-export function streamMicrophone(media: MediaDevices, url: string): () => void {
+function measureRecorders(): () => void {
+  const Recorder = window.MediaRecorder;
+  if (!Recorder) return () => {};
+  const Measured = class extends Recorder {
+    constructor(stream: MediaStream, options?: MediaRecorderOptions) {
+      super(stream, options);
+      const take = current;
+      if (!take) return;
+      let bytes = 0;
+      this.addEventListener("dataavailable", ({ data }) => (bytes += data.size));
+      this.addEventListener("stop", () => {
+        if (!take.streaming()) return;
+        take.size(bytes);
+        hurryUntil = Date.now() + HURRY_MS;
+      });
+    }
+  };
+  window.MediaRecorder = Measured;
+  return () => {
+    if (window.MediaRecorder === Measured) window.MediaRecorder = Recorder;
+  };
+}
+
+/** Has the page see reduced motion for a while after each take. */
+function hurryTranscripts(): () => void {
+  const proto = globalThis.MediaQueryList?.prototype;
+  const matches = proto && Object.getOwnPropertyDescriptor(proto, "matches");
+  const get = matches?.get;
+  if (!proto || !matches || !get) return () => {};
+  function hurried(this: MediaQueryList) {
+    const hurry = this.media === REDUCED_MOTION && Date.now() < hurryUntil;
+    return hurry || get!.call(this);
+  }
+  Object.defineProperty(proto, "matches", { ...matches, get: hurried });
+  return () => {
+    if (Object.getOwnPropertyDescriptor(proto, "matches")?.get === hurried)
+      Object.defineProperty(proto, "matches", matches);
+  };
+}
+
+/**
+ * Has every microphone that BB opens stream to `url` too, each recording BB
+ * makes of it report its size, and BB put the text in without its
+ * transition. Returns a function that undoes it. The stream BB gets is
+ * untouched.
+ */
+export function streamTakes(media: MediaDevices, url: string): () => void {
+  const unmeasure = measureRecorders();
+  const unhurry = hurryTranscripts();
   const original = media.getUserMedia;
   media.getUserMedia = async (constraints) => {
     const stream = await original.call(media, constraints);
@@ -203,5 +266,7 @@ export function streamMicrophone(media: MediaDevices, url: string): () => void {
     // replaced it before this one.
     delete (media as Partial<MediaDevices>).getUserMedia;
     if (media.getUserMedia !== original) media.getUserMedia = original;
+    unhurry();
+    unmeasure();
   };
 }

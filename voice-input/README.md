@@ -23,9 +23,10 @@ composer         ◀──text────────────────�
   Russian, Ukrainian, German, French, Spanish, and 19 more European
   languages. A take can mix them.
 - **Fast.** The plugin streams each take to the server while you speak, so
-  its text is ready about as soon as you stop, however long the take. On an
-  M4, the text of a 25-second take reaches the composer 0.27 seconds after
-  Stop, against 0.66 seconds from the recording alone.
+  its text is in the composer about as soon as you stop, however long the
+  take. On an M4 it takes 0.05 seconds after Stop when you pause before it,
+  and 0.14 seconds when you stop mid-word, against 0.66 seconds from the
+  recording alone.
 - **Built-in microphone.** Under **Settings** → **Plugins** → **Voice Input**,
   set **Microphone** to **Built-in**, or run
   `bb plugin config voice-input set microphone built-in`
@@ -76,14 +77,21 @@ To go back to bb cloud, run `bb settings ai-services set voice automatic`.
   audio-only stream BB opens; BB's stream stays as it is. It streams the
   microphone to the server over a WebSocket,
   `/api/v1/plugins/voice-input/http/stream`: 16 kHz 16-bit samples in chunks
-  of 80 ms, then `end` once BB stops the microphone. The server takes the
-  stream only while voice input uses Parakeet Ultra.
+  of 80 ms, `size:<bytes>` for BB's recording of the take, then `end` once BB
+  stops the microphone. It learns the size from BB's `MediaRecorder`, which
+  it also wraps. The server takes the stream only while voice input uses
+  Parakeet Ultra.
 - The recognizer decodes each piece of a streamed take (below) as soon as the
-  audio after it fixes its cut, so a long take decodes while you speak. At
-  Stop only the last piece is left, at most 15 seconds, and it decodes while
-  BB uploads the recording. BB's request gets the text of the newest streamed
-  take if its length matches the recording's, which ffmpeg reads from the
-  file's container in about 20 ms.
+  audio after it fixes its cut, so a long take decodes while you speak. It
+  also decodes the last piece ahead every half second. At Stop, when that
+  guess ended in silence and only silence came after it, the text is ready;
+  otherwise the last piece, at most 15 seconds, decodes in about 50 ms.
+- BB's request gets the text of the newest streamed take when the recording
+  has the size the browser reported.
+- Once the text comes, BB's composer plays a 180 ms transition before it puts
+  it in, unless the system asks for reduced motion. For 2 seconds after BB
+  stops recording a streamed take, the frontend has the page see
+  `(prefers-reduced-motion: reduce)`, so the text goes in at once.
 - A recording with no streamed take, such as one BB retries or one whose
   stream broke off, is decoded from the file: ffmpeg turns it, webm from
   desktop browsers or mp4 from Safari, into a WAV file in a temporary folder.

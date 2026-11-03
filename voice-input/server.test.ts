@@ -1,7 +1,12 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 
-const take = vi.hoisted(() => ({ add: vi.fn(), end: vi.fn(), abandon: vi.fn() }));
+const take = vi.hoisted(() => ({
+  add: vi.fn(),
+  size: vi.fn(),
+  end: vi.fn(),
+  abandon: vi.fn(),
+}));
 const engine = vi.hoisted(() => ({
   start: vi.fn(async () => {}),
   stream: vi.fn(() => take as typeof take | null),
@@ -52,8 +57,10 @@ it("streams a take from the browser to the engine", async () => {
   const socket = await harness.experimental_openWebSocket("/stream");
   const samples = new Uint8Array([1, 0, 2, 0]);
   await socket.receive(samples);
+  await socket.receive("size:123");
   await socket.receive("end");
   expect(take.add).toHaveBeenCalledWith(samples);
+  expect(take.size).toHaveBeenCalledWith(123);
   expect(take.end).toHaveBeenCalledOnce();
   await socket.close();
   expect(take.abandon).toHaveBeenCalledOnce();

@@ -23,6 +23,13 @@ let context = 4 * rate
 /// A piece also reads this much past its cut, so its last words have theirs.
 /// The next piece writes them.
 let lookahead = 3 * rate
+/// A streamed take's last piece is decoded ahead each time this much audio has
+/// come, so finishing has nothing left to do when the take ends in silence.
+let guessEvery = rate / 2
+/// A guess stands only when this much audio before it, and all after it, is silent.
+let settled = rate / 4
+/// A frame quieter than this, as RMS, holds no word.
+let silence: Float = 0.005
 let blank = 8_192
 /// Tokens TDT may write on one frame before it has to move on.
 let maxSymbols = 2
@@ -88,8 +95,23 @@ final class Take {
     /// Where the first piece not yet decoded starts.
     var start = 0
     var tokens: [Int] = []
+    /// The last piece decoded ahead: where it started, how much audio it read, its tokens.
+    var guess: (start: Int, count: Int, tokens: [Int])?
+    /// When the last guess finished, and how long it took.
+    var guessed = (at: Date.distantPast, took: TimeInterval(0))
     /// Why a piece failed; finishing the take reports it.
     var failure: Error?
+
+    /// The piece from start to the end of the audio so far.
+    var last: Piece { (max(0, start - context)..<audio.count, start..<audio.count) }
+
+    /// Whether every frame of the audio after from is silent.
+    func silent(after from: Int) -> Bool {
+        stride(from: max(0, from), to: audio.count, by: frameLength).allSatisfy { at in
+            let frame = audio[at..<min(at + frameLength, audio.count)]
+            return (frame.reduce(0) { $0 + $1 * $1 } / Float(frame.count)).squareRoot() < silence
+        }
+    }
 
     init(_ audio: [Float] = []) { self.audio = audio }
 
@@ -142,12 +164,27 @@ final class Recognizer {
         }
     }
 
-    /// The take's text, with its last piece decoded.
+    /// Decodes the take's last piece ahead, once enough audio has come since the last time.
+    func guess(_ take: Take) throws {
+        if let guess = take.guess, guess.start == take.start, take.audio.count - guess.count < guessEvery { return }
+        // A slow Mac guesses less often, so a take's end never waits behind guesses.
+        if Date().timeIntervalSince(take.guessed.at) < 3 * take.guessed.took { return }
+        let began = Date()
+        take.guess = (take.start, take.audio.count, try tokens(of: take.last, in: take.audio))
+        take.guessed = (Date(), Date().timeIntervalSince(began))
+    }
+
+    /// The take's text, with its last piece decoded, or guessed when only silence came after the guess.
     func finish(_ take: Take) throws -> String {
         if let failure = take.failure { throw failure }
         try advance(take)
-        let last = (max(0, take.start - context)..<take.audio.count, take.start..<take.audio.count)
-        let text = (take.tokens + (try tokens(of: last, in: take.audio))).compactMap { pieces[$0] }.joined()
+        let tail: [Int]
+        if let guess = take.guess, guess.start == take.start, take.silent(after: guess.count - settled) {
+            tail = guess.tokens
+        } else {
+            tail = try tokens(of: take.last, in: take.audio)
+        }
+        let text = (take.tokens + tail).compactMap { pieces[$0] }.joined()
         return text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
@@ -285,7 +322,12 @@ while let line = readLine() {
         takes[name] = take
         if let samples = request.samples, let data = Data(base64Encoded: samples), take.failure == nil {
             take.append(data)
-            do { try recognizer.advance(take) } catch { take.failure = error }
+            do {
+                try recognizer.advance(take)
+                try recognizer.guess(take)
+            } catch {
+                take.failure = error
+            }
         }
         if request.drop == true { takes[name] = nil }
         guard request.finish == true, let id = request.id else { continue }
