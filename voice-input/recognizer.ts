@@ -6,6 +6,11 @@ import CoreML
 // graphs of Parakeet Ultra, a Parakeet TDT v3 model, on the Neural Engine,
 // and answers one JSON line per request on stdin:
 //   {"id":1,"audio":"/path/take.wav"} -> {"id":1,"text":"…"} or {"id":1,"error":"…"}
+// A take can also arrive while it is spoken, as base64 of 16 kHz 16-bit
+// little-endian samples. Its pieces are decoded as their audio comes in:
+//   {"take":"a","samples":"…"}           no reply
+//   {"id":2,"take":"a","finish":true} -> {"id":2,"text":"…"} or {"id":2,"error":"…"}
+//   {"take":"a","drop":true}             no reply
 // It prints {"ready":true} once the graphs are open, or {"error":"…"} and exits.
 
 let rate = 16_000
@@ -57,26 +62,45 @@ func load(_ url: URL) throws -> [Float] {
     return samples
 }
 
-/// The pieces of a take that the graphs can hold. Each cut falls in the
-/// quietest frame of a 5 s stretch, so it falls between words. A piece reads
-/// context on both sides of its own audio, keep, and writes only that.
-func segments(of audio: [Float]) -> [(read: Range<Int>, keep: Range<Int>)] {
-    var pieces: [(read: Range<Int>, keep: Range<Int>)] = []
+/// A part of a take that the graphs can hold. It reads context on both sides
+/// of its own audio, keep, and writes only that.
+typealias Piece = (read: Range<Int>, keep: Range<Int>)
+
+/// The piece of a take that starts at start, once the audio after it is long
+/// enough to fix its cut, or nil while the rest of the take fits the graphs.
+/// Each cut falls in the quietest frame of a 5 s stretch, so it falls between
+/// words; more audio never moves it.
+func piece(of audio: [Float], from start: Int) -> Piece? {
+    let from = max(0, start - context)
+    if audio.count - from <= span { return nil }
+    let end = from + span - lookahead
+    var cut = end - frameLength, quiet = Float.infinity
+    for at in stride(from: end - 5 * rate, to: end - frameLength, by: frameLength) {
+        let energy = audio[at..<(at + frameLength)].reduce(0) { $0 + $1 * $1 }
+        if energy < quiet { (cut, quiet) = (at + frameLength / 2, energy) }
+    }
+    return (from..<cut + lookahead, start..<cut)
+}
+
+/// A take and the tokens of its pieces decoded so far.
+final class Take {
+    var audio: [Float]
+    /// Where the first piece not yet decoded starts.
     var start = 0
-    while true {
-        let from = max(0, start - context)
-        if audio.count - from <= span {
-            pieces.append((from..<audio.count, start..<audio.count))
-            return pieces
+    var tokens: [Int] = []
+    /// Why a piece failed; finishing the take reports it.
+    var failure: Error?
+
+    init(_ audio: [Float] = []) { self.audio = audio }
+
+    func append(_ data: Data) {
+        data.withUnsafeBytes { raw in
+            audio.reserveCapacity(audio.count + raw.count / 2)
+            for at in stride(from: 0, to: raw.count - 1, by: 2) {
+                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: Int16.self))
+                audio.append(Float(sample) / 32_768)
+            }
         }
-        let end = from + span - lookahead
-        var cut = end - frameLength, quiet = Float.infinity
-        for at in stride(from: end - 5 * rate, to: end - frameLength, by: frameLength) {
-            let energy = audio[at..<(at + frameLength)].reduce(0) { $0 + $1 * $1 }
-            if energy < quiet { (cut, quiet) = (at + frameLength / 2, energy) }
-        }
-        pieces.append((from..<cut + lookahead, start..<cut))
-        start = cut
     }
 }
 
@@ -107,17 +131,34 @@ final class Recognizer {
     }
 
     func transcribe(_ audio: [Float]) throws -> String {
-        var tokens: [Int] = []
-        for piece in segments(of: audio) {
-            // The take's last piece keeps its last frame too, which the encoder
-            // may add past the audio.
-            let end = piece.keep.upperBound == audio.count
-                ? Int.max : (piece.keep.upperBound - piece.read.lowerBound + frameLength - 1) / frameLength
-            let kept = (piece.keep.lowerBound - piece.read.lowerBound) / frameLength ..< end
-            tokens += try decode(Array(audio[piece.read])).filter { kept.contains($0.frame) }.map(\.token)
+        try finish(Take(audio))
+    }
+
+    /// Decodes every piece of the take whose cut its audio has fixed.
+    func advance(_ take: Take) throws {
+        while let next = piece(of: take.audio, from: take.start) {
+            take.tokens += try tokens(of: next, in: take.audio)
+            take.start = next.keep.upperBound
         }
-        let text = tokens.compactMap { pieces[$0] }.joined()
+    }
+
+    /// The take's text, with its last piece decoded.
+    func finish(_ take: Take) throws -> String {
+        if let failure = take.failure { throw failure }
+        try advance(take)
+        let last = (max(0, take.start - context)..<take.audio.count, take.start..<take.audio.count)
+        let text = (take.tokens + (try tokens(of: last, in: take.audio))).compactMap { pieces[$0] }.joined()
         return text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// The tokens a piece writes for its own audio.
+    private func tokens(of piece: Piece, in audio: [Float]) throws -> [Int] {
+        // The take's last piece keeps its last frame too, which the encoder
+        // may add past the audio.
+        let end = piece.keep.upperBound == audio.count
+            ? Int.max : (piece.keep.upperBound - piece.read.lowerBound + frameLength - 1) / frameLength
+        let kept = (piece.keep.lowerBound - piece.read.lowerBound) / frameLength ..< end
+        return try decode(Array(audio[piece.read])).filter { kept.contains($0.frame) }.map(\.token)
     }
 
     /// Greedy TDT decoding of one piece: at each frame the joint names the
@@ -212,8 +253,12 @@ final class Recognizer {
 }
 
 struct Request: Decodable {
-    let id: Int
-    let audio: String
+    let id: Int?
+    let audio: String?
+    let take: String?
+    let samples: String?
+    let finish: Bool?
+    let drop: Bool?
 }
 
 func send(_ reply: [String: Any]) {
@@ -232,13 +277,30 @@ do {
 }
 send(["ready": true])
 
+var takes: [String: Take] = [:]
 while let line = readLine() {
     guard let request = try? JSONDecoder().decode(Request.self, from: Data(line.utf8)) else { continue }
-    do {
-        let text = try recognizer.transcribe(load(URL(fileURLWithPath: request.audio)))
-        send(["id": request.id, "text": text])
-    } catch {
-        send(["id": request.id, "error": "\(error)"])
+    if let name = request.take {
+        let take = takes[name] ?? Take()
+        takes[name] = take
+        if let samples = request.samples, let data = Data(base64Encoded: samples), take.failure == nil {
+            take.append(data)
+            do { try recognizer.advance(take) } catch { take.failure = error }
+        }
+        if request.drop == true { takes[name] = nil }
+        guard request.finish == true, let id = request.id else { continue }
+        takes[name] = nil
+        do {
+            send(["id": id, "text": try recognizer.finish(take)])
+        } catch {
+            send(["id": id, "error": "\(error)"])
+        }
+    } else if let id = request.id, let audio = request.audio {
+        do {
+            send(["id": id, "text": try recognizer.transcribe(load(URL(fileURLWithPath: audio)))])
+        } catch {
+            send(["id": id, "error": "\(error)"])
+        }
     }
 }
 `;

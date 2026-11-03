@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createWriteStream, existsSync } from "node:fs";
 import {
   mkdir,
@@ -14,6 +14,7 @@ import { delimiter, join } from "node:path";
 import { Readable } from "node:stream";
 import type { ReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import type { PluginAiServiceStatus } from "@get-bb/plugin-sdk";
 import { RECOGNIZER_SWIFT } from "./recognizer";
@@ -22,13 +23,78 @@ import { RecognizerProcess } from "./recognizer-process";
 const run = promisify(execFile);
 
 /** Parakeet Ultra's Core ML graphs and vocabulary, zipped. */
-const MODEL_URL = "https://d390utbf6y9hg4.cloudfront.net/audio/v3";
+const MODEL_URL = "https://models.shelest.app/models/audio/v3";
 const HOME = join(
   homedir(),
   "Library",
   "Application Support",
   "bb-voice-input",
 );
+
+/**
+ * How long after its stream ends a take waits for BB to ask for its text: BB
+ * first uploads the whole recording.
+ */
+const CLAIM_MS = 60_000;
+/** How long BB's request waits for the stream of its take to end. */
+const END_MS = 2_000;
+/**
+ * How far a stream's length may be off its recording's: the two start a few
+ * milliseconds apart.
+ */
+const SLACK_SECONDS = 0.5;
+/** A second of streamed samples. */
+const BYTES_PER_SECOND = 32_000;
+/**
+ * Shorter streams are not BB's takes: BB drops takes under a second, and a
+ * stream may miss the first moments of one.
+ */
+const MIN_BYTES = BYTES_PER_SECOND / 2;
+
+/** A take the browser streams while it is spoken. */
+export type Stream = {
+  /** 16 kHz 16-bit little-endian samples, in order. */
+  add(samples: Uint8Array): void;
+  /** The take is over: its text gets ready for BB's request. */
+  end(): void;
+  /** The stream broke off; BB's recording is decoded instead. */
+  abandon(): void;
+};
+
+type Streamed = {
+  bytes: number;
+  text: Promise<string> | null;
+  ended: Promise<void>;
+};
+
+/** How long a recording runs, read from its container without decoding it. */
+async function duration(
+  ffmpeg: string,
+  file: string,
+  signal: AbortSignal,
+): Promise<number | null> {
+  const args = ["-v", "error", "-nostdin", "-progress", "pipe:1", "-i", file];
+  const copy = ["-map", "0:a:0", "-c", "copy", "-f", "null", "-"];
+  try {
+    const { stdout } = await run(ffmpeg, [...args, ...copy], { signal });
+    const last = [...stdout.matchAll(/out_time_us=(\d+)/g)].at(-1);
+    return last ? Number(last[1]) / 1e6 : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `promise`, or the reason `signal` aborts first. */
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    if (signal.aborted) return abort();
+    signal.addEventListener("abort", abort, { once: true });
+    promise
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener("abort", abort));
+  });
+}
 
 /** Removes the entries of HOME that start with `prefix`, except `keep`. */
 async function sweep(prefix: string, keep?: string): Promise<void> {
@@ -116,6 +182,30 @@ export function createEngine(log: (message: string) => void) {
   }> | null = null;
   let live: RecognizerProcess | null = null;
   const closing = new AbortController();
+  /** Streamed takes, oldest first. */
+  const streams = new Map<string, Streamed>();
+
+  /**
+   * The text of the newest streamed take, if it is the recording BB asks
+   * about: BB uploads a recording once it stops, before the next take starts.
+   * A take serves one request at most, so a retried recording is decoded.
+   */
+  async function streamed(
+    seconds: Promise<number | null>,
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    const [id, take] = [...streams].at(-1) ?? [];
+    if (!id || !take) return null;
+    streams.delete(id);
+    if (!take.text) await Promise.race([take.ended, delay(END_MS)]);
+    const length = take.bytes / BYTES_PER_SECOND;
+    const recording = await seconds;
+    log(`Streamed ${length.toFixed(1)} s of a ${recording ?? "?"} s recording`);
+    if (!take.text) return null;
+    if (recording !== null && Math.abs(length - recording) > SLACK_SECONDS)
+      return null;
+    return abortable(take.text, signal);
+  }
 
   const start = () =>
     (starting ??= (async () => {
@@ -165,6 +255,44 @@ export function createEngine(log: (message: string) => void) {
       return status;
     },
 
+    /** A take to stream while it is spoken, or null until a recognizer is up. */
+    stream(): Stream | null {
+      const recognizer = live;
+      if (!recognizer) return null;
+      const id = randomUUID();
+      let done = () => {};
+      const take: Streamed = {
+        bytes: 0,
+        text: null,
+        ended: new Promise((resolve) => (done = resolve)),
+      };
+      streams.set(id, take);
+      let over = false;
+      return {
+        add(samples) {
+          if (over) return;
+          take.bytes += samples.length;
+          recognizer.append(id, samples);
+        },
+        end() {
+          if (over) return;
+          if (take.bytes < MIN_BYTES) return this.abandon();
+          over = true;
+          take.text = recognizer.finish(id);
+          take.text.catch(() => {});
+          done();
+          setTimeout(() => streams.delete(id), CLAIM_MS).unref();
+        },
+        abandon() {
+          if (over) return;
+          over = true;
+          recognizer.drop(id);
+          streams.delete(id);
+          done();
+        },
+      };
+    },
+
     async transcribe(audio: File, signal: AbortSignal): Promise<string> {
       const { recognizer, ffmpeg } = await start();
       const dir = await mkdtemp(join(tmpdir(), "bb-voice-input-"));
@@ -172,6 +300,14 @@ export function createEngine(log: (message: string) => void) {
         const take = join(dir, "take");
         const wav = join(dir, "take.wav");
         await writeFile(take, Buffer.from(await audio.arrayBuffer()));
+        try {
+          const text = await streamed(duration(ffmpeg, take, signal), signal);
+          // Silence, or a stream that heard nothing: the recording may say more.
+          if (text) return text;
+        } catch (error) {
+          if (signal.aborted) throw error;
+          log(`Decoding the recording: ${(error as Error).message}`);
+        }
         const decode = ["-v", "error", "-nostdin", "-i", take, "-ac", "1"];
         await run(ffmpeg, [...decode, "-c:a", "pcm_f32le", wav], { signal });
         return await recognizer.transcribe(wav, signal);

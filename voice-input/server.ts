@@ -1,6 +1,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { createEngine } from "./engine";
+import { createEngine, type Stream } from "./engine";
 import { stripHesitations } from "./hesitations";
+
+const SERVICE = "parakeet";
 
 export default function plugin(bb: BbPluginApi): void {
   // BB records in the browser, so app.tsx reads this setting.
@@ -23,11 +25,48 @@ export default function plugin(bb: BbPluginApi): void {
   bb.onDispose(() => engine.close());
 
   bb.experimental_aiServices.register({
-    id: "parakeet",
+    id: SERVICE,
     displayName: "Parakeet Ultra",
     transcribe: async (audio, { signal }) =>
       stripHesitations(await engine.transcribe(audio, signal)),
     status: async () => engine.status(),
+  });
+
+  /** Whether BB sends voice input to this plugin; a check that fails says yes. */
+  const chosen = async () => {
+    try {
+      const { voice } = (await bb.sdk.system.aiServices()).selections;
+      return (
+        voice.mode === "service" &&
+        voice.pluginId === bb.pluginId &&
+        voice.serviceId === SERVICE
+      );
+    } catch {
+      return true;
+    }
+  };
+
+  // The browser streams each take while it is spoken (stream.ts): binary
+  // messages of 16 kHz 16-bit samples, then "end" when the take stops.
+  bb.http.experimental_websocket("/stream", () => {
+    let take: Stream | null = null;
+    return {
+      onOpen(socket) {
+        take = engine.stream();
+        if (!take) return socket.close(1013, "Not ready");
+        void chosen().then((yes) => {
+          if (yes) return;
+          take?.abandon();
+          socket.close(1000, "Voice input uses another service");
+        });
+      },
+      onMessage(_socket, data) {
+        if (typeof data !== "string") take?.add(data);
+        else if (data === "end") take?.end();
+      },
+      onClose: () => take?.abandon(),
+      onError: () => take?.abandon(),
+    };
   });
 
   // The model downloads and opens now, so the first take does not wait.

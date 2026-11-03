@@ -3,6 +3,15 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `voice-input/v<version>`.
 
+## 0.1.2 (2026-11-02)
+
+- Faster: the plugin streams each take of BB's voice input to the server while
+  you speak, and decodes it as it comes in. The text is ready about as soon as
+  you stop, however long the take: a 25-second take now reaches the composer
+  0.27 seconds after Stop instead of 0.66.
+- Fixed: the plugin downloads the speech model from its new address. The old
+  one stopped working, so new installs could not get ready.
+
 ## 0.1.1 (2026-10-14)
 
 - New: a **Microphone** setting for BB's voice input. With **Built-in**, BB
