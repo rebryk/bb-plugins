@@ -3,6 +3,12 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `superhuman/v<version>`.
 
+## 0.1.32 (2026-11-04)
+
+- On BB 0.48, Universal Search, Search Actions, and snoozed threads in BB's
+  thread search work again. They turn themselves off on BB versions they
+  weren't checked on, and now run on BB 0.48.0 and 0.48.1 too.
+
 ## 0.1.31 (2026-10-26)
 
 - On phones with BB 0.47, the navigation rail runs from the bottom again:
