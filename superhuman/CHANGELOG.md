@@ -6,8 +6,14 @@ gets a new version. Each version is tagged `superhuman/v<version>`.
 ## 0.1.32 (2026-11-04)
 
 - On BB 0.48, Universal Search, Search Actions, and snoozed threads in BB's
-  thread search work again. They turn themselves off on BB versions they
-  weren't checked on, and now run on BB 0.48.0 and 0.48.1 too.
+  thread search work again. They no longer turn themselves off on a BB version
+  they weren't checked on. Each checks what it reads of BB's search and leaves
+  it alone when a BB update changes it.
+- Search Actions ticks **Archived** in thread search's **Filter and sort** menu
+  once, so archived threads show there too, unless you changed that menu in
+  this browser. Turning it off leaves the menu as it is.
+- **⌘↵** unsnoozes or unarchives a thread only where its row shows the hint.
+  Elsewhere, such as on a phone, it does what BB does.
 
 ## 0.1.31 (2026-10-26)
 
