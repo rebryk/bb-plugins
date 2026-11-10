@@ -217,6 +217,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     current: SlackConnection,
     thread: Thread,
     messages: Message[],
+    previousBbThreadId: string | null = null,
   ) => {
     const values = await settings.get();
     const { channelId, threadTs } = splitChatThreadId(thread.id);
@@ -253,6 +254,11 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       ...(earlier.length > 0
         ? [
             `Earlier messages in this Slack thread, oldest first:\n${earlier.map(describeMessage).join("\n")}`,
+          ]
+        : []),
+      ...(previousBbThreadId
+        ? [
+            `This Slack thread used to continue bb thread ${previousBbThreadId}, which is no longer available; you take it over.`,
           ]
         : []),
       INSTRUCTIONS,
@@ -320,9 +326,10 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     binding: Binding,
     messages: Message[],
   ) => {
-    const interactions = await bb.sdk.threads.interactions.list({
-      threadId: binding.bbThreadId,
-    });
+    // An archived or deleted thread is handled where the send fails.
+    const interactions = await bb.sdk.threads.interactions
+      .list({ threadId: binding.bbThreadId })
+      .catch(() => []);
     const waiting = interactions
       .filter((interaction) => interaction.status === "pending")
       .sort((a, b) => a.createdAt - b.createdAt)[0];
@@ -355,20 +362,54 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     const text = messages
       .map((message) => `Slack reply from ${describeMessage(message)}`)
       .join("\n\n");
-    try {
-      await bb.sdk.threads.send({
+    const send = () =>
+      bb.sdk.threads.send({
         threadId: binding.bbThreadId,
         mode: "auto",
         input: [{ type: "text", text, mentions: [] }],
       });
+    try {
+      await send();
     } catch (error) {
-      if (httpStatus(error) !== 404) throw error;
-      // The bb thread is gone: start a fresh one for this Slack thread.
-      store.remove(binding.slackKey);
-      await startThread(current, thread, messages);
-      return;
+      if (!(await reviveAndSend(binding.bbThreadId, error, send))) {
+        // The bb thread is gone for good: a fresh one takes the Slack thread.
+        store.remove(binding.slackKey);
+        await startThread(current, thread, messages, binding.bbThreadId);
+        return;
+      }
     }
     markPending(binding, messages);
+  };
+
+  /**
+   * After a failed send: unarchives an archived thread and sends once more.
+   * Returns false when the thread is deleted, missing, or cannot come back;
+   * rethrows any other failure.
+   */
+  const reviveAndSend = async (
+    bbThreadId: string,
+    error: unknown,
+    send: () => Promise<unknown>,
+  ) => {
+    const status = httpStatus(error);
+    if (status === 404 || status === 410) return false;
+    if (status !== 409) throw error;
+    const thread = await bb.sdk.threads
+      .get({ threadId: bbThreadId })
+      .catch(() => null);
+    if (!thread || thread.deletedAt !== null) return false;
+    if (thread.archivedAt === null) throw error;
+    try {
+      await bb.sdk.threads.unarchive({ threadId: bbThreadId });
+      await send();
+      bb.log.info(`Unarchived bb thread ${bbThreadId} for a Slack reply`);
+      return true;
+    } catch (retryError) {
+      bb.log.warn(
+        `Could not bring back bb thread ${bbThreadId}: ${errorMessage(retryError)}`,
+      );
+      return false;
+    }
   };
 
   const onInbound = async (
