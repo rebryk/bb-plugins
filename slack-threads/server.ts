@@ -587,6 +587,10 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           {
             footer,
             blocks: reply.blocks,
+            onFixes: (fixes) =>
+              bb.log.info(
+                `Fixed the blocks of a reply from ${bbThreadId}: ${fixes.join("; ")}`,
+              ),
             onBlocksError: (detail) =>
               bb.log.warn(
                 `Slack rejected the blocks of a reply from ${bbThreadId}: ${detail}`,
@@ -859,6 +863,10 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
               message.text,
               {
                 blocks: message.blocks,
+                onFixes: (fixes) =>
+                  bb.log.info(
+                    `Fixed the blocks of a post: ${fixes.join("; ")}`,
+                  ),
                 onBlocksError: (detail) => {
                   problems.push(`Slack rejected the blocks: ${detail}`);
                   bb.log.warn(`Slack rejected the blocks of a post: ${detail}`);

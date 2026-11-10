@@ -1,6 +1,7 @@
 import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { Chat, type Logger, type Message, type Thread } from "chat";
+import { blockPointers, sanitizeBlocks } from "./blocks";
 
 /** Slack's `markdown_text` holds 12,000 characters; leave room. */
 const CHUNK_CHARS = 11_000;
@@ -204,13 +205,18 @@ export function describeSlackError(error: unknown): string | null {
   });
 }
 
+const ONE_CHART_FAILED = "_(one chart could not be rendered)_";
+
 /**
  * Posts Markdown into a Slack thread through the Web API, one message per
- * chunk. The last message also carries `blocks` (charts, tables) and a muted
- * `footer`; when Slack rejects the blocks, it is posted again without them,
- * with a note, and `onBlocksError` gets Slack's error. An empty `threadTs`
- * posts at the top level and threads the rest under the first message.
- * Returns the first message's ts, or null when nothing was posted.
+ * chunk. `blocks` (charts, tables) are fixed up and go with the last chunk,
+ * two charts per message at most, extra charts in follow-up messages; the
+ * muted `footer` goes on the very last message. When Slack rejects blocks,
+ * the ones its error points at are dropped and the message is sent once
+ * more; if that fails too, it goes without blocks. Each drop is noted in the
+ * message and reported to `onBlocksError`. An empty `threadTs` posts at the
+ * top level and threads the rest under the first message. Returns the first
+ * message's ts, or null when nothing was posted.
  */
 export async function postMarkdown(
   connection: SlackConnection,
@@ -220,12 +226,26 @@ export async function postMarkdown(
   options: {
     footer?: string | null;
     blocks?: Block[];
+    onFixes?: (fixes: string[]) => void;
     onBlocksError?: (detail: string) => void;
   } = {},
 ): Promise<string | null> {
-  const extra = options.blocks ?? [];
+  const { groups, fixes } = sanitizeBlocks(options.blocks ?? []);
+  if (fixes.length > 0) options.onFixes?.(fixes);
   const chunks = chunkMarkdown(text).filter((chunk) => !isBlank(chunk));
-  if (chunks.length === 0 && extra.length === 0) return null;
+  const messages = (chunks.length > 0 ? chunks : [""]).map((chunk) => ({
+    chunk,
+    blocks: [] as Block[],
+  }));
+  const tail = messages[messages.length - 1];
+  if (tail) tail.blocks = groups[0] ?? [];
+  for (const group of groups.slice(1))
+    messages.push({ chunk: "", blocks: group });
+  if (
+    messages.every((message) => !message.chunk && message.blocks.length === 0)
+  ) {
+    return null;
+  }
   const footer: Block[] = options.footer
     ? [
         {
@@ -234,34 +254,73 @@ export async function postMarkdown(
         },
       ]
     : [];
-  const send = (parent: string | null, chunk: string, blocks: Block[]) =>
+
+  const send = (
+    parent: string | null,
+    chunk: string,
+    blocks: Block[],
+    last: boolean,
+  ) =>
     connection.slack.webClient.chat.postMessage({
       channel: channelId,
       ...(parent ? { thread_ts: parent } : {}),
-      text: chunk || fallbackText(extra),
+      text: chunk || fallbackText(blocks),
       blocks: [
         ...(chunk ? [{ type: "markdown" as const, text: chunk }] : []),
         ...blocks,
+        ...(last ? footer : []),
       ],
       unfurl_links: false,
       unfurl_media: false,
     });
+  const noted = (chunk: string, note: string) => `${chunk}\n\n${note}`.trim();
 
-  let first: string | null = null;
-  const count = Math.max(chunks.length, 1);
-  for (let index = 0; index < count; index += 1) {
-    const chunk = chunks[index] ?? "";
-    const last = index === count - 1;
-    const parent = threadTs || first;
-    let result;
+  /** Sends one message; drops the blocks Slack rejects instead of failing. */
+  const deliver = async (
+    parent: string | null,
+    chunk: string,
+    blocks: Block[],
+    last: boolean,
+  ) => {
     try {
-      result = await send(parent, chunk, last ? [...extra, ...footer] : []);
+      return await send(parent, chunk, blocks, last);
     } catch (error) {
       const detail = describeSlackError(error);
-      if (!last || extra.length === 0 || !detail) throw error;
+      if (blocks.length === 0 || !detail) throw error;
       options.onBlocksError?.(detail);
-      result = await send(parent, `${chunk}\n\n${CHART_FAILED}`.trim(), footer);
+      const offset = chunk ? 1 : 0;
+      const bad = new Set(
+        blockPointers(detail)
+          .map((index) => index - offset)
+          .filter((index) => index >= 0 && index < blocks.length),
+      );
+      if (bad.size > 0 && bad.size < blocks.length) {
+        const note =
+          bad.size === 1
+            ? ONE_CHART_FAILED
+            : `_(${bad.size} charts could not be rendered)_`;
+        const kept = blocks.filter((_, index) => !bad.has(index));
+        try {
+          return await send(parent, noted(chunk, note), kept, last);
+        } catch (retryError) {
+          const retryDetail = describeSlackError(retryError);
+          if (!retryDetail) throw retryError;
+          options.onBlocksError?.(retryDetail);
+        }
+      }
+      const note = blocks.length === 1 ? ONE_CHART_FAILED : CHART_FAILED;
+      return await send(parent, noted(chunk, note), [], last);
     }
+  };
+
+  let first: string | null = null;
+  for (const [index, message] of messages.entries()) {
+    const result = await deliver(
+      threadTs || first,
+      message.chunk,
+      message.blocks,
+      index === messages.length - 1,
+    );
     first ??= result.ts ?? null;
   }
   return first;
