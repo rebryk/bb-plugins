@@ -45,18 +45,28 @@ const windowName = (minutes: number | null) =>
               ? `${minutes / 60}h`
               : `${minutes}m`;
 
-const resetTime = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/Los_Angeles",
-  weekday: "short",
-  hour: "numeric",
-  minute: "2-digit",
-});
+const FIVE_HOURS = 300;
+const WEEK = 10080;
+/** The weekly window takes over the footer from this utilization on. */
+const WEEK_ALERT = 0.95;
+
+/** "45m", "1h 40m", "2d 5h": the time left until `resetAt`. */
+const timeLeft = (ms: number) => {
+  const minutes = Math.max(1, Math.ceil(ms / 60_000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const rest = minutes % 60;
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+  return `${rest}m`;
+};
 
 /**
- * "5h 23% · week 41% · resets Fri 4:00 PM PT" for the account that most
- * likely served the thread's last turn: the provider's most recently used
- * enabled account, else its first ready one. Null when the provider is not
- * routed through the pool or the account reports no windows.
+ * One usage window of the account that most likely served the thread's last
+ * turn (the provider's most recently used enabled account, else its first
+ * ready one): "5h usage 42% · resets in 1h 40m", or the weekly window once it
+ * reaches 95% or when there is no five-hour window. Null when the provider is
+ * not routed through the pool or the account reports no windows.
  */
 export function describeUsage(
   status: PoolStatus,
@@ -75,23 +85,25 @@ export function describeUsage(
     recent ?? accounts.find((candidate) => candidate.status === "ready");
   const windows = (account?.limitWindows ?? [])
     .filter((window) => window.utilization !== null)
-    .map((window) => ({
-      ...window,
+    .map((window) => {
       // A window past its reset has started over.
-      utilization:
-        window.resetAt !== null && window.resetAt <= now
-          ? 0
-          : (window.utilization ?? 0),
-    }))
+      const over = window.resetAt !== null && window.resetAt <= now;
+      return {
+        ...window,
+        utilization: over ? 0 : (window.utilization ?? 0),
+        resetAt: over ? null : window.resetAt,
+      };
+    })
     .sort((a, b) => (a.windowMinutes ?? 0) - (b.windowMinutes ?? 0));
-  if (windows.length === 0) return null;
-  const parts = windows.map(
-    (window) =>
-      `${windowName(window.windowMinutes)} ${Math.round(window.utilization * 100)}%`,
-  );
-  const closest = [...windows].sort((a, b) => b.utilization - a.utilization)[0];
-  if (closest?.resetAt && closest.resetAt > now) {
-    parts.push(`resets ${resetTime.format(closest.resetAt)} PT`);
-  }
-  return parts.join(" · ");
+  const five = windows.find((window) => window.windowMinutes === FIVE_HOURS);
+  const week = windows.find((window) => window.windowMinutes === WEEK);
+  const shown =
+    week && (week.utilization >= WEEK_ALERT || !five)
+      ? week
+      : (five ?? windows[0]);
+  if (!shown) return null;
+  const usage = `${windowName(shown.windowMinutes)} usage ${Math.round(shown.utilization * 100)}%`;
+  return shown.resetAt
+    ? `${usage} · resets in ${timeLeft(shown.resetAt - now)}`
+    : usage;
 }
