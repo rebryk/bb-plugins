@@ -1,6 +1,6 @@
 ---
 name: slack-threads
-description: "Work in a bb thread that is bound to a Slack thread, or start a Slack thread for your own bb thread with `bb slack-threads post`."
+description: "Work in a bb thread that is bound to a Slack thread, or post a Slack message from bb with `bb slack-threads post`."
 ---
 
 # Slack Threads
@@ -22,17 +22,24 @@ that Slack thread, mention or not, arrive in the same bb thread as
   too, and the next Slack reply answers it.
 - Several people may write in one Slack thread; each message names its author.
 
-## Starting a Slack thread from bb
+## Posting to Slack from bb
 
 ```sh
 bb slack-threads post --channel '#team' --text 'Daily report: …'
 ```
 
-This posts a new top-level message (the bot must be in the channel) and binds
-its Slack thread to the calling bb thread (`--thread <bbThreadId>` binds
-another). Replies there continue that bb thread, and your reply to each of them
-goes back to Slack. Your own turn that ran `post` does not post its final text
-to Slack. Scheduled automations use this to open a Slack thread for their run.
+This posts a new top-level message (the bot must be in the channel) and
+returns; it does not tie the Slack thread to your bb thread, so one thread or
+automation can post as many separate messages as it needs. The first reply
+anyone writes under the post (no mention needed) starts a new bb thread with
+the Slack thread's history and a pointer back to your thread, and that Slack
+thread belongs to the new bb thread from then on.
+
+Pass `--bind` only when replies must come back to the posting thread itself:
+then replies there continue it, and your reply to each of them goes back to
+Slack (your own turn that ran `post` does not post its final text).
+`--thread <bbThreadId>` names another bb thread as the source or the binding
+target.
 
 `--text` takes Markdown; pass multi-line text as the argument
 (`--text "$(cat report.md)"`). `--text-stdin` reads a single line only.
@@ -40,7 +47,8 @@ to Slack. Scheduled automations use this to open a Slack thread for their run.
 ## Other commands
 
 - `bb slack-threads status` — whether Slack is connected, the workspace, the
-  bot user and how many Slack threads are bound.
+  bot user, how many Slack threads are bound and how many posts wait for a
+  first reply.
 - `bb slack-threads list [--limit N]` — recently active Slack threads and their
   bb threads.
 

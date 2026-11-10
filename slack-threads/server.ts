@@ -224,7 +224,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     current: SlackConnection,
     thread: Thread,
     messages: Message[],
-    previousBbThreadId: string | null = null,
+    note: string | null = null,
   ) => {
     const values = await settings.get();
     const { channelId, threadTs } = splitChatThreadId(thread.id);
@@ -263,11 +263,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             `Earlier messages in this Slack thread, oldest first:\n${earlier.map(describeMessage).join("\n")}`,
           ]
         : []),
-      ...(previousBbThreadId
-        ? [
-            `This Slack thread used to continue bb thread ${previousBbThreadId}, which is no longer available; you take it over.`,
-          ]
-        : []),
+      ...(note ? [note] : []),
       INSTRUCTIONS,
     ].join("\n\n");
 
@@ -386,7 +382,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       if (!(await reviveAndSend(binding.bbThreadId, error, send))) {
         // The bb thread is gone for good: a fresh one takes the Slack thread.
         store.remove(binding.slackKey);
-        await startThread(current, thread, messages, binding.bbThreadId);
+        await startThread(
+          current,
+          thread,
+          messages,
+          `This Slack thread used to continue bb thread ${binding.bbThreadId}, which is no longer available; you take it over.`,
+        );
         return;
       }
     }
@@ -445,11 +446,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         ts === threadTs
           ? thread
           : current.bot.thread(chatThreadId(channelId, ts));
-      const binding = store.get(
-        slackKey(current.identity.teamId, channelId, ts),
-      );
+      const key = slackKey(current.identity.teamId, channelId, ts);
+      const binding = store.get(key);
+      const watched = binding ? null : store.getWatched(key);
       if (
         !binding &&
+        !watched &&
         kind === "subscribed" &&
         !messages.some((m) => m.isMention)
       ) {
@@ -463,7 +465,17 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         if (binding) {
           await continueThread(current, target, binding, messages);
         } else {
-          await startThread(current, target, messages);
+          const source = watched?.sourceBbThreadId;
+          await startThread(
+            current,
+            target,
+            messages,
+            source
+              ? `This post came from bb thread ${source}; read it with \`bb thread messages ${source}\` if you need its context.`
+              : null,
+          );
+          // From now on the Slack thread is bound to the new bb thread.
+          if (watched && store.get(key)) store.unwatch(key);
         }
       } catch (error) {
         bb.log.error(
@@ -643,12 +655,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             appToken: String(appToken),
             logger: makeLogger("chat"),
             subscriptions: (teamId) =>
-              store
-                .all()
-                .filter((binding) => binding.teamId === teamId)
-                .map((binding) =>
-                  chatThreadId(binding.channelId, binding.threadTs),
-                ),
+              [...store.all(), ...store.allWatched()]
+                .filter((entry) => entry.teamId === teamId)
+                .map((entry) => chatThreadId(entry.channelId, entry.threadTs)),
             onInbound,
           });
           connection = current;
@@ -711,7 +720,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       commands: {
         post: cliCommand({
           summary:
-            "Start a Slack thread whose replies continue a bb thread (default: the calling thread)",
+            "Post a new Slack message; the first reply under it starts a new bb thread",
           options: {
             channel: {
               type: "string",
@@ -728,27 +737,32 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             thread: {
               type: "string",
               description:
-                "bb thread ID to bind (defaults to the calling thread)",
+                "bb thread the post comes from (defaults to the calling thread)",
+            },
+            bind: {
+              type: "boolean",
+              description:
+                "Bind the Slack thread to that bb thread instead, so replies continue it",
             },
             json: { type: "boolean", description: "Print JSON" },
           },
           async run(input, ctx) {
             const current = requireConnection();
-            const bbThreadId = input.options.thread ?? ctx.threadId;
-            if (!bbThreadId) {
+            const bbThreadId = input.options.thread ?? ctx.threadId ?? null;
+            if (input.options.bind && !bbThreadId) {
               throw new PluginCliError("No bb thread to bind.", {
                 code: "missing_thread",
                 hint: "Pass --thread <bbThreadId>.",
               });
             }
-            await bb.sdk.threads.get({ threadId: bbThreadId }).catch(() => {
-              throw new PluginCliError(
-                `bb thread ${bbThreadId} was not found.`,
-                {
-                  code: "thread_not_found",
-                },
-              );
-            });
+            if (bbThreadId) {
+              await bb.sdk.threads.get({ threadId: bbThreadId }).catch(() => {
+                throw new PluginCliError(
+                  `bb thread ${bbThreadId} was not found.`,
+                  { code: "thread_not_found" },
+                );
+              });
+            }
             const channelId = await resolveChannel(
               current,
               input.options.channel,
@@ -774,28 +788,50 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
               });
             }
             const link = await permalink(current, channelId, threadTs);
-            const key = slackKey(current.identity.teamId, channelId, threadTs);
-            store.save({
-              slackKey: key,
-              bbThreadId,
-              teamId: current.identity.teamId,
-              channelId,
-              threadTs,
-              channelName: input.options.channel.startsWith("#")
-                ? input.options.channel
-                : null,
-              permalink: link,
-              origin: "cli",
-            });
+            const teamId = current.identity.teamId;
+            const key = slackKey(teamId, channelId, threadTs);
+            if (input.options.bind && bbThreadId) {
+              store.save({
+                slackKey: key,
+                bbThreadId,
+                teamId,
+                channelId,
+                threadTs,
+                channelName: input.options.channel.startsWith("#")
+                  ? input.options.channel
+                  : null,
+                permalink: link,
+                origin: "cli",
+              });
+            } else {
+              store.watch({
+                slackKey: key,
+                teamId,
+                channelId,
+                threadTs,
+                sourceBbThreadId: bbThreadId,
+              });
+            }
             await current.bot
               .getState()
               .subscribe(chatThreadId(channelId, threadTs));
-            const result = { channelId, threadTs, permalink: link, bbThreadId };
+            const bound = Boolean(input.options.bind);
+            const result = {
+              channelId,
+              threadTs,
+              permalink: link,
+              bbThreadId,
+              bound,
+            };
             return {
               exitCode: 0,
               stdout: input.options.json
                 ? `${JSON.stringify(result)}\n`
-                : `Posted ${link ?? `${channelId}/${threadTs}`}\nReplies there continue bb thread ${bbThreadId}.\n`,
+                : `Posted ${link ?? `${channelId}/${threadTs}`}\n${
+                    bound
+                      ? `Replies there continue bb thread ${bbThreadId}.`
+                      : "The first reply there starts a new bb thread."
+                  }\n`,
             };
           },
         }),
@@ -822,6 +858,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
                 ? { id: identity.botUserId, name: identity.botName }
                 : null,
               bindings: store.count(),
+              watched: store.watchedCount(),
               missingSettings: missing,
               lastError,
             };
@@ -833,6 +870,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
               `Workspace: ${identity ? `${identity.teamName} (${identity.teamId}) ${identity.teamUrl}` : "-"}`,
               `Bot user: ${identity ? `@${identity.botName} (${identity.botUserId})` : "-"}`,
               `Bound Slack threads: ${status.bindings}`,
+              `Posts waiting for a first reply: ${status.watched}`,
               ...(missing.length > 0
                 ? [`Missing settings: ${missing.join(", ")}`]
                 : []),

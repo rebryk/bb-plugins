@@ -16,6 +16,19 @@ export interface Binding {
   updatedAt: number;
 }
 
+/**
+ * A Slack thread opened by `bb slack-threads post` that no bb thread owns yet:
+ * its first human reply starts one.
+ */
+export interface Watched {
+  slackKey: string;
+  teamId: string;
+  channelId: string;
+  threadTs: string;
+  /** The bb thread that posted it, for context. */
+  sourceBbThreadId: string | null;
+}
+
 /** A Slack message forwarded to bb whose reply has not been posted yet. */
 export interface PendingMessage {
   slackKey: string;
@@ -82,7 +95,29 @@ export function openStore(bb: BbPluginApi) {
     `DELETE FROM pending WHERE slack_key IN
       (SELECT slack_key FROM bindings WHERE thread_ts = '')`,
     `DELETE FROM bindings WHERE thread_ts = ''`,
+    `CREATE TABLE IF NOT EXISTS watched (
+      slack_key TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      thread_ts TEXT NOT NULL,
+      source_bb_thread_id TEXT,
+      created_at INTEGER NOT NULL
+    )`,
   ]);
+
+  const toWatched = (row: {
+    slack_key: string;
+    team_id: string;
+    channel_id: string;
+    thread_ts: string;
+    source_bb_thread_id: string | null;
+  }): Watched => ({
+    slackKey: row.slack_key,
+    teamId: row.team_id,
+    channelId: row.channel_id,
+    threadTs: row.thread_ts,
+    sourceBbThreadId: row.source_bb_thread_id,
+  });
 
   return {
     get(key: string): Binding | null {
@@ -166,6 +201,46 @@ export function openStore(bb: BbPluginApi) {
       db.prepare(`DELETE FROM bindings WHERE bb_thread_id = ?`).run(bbThreadId);
       db.prepare(`DELETE FROM pending WHERE bb_thread_id = ?`).run(bbThreadId);
       return removed;
+    },
+
+    watch(watched: Watched): void {
+      db.prepare(
+        `INSERT OR REPLACE INTO watched (slack_key, team_id, channel_id,
+           thread_ts, source_bb_thread_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(
+        watched.slackKey,
+        watched.teamId,
+        watched.channelId,
+        watched.threadTs,
+        watched.sourceBbThreadId,
+        Date.now(),
+      );
+    },
+
+    getWatched(key: string): Watched | null {
+      const row = db
+        .prepare(`SELECT * FROM watched WHERE slack_key = ?`)
+        .get(key) as Parameters<typeof toWatched>[0] | undefined;
+      return row ? toWatched(row) : null;
+    },
+
+    allWatched(): Watched[] {
+      return (
+        db.prepare(`SELECT * FROM watched`).all() as Parameters<
+          typeof toWatched
+        >[0][]
+      ).map(toWatched);
+    },
+
+    unwatch(key: string): void {
+      db.prepare(`DELETE FROM watched WHERE slack_key = ?`).run(key);
+    },
+
+    watchedCount(): number {
+      return (
+        db.prepare(`SELECT COUNT(*) AS n FROM watched`).get() as { n: number }
+      ).n;
     },
 
     addPending(bbThreadId: string, key: string, messageTs: string): void {
