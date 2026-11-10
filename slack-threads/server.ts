@@ -115,6 +115,13 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       description: "Reasoning level for new threads; empty uses the default",
       default: "",
     },
+    permissionMode: {
+      type: "string",
+      label: "Permission mode",
+      description:
+        "Permission mode for new threads: full, auto, or accept-edits; empty uses the default",
+      default: "full",
+    },
     allowedChannelIds: {
       type: "string",
       label: "Allowed channels",
@@ -275,6 +282,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       .trim();
     const title = `${thread.isDM ? `@${author}` : (name ?? channelId)} · ${clip(words || "Slack thread", 60)}`;
 
+    const permissionMode = (["full", "auto", "accept-edits"] as const).find(
+      (mode) => mode === values.permissionMode.trim(),
+    );
     const spawned = await bb.sdk.threads.spawn({
       projectId: values.projectId,
       environment: { type: "project-default" },
@@ -283,12 +293,14 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       ...(values.reasoningLevel
         ? { reasoningLevel: values.reasoningLevel }
         : {}),
+      ...(permissionMode ? { permissionMode } : {}),
       executionInputSources: {
         ...(values.provider ? { providerId: "explicit" as const } : {}),
         ...(values.model ? { model: "explicit" as const } : {}),
         ...(values.reasoningLevel
           ? { reasoningLevel: "explicit" as const }
           : {}),
+        ...(permissionMode ? { permissionMode: "explicit" as const } : {}),
       },
       title,
       prompt,
