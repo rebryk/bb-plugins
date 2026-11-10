@@ -3,6 +3,7 @@ import {
   cliCommand,
   defineCli,
   type BbPluginApi,
+  type PluginCliContext,
   type PluginThreadEventPayloads,
 } from "@get-bb/plugin-sdk";
 import type { Logger, Message, Thread } from "chat";
@@ -12,6 +13,9 @@ import {
   chatThreadId,
   connectSlack,
   describeMessage,
+  extractBlocks,
+  parseBlocks,
+  CHART_FAILED,
   isAuthError,
   isHumanMessage,
   permalink,
@@ -32,7 +36,7 @@ const DONE = "check";
 const FAILED = "x";
 
 const INSTRUCTIONS =
-  "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no tables or HTML). Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
+  "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no Markdown tables or HTML); for a chart or table, add a `slack-blocks` fence as the slack-threads skill describes. Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
 
 const EFFORTS: Record<string, string> = {
   xhigh: "extra high",
@@ -545,7 +549,8 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     bbThreadId: string,
     text: string | null,
     reaction: string | null,
-    footer: () => Promise<string | null> = async () => null,
+    /** The thread whose final reply this is: adds charts and the model. */
+    agentReply: ThreadResponse | null = null,
   ) => {
     const bindings = store.forBbThread(bbThreadId);
     if (bindings.length === 0) return;
@@ -562,15 +567,31 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       bb.log.warn(`Slack is not connected; dropped a reply for ${bbThreadId}`);
       return;
     }
-    const note = text ? await footer() : null;
+    const reply =
+      agentReply && text
+        ? extractBlocks(text)
+        : { text: text ?? "", blocks: [], errors: [] };
+    if (reply.errors.length > 0) {
+      bb.log.warn(
+        `Could not parse slack-blocks from ${bbThreadId}: ${reply.errors.join("; ")}`,
+      );
+    }
+    const footer = agentReply && text ? await modelFooter(agentReply) : null;
     for (const binding of targets) {
       if (text) {
         await postMarkdown(
           current,
           binding.channelId,
           binding.threadTs,
-          text,
-          note,
+          reply.text,
+          {
+            footer,
+            blocks: reply.blocks,
+            onBlocksError: (detail) =>
+              bb.log.warn(
+                `Slack rejected the blocks of a reply from ${bbThreadId}: ${detail}`,
+              ),
+          },
         );
       }
       store.touch(binding.slackKey);
@@ -592,9 +613,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   };
 
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
-    await deliver(thread.id, lastAssistantText?.trim() || null, DONE, () =>
-      modelFooter(thread),
-    );
+    await deliver(thread.id, lastAssistantText?.trim() || null, DONE, thread);
   });
 
   bb.events.on("thread.failed", async ({ thread, error }) => {
@@ -691,6 +710,42 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   // CLI
   // ---------------------------------------------------------------------
 
+  /** Reads a file on the machine that ran the command, not the server's. */
+  const readInvokerFile = async (path: string, ctx: PluginCliContext) => {
+    const absolute = path.startsWith("/")
+      ? path
+      : ctx.cwd
+        ? `${ctx.cwd.replace(/\/$/u, "")}/${path}`
+        : null;
+    if (!absolute) {
+      throw new PluginCliError(`Pass an absolute path for ${path}.`, {
+        code: "invalid_value",
+      });
+    }
+    try {
+      const thread = ctx.threadId
+        ? await bb.sdk.threads.get({ threadId: ctx.threadId })
+        : null;
+      const environment = thread?.environmentId
+        ? await bb.sdk.environments.get({ environmentId: thread.environmentId })
+        : null;
+      const file = await bb.sdk.files.read({
+        path: absolute,
+        ...(environment?.hostId ? { hostId: environment.hostId } : {}),
+      });
+      return file.contentEncoding === "base64"
+        ? Buffer.from(file.content, "base64").toString("utf8")
+        : file.content;
+    } catch (error) {
+      throw new PluginCliError(
+        `Could not read ${absolute}: ${errorMessage(error)}`,
+        {
+          code: "file_not_found",
+        },
+      );
+    }
+  };
+
   const requireConnection = () => {
     if (!connection) {
       throw new PluginCliError("Slack is not connected.", {
@@ -729,10 +784,14 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             },
             text: {
               type: "string",
-              required: true,
               stdin: true,
               description:
                 "Markdown message; --text-stdin reads one line from stdin, so pass multi-line text as the argument",
+            },
+            "blocks-file": {
+              type: "string",
+              description:
+                "JSON file with an array of Block Kit blocks (charts, tables) to post under the text",
             },
             thread: {
               type: "string",
@@ -746,6 +805,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             },
             json: { type: "boolean", description: "Print JSON" },
           },
+          constraints: [
+            { kind: "at-least-one", options: ["text", "blocks-file"] },
+          ],
           async run(input, ctx) {
             const current = requireConnection();
             const bbThreadId = input.options.thread ?? ctx.threadId ?? null;
@@ -776,11 +838,32 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
                 },
               );
             }
+            const message = extractBlocks(input.options.text ?? "");
+            const problems = [...message.errors];
+            const file = input.options["blocks-file"];
+            if (file) {
+              const json = await readInvokerFile(file, ctx);
+              try {
+                message.blocks.push(...parseBlocks(json));
+              } catch (error) {
+                problems.push(`${file}: ${errorMessage(error)}`);
+                if (message.errors.length === 0) {
+                  message.text = `${message.text}\n\n${CHART_FAILED}`.trim();
+                }
+              }
+            }
             const threadTs = await postMarkdown(
               current,
               channelId,
               "",
-              input.options.text,
+              message.text,
+              {
+                blocks: message.blocks,
+                onBlocksError: (detail) => {
+                  problems.push(`Slack rejected the blocks: ${detail}`);
+                  bb.log.warn(`Slack rejected the blocks of a post: ${detail}`);
+                },
+              },
             );
             if (!threadTs) {
               throw new PluginCliError("The text is empty.", {
@@ -822,6 +905,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
               permalink: link,
               bbThreadId,
               bound,
+              problems,
             };
             return {
               exitCode: 0,
@@ -831,7 +915,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
                     bound
                       ? `Replies there continue bb thread ${bbThreadId}.`
                       : "The first reply there starts a new bb thread."
-                  }\n`,
+                  }\n${problems.map((problem) => `Warning: blocks not rendered: ${problem}\n`).join("")}`,
             };
           },
         }),

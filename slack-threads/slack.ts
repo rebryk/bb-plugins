@@ -142,46 +142,143 @@ export function chunkMarkdown(text: string): string[] {
 const isBlank = (text: string) =>
   !text.replace(/[\s\u200b-\u200d\u2060\ufeff]/gu, "");
 
+type PostArgs = Parameters<SlackAdapter["webClient"]["chat"]["postMessage"]>[0];
+type Block = NonNullable<
+  Extract<PostArgs, { blocks?: unknown }>["blocks"]
+>[number];
+
+export const CHART_FAILED = "_(chart could not be rendered)_";
+
+const BLOCKS_FENCE = /```slack-blocks[^\n]*\n([\s\S]*?)```/gu;
+
+/** Parses a JSON array of Block Kit blocks, or one block; throws if invalid. */
+export function parseBlocks(json: string): Block[] {
+  const parsed: unknown = JSON.parse(json);
+  const list = Array.isArray(parsed) ? parsed : [parsed];
+  for (const block of list) {
+    if (typeof (block as { type?: unknown } | null)?.type !== "string") {
+      throw new Error("every block needs a string `type`");
+    }
+  }
+  return list as Block[];
+}
+
+/**
+ * Takes the ```slack-blocks fences (a JSON array of Block Kit blocks, or one
+ * block) out of Markdown. A fence that is not valid JSON blocks is dropped,
+ * noted in the text, and reported in `errors`.
+ */
+export function extractBlocks(markdown: string): {
+  text: string;
+  blocks: Block[];
+  errors: string[];
+} {
+  const blocks: Block[] = [];
+  const errors: string[] = [];
+  const text = markdown
+    .replace(BLOCKS_FENCE, (_fence, json: string) => {
+      try {
+        blocks.push(...parseBlocks(json));
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
+      return "";
+    })
+    .trim();
+  return {
+    text: errors.length > 0 ? `${text}\n\n${CHART_FAILED}`.trim() : text,
+    blocks,
+    errors,
+  };
+}
+
+/** Slack's own account of a rejected call, safe to log. */
+export function describeSlackError(error: unknown): string | null {
+  const data = (error as { data?: Record<string, unknown> } | null)?.data;
+  if (typeof data?.error !== "string") return null;
+  const metadata = data.response_metadata as { messages?: unknown } | undefined;
+  return JSON.stringify({
+    error: data.error,
+    ...(data.errors ? { errors: data.errors } : {}),
+    ...(metadata?.messages ? { messages: metadata.messages } : {}),
+  });
+}
+
 /**
  * Posts Markdown into a Slack thread through the Web API, one message per
- * chunk, with an optional muted `footer` under the last one. An empty
- * `threadTs` posts at the top level and threads the rest under the first
- * message. Returns the first message's ts, or null when nothing was posted.
+ * chunk. The last message also carries `blocks` (charts, tables) and a muted
+ * `footer`; when Slack rejects the blocks, it is posted again without them,
+ * with a note, and `onBlocksError` gets Slack's error. An empty `threadTs`
+ * posts at the top level and threads the rest under the first message.
+ * Returns the first message's ts, or null when nothing was posted.
  */
 export async function postMarkdown(
   connection: SlackConnection,
   channelId: string,
   threadTs: string,
   text: string,
-  footer: string | null = null,
+  options: {
+    footer?: string | null;
+    blocks?: Block[];
+    onBlocksError?: (detail: string) => void;
+  } = {},
 ): Promise<string | null> {
+  const extra = options.blocks ?? [];
   const chunks = chunkMarkdown(text).filter((chunk) => !isBlank(chunk));
-  let first: string | null = null;
-  for (const [index, chunk] of chunks.entries()) {
-    const last = index === chunks.length - 1;
-    const parent = threadTs || first;
-    const result = await connection.slack.webClient.chat.postMessage({
+  if (chunks.length === 0 && extra.length === 0) return null;
+  const footer: Block[] = options.footer
+    ? [
+        {
+          type: "context",
+          elements: [{ type: "mrkdwn", text: options.footer }],
+        },
+      ]
+    : [];
+  const send = (parent: string | null, chunk: string, blocks: Block[]) =>
+    connection.slack.webClient.chat.postMessage({
       channel: channelId,
       ...(parent ? { thread_ts: parent } : {}),
-      text: chunk,
+      text: chunk || fallbackText(extra),
       blocks: [
-        { type: "markdown", text: chunk },
-        ...(last && footer
-          ? [
-              {
-                type: "context" as const,
-                elements: [{ type: "mrkdwn" as const, text: footer }],
-              },
-            ]
-          : []),
+        ...(chunk ? [{ type: "markdown" as const, text: chunk }] : []),
+        ...blocks,
       ],
       unfurl_links: false,
       unfurl_media: false,
     });
+
+  let first: string | null = null;
+  const count = Math.max(chunks.length, 1);
+  for (let index = 0; index < count; index += 1) {
+    const chunk = chunks[index] ?? "";
+    const last = index === count - 1;
+    const parent = threadTs || first;
+    let result;
+    try {
+      result = await send(parent, chunk, last ? [...extra, ...footer] : []);
+    } catch (error) {
+      const detail = describeSlackError(error);
+      if (!last || extra.length === 0 || !detail) throw error;
+      options.onBlocksError?.(detail);
+      result = await send(parent, `${chunk}\n\n${CHART_FAILED}`.trim(), footer);
+    }
     first ??= result.ts ?? null;
   }
   return first;
 }
+
+/** Notification text for a message that is only blocks. */
+const fallbackText = (blocks: Block[]) =>
+  blocks
+    .map((block) => {
+      const { title, caption } = block as {
+        title?: unknown;
+        caption?: unknown;
+      };
+      return typeof title === "string" ? title : caption;
+    })
+    .filter((label): label is string => typeof label === "string")
+    .join(", ") || "Chart";
 
 export const authorName = (message: Message) =>
   message.author.isMe

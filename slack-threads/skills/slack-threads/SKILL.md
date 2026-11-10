@@ -17,10 +17,65 @@ that Slack thread, mention or not, arrive in the same bb thread as
   automatically. Do not post it yourself, and do not call
   `bb slack-threads post` to answer.
 - Keep replies short. Slack renders standard Markdown (bold, lists, links,
-  code); avoid tables and HTML.
+  code); avoid Markdown tables and HTML, and use `slack-blocks` (below) for
+  tables and charts.
 - A question you ask through the question or approval tools is posted to Slack
   too, and the next Slack reply answers it.
 - Several people may write in one Slack thread; each message names its author.
+
+## Charts and tables
+
+When someone in Slack asks for a chart, a trend or a breakdown, or for a table,
+answer with native Slack blocks: put a fenced code block with the language
+`slack-blocks` in your final reply, holding a JSON array of Block Kit blocks
+(or one block). The plugin takes it out of the text, posts the rest of your
+reply above it, and keeps the model line last. Several fences are joined.
+Invalid JSON or blocks Slack rejects are dropped with the note "(chart could
+not be rendered)", so check the rules below.
+
+- `data_visualization`: `line` for time series, `bar` for comparisons, `area`
+  for stacked totals, `pie` for shares (`segments`, 1–12, each value > 0).
+  At most 2 charts per reply.
+- `data_table`: tables; the first row is the header (`raw_text` only), every
+  row has the same number of cells, at most 20 columns and 200 rows. Use
+  `raw_number` with a formatted `text` for numbers so columns sort
+  numerically. `caption` is required.
+- Rules Slack enforces: every series has one point for each entry of
+  `axis_config.categories`, with `label` exactly matching it; at most 20
+  categories and 12 series; series names unique; labels, categories and
+  series names ≤ 20 characters; `title` and axis labels ≤ 50 characters.
+
+````markdown
+```slack-blocks
+[
+  {
+    "type": "data_visualization",
+    "title": "Weekly signups",
+    "chart": {
+      "type": "line",
+      "series": [
+        { "name": "Signups", "data": [
+          { "label": "W1", "value": 120 },
+          { "label": "W2", "value": 145 },
+          { "label": "W3", "value": 160 }
+        ] }
+      ],
+      "axis_config": { "categories": ["W1", "W2", "W3"], "y_label": "Users" }
+    }
+  },
+  {
+    "type": "data_table",
+    "caption": "Revenue by plan",
+    "rows": [
+      [ { "type": "raw_text", "text": "Plan" },
+        { "type": "raw_text", "text": "Revenue" } ],
+      [ { "type": "raw_text", "text": "Pro" },
+        { "type": "raw_number", "value": 12500, "text": "$12,500" } ]
+    ]
+  }
+]
+```
+````
 
 ## Posting to Slack from bb
 
@@ -43,6 +98,9 @@ target.
 
 `--text` takes Markdown; pass multi-line text as the argument
 (`--text "$(cat report.md)"`). `--text-stdin` reads a single line only.
+`--blocks-file <path>` adds a JSON array of blocks (charts, tables) under the
+text, with the same rules as a `slack-blocks` fence, which `--text` may also
+contain.
 
 ## Other commands
 
