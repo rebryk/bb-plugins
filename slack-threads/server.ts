@@ -28,6 +28,7 @@ import {
   type SlackConnection,
 } from "./slack";
 import { openStore, slackKey, type Binding } from "./store";
+import { describeUsage, poolStatusSchema, type PoolStatus } from "./usage";
 
 type ThreadResponse = PluginThreadEventPayloads["thread.idle"]["thread"];
 
@@ -37,6 +38,8 @@ const FAILED = "x";
 
 const INSTRUCTIONS =
   "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no Markdown tables or HTML); for a chart or table, add a `slack-blocks` fence as the slack-threads skill describes. Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
+
+const USAGE_TTL_MS = 60_000;
 
 const MENTION_ONLY =
   "Messages arrive only when someone mentions you; earlier messages since your last turn are included as context.";
@@ -590,7 +593,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
 
   const labels = new Map<string, string>();
   /** "Opus 5.5 · extra high" for the model and reasoning the thread runs. */
-  const modelFooter = async (thread: ThreadResponse) => {
+  const modelLabel = async (thread: ThreadResponse) => {
     try {
       const options = await bb.sdk.threads.defaultExecutionOptions({
         threadId: thread.id,
@@ -629,6 +632,32 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       );
       return null;
     }
+  };
+
+  let pool: { status: PoolStatus | null; readAt: number } | null = null;
+  /** The Account Pooler's status, at most a minute old; null without it. */
+  const poolStatus = async () => {
+    if (pool && Date.now() - pool.readAt < USAGE_TTL_MS) return pool.status;
+    const status = await bb.sdk.plugins
+      .callRpc({
+        pluginId: "account-pool",
+        method: "status.get",
+        input: null,
+        outputSchema: poolStatusSchema,
+      })
+      .catch(() => null);
+    pool = { status, readAt: Date.now() };
+    return status;
+  };
+
+  /** The model line, then the serving account's usage when the pool has it. */
+  const modelFooter = async (thread: ThreadResponse) => {
+    const [model, status] = await Promise.all([
+      modelLabel(thread),
+      poolStatus(),
+    ]);
+    const usage = status ? describeUsage(status, thread.providerId) : null;
+    return [model, usage].filter(Boolean).join(" · ") || null;
   };
 
   /**
