@@ -138,19 +138,47 @@ export function chunkMarkdown(text: string): string[] {
   return chunks;
 }
 
-/** Posts Markdown into a Slack thread; returns the first message's ts. */
+/** True when the text has nothing Slack would show. */
+const isBlank = (text: string) =>
+  !text.replace(/[\s\u200b-\u200d\u2060\ufeff]/gu, "");
+
+/**
+ * Posts Markdown into a Slack thread through the Web API, one message per
+ * chunk, with an optional muted `footer` under the last one. An empty
+ * `threadTs` posts at the top level and threads the rest under the first
+ * message. Returns the first message's ts, or null when nothing was posted.
+ */
 export async function postMarkdown(
   connection: SlackConnection,
   channelId: string,
   threadTs: string,
   text: string,
+  footer: string | null = null,
 ): Promise<string | null> {
+  const chunks = chunkMarkdown(text).filter((chunk) => !isBlank(chunk));
   let first: string | null = null;
-  for (const chunk of chunkMarkdown(text)) {
-    const sent = await connection.bot
-      .thread(chatThreadId(channelId, threadTs))
-      .post({ markdown: chunk });
-    first ??= sent.id;
+  for (const [index, chunk] of chunks.entries()) {
+    const last = index === chunks.length - 1;
+    const parent = threadTs || first;
+    const result = await connection.slack.webClient.chat.postMessage({
+      channel: channelId,
+      ...(parent ? { thread_ts: parent } : {}),
+      text: chunk,
+      blocks: [
+        { type: "markdown", text: chunk },
+        ...(last && footer
+          ? [
+              {
+                type: "context" as const,
+                elements: [{ type: "mrkdwn" as const, text: footer }],
+              },
+            ]
+          : []),
+      ],
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    first ??= result.ts ?? null;
   }
   return first;
 }
@@ -173,9 +201,9 @@ export function describeMessage(message: Message): string {
   return `${authorName(message)}: ${clip(message.text.trim(), HISTORY_MESSAGE_CHARS)}${files}`;
 }
 
-/** The latest messages of a Slack thread, oldest first; empty for a DM. */
+/** The latest messages of a Slack thread, oldest first. */
 export async function threadHistory(thread: Thread): Promise<Message[]> {
-  if (thread.isDM) return [];
+  if (!thread.id.split(":")[2]) return [];
   const result = await thread.adapter.fetchMessages(thread.id, {
     limit: HISTORY_MESSAGES,
   });
@@ -248,4 +276,30 @@ export async function react(
       .addReaction(threadId, messageTs, add)
       .catch(() => {});
   }
+}
+
+/** Subtypes people post; joins, bot posts and Slack's own messages are not. */
+const HUMAN_SUBTYPES = new Set([
+  "file_share",
+  "thread_broadcast",
+  "me_message",
+]);
+
+/** True for a message a person wrote that has something to forward. */
+export function isHumanMessage(message: Message): boolean {
+  const raw = message.raw as { subtype?: string; bot_id?: string } | null;
+  if (message.author.isMe || message.author.isBot === true) return false;
+  if (message.author.isSystem || raw?.bot_id) return false;
+  if (raw?.subtype && !HUMAN_SUBTYPES.has(raw.subtype)) return false;
+  return !isBlank(message.text) || message.attachments.length > 0;
+}
+
+/**
+ * The ts of the Slack thread a message belongs to. A top-level direct
+ * message starts its own thread, like a top-level channel message.
+ */
+export function rootTs(thread: Thread, message: Message): string {
+  const threadTs = thread.id.split(":")[2] ?? "";
+  const raw = message.raw as { thread_ts?: string } | null;
+  return threadTs || raw?.thread_ts || message.id;
 }

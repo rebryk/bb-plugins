@@ -77,6 +77,11 @@ export function openStore(bb: BbPluginApi) {
       PRIMARY KEY (slack_key, message_ts)
     )`,
     `CREATE INDEX IF NOT EXISTS pending_bb_thread ON pending (bb_thread_id)`,
+    // A DM conversation was once one binding with an empty thread ts; every
+    // Slack thread, DMs included, is its own bb thread now.
+    `DELETE FROM pending WHERE slack_key IN
+      (SELECT slack_key FROM bindings WHERE thread_ts = '')`,
+    `DELETE FROM bindings WHERE thread_ts = ''`,
   ]);
 
   return {

@@ -5,8 +5,9 @@ description: "Work in a bb thread that is bound to a Slack thread, or start a Sl
 
 # Slack Threads
 
-The Slack Threads plugin binds Slack threads to bb threads. Mentioning the bot
-in Slack (or sending it a direct message) starts a bb thread; later messages in
+The Slack Threads plugin binds each Slack thread to one bb thread. Mentioning
+the bot in Slack, or sending it a top-level direct message, starts a bb thread
+and the bot answers in a Slack thread under that message; later messages in
 that Slack thread, mention or not, arrive in the same bb thread as
 `Slack reply from <name>: <text>`.
 

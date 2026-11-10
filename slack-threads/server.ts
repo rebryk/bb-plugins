@@ -3,25 +3,29 @@ import {
   cliCommand,
   defineCli,
   type BbPluginApi,
+  type PluginThreadEventPayloads,
 } from "@get-bb/plugin-sdk";
 import type { Logger, Message, Thread } from "chat";
 import { answerFromText, describeInteraction } from "./interactions";
 import {
   channelName,
   chatThreadId,
-  chunkMarkdown,
   connectSlack,
   describeMessage,
   isAuthError,
+  isHumanMessage,
   permalink,
   postMarkdown,
   react,
   resolveChannel,
+  rootTs,
   threadHistory,
   authorName,
   type SlackConnection,
 } from "./slack";
 import { openStore, slackKey, type Binding } from "./store";
+
+type ThreadResponse = PluginThreadEventPayloads["thread.idle"]["thread"];
 
 const EYES = "eyes";
 const DONE = "check";
@@ -29,6 +33,24 @@ const FAILED = "x";
 
 const INSTRUCTIONS =
   "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no tables or HTML). Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
+
+const EFFORTS: Record<string, string> = {
+  xhigh: "extra high",
+  max: "max",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  minimal: "minimal",
+  none: "no reasoning",
+};
+
+/** `claude-opus-5-5` → `Opus 5.5`; other ids stay as they are. */
+const modelName = (id: string) => {
+  const match = /^claude-([a-z]+)-(\d+)(?:-(\d+))?(?:$|-)/u.exec(id);
+  if (!match) return id;
+  const [, family = "", major, minor] = match;
+  return `${family.charAt(0).toUpperCase()}${family.slice(1)} ${major}${minor ? `.${minor}` : ""}`;
+};
 
 const needsConfiguration = (message: string) =>
   Object.assign(new Error(message), { name: "NeedsConfigurationError" });
@@ -201,7 +223,10 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     const last = messages[messages.length - 1];
     if (!last) return;
     if (!values.projectId) {
-      await thread.post(
+      await postMarkdown(
+        current,
+        channelId,
+        threadTs,
         "bb is not set up yet: pick a project for Slack Threads.",
       );
       await unmark(current, channelId, messages);
@@ -307,7 +332,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         messages.map((message) => message.text).join("\n"),
       );
       if (answer && "hint" in answer) {
-        await thread.post(answer.hint);
+        await postMarkdown(
+          current,
+          binding.channelId,
+          binding.threadTs,
+          answer.hint,
+        );
         await unmark(current, binding.channelId, messages);
         return;
       }
@@ -347,40 +377,48 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     batch: Message[],
     kind: "mention" | "subscribed" | "direct",
   ) => {
-    const messages: Message[] = [];
+    // One Slack thread is one bb thread: split a batch of top-level DMs.
+    const groups = new Map<string, Message[]>();
     for (const message of batch) {
-      if (message.author.isMe || message.author.isBot === true) continue;
-      if (message.author.isSystem) continue;
-      if (await isAllowed(thread, message)) messages.push(message);
+      if (!isHumanMessage(message) || !(await isAllowed(thread, message))) {
+        continue;
+      }
+      const ts = rootTs(thread, message);
+      groups.set(ts, [...(groups.get(ts) ?? []), message]);
     }
-    if (messages.length === 0) return;
     const { channelId, threadTs } = splitChatThreadId(thread.id);
-    const binding = store.get(
-      slackKey(current.identity.teamId, channelId, threadTs),
-    );
-    if (
-      !binding &&
-      kind === "subscribed" &&
-      !messages.some((m) => m.isMention)
-    ) {
-      await thread.unsubscribe();
-      return;
-    }
-    try {
-      for (const message of messages) {
-        await react(current, channelId, message.id, EYES);
-      }
-      if (binding) {
-        await continueThread(current, thread, binding, messages);
-      } else {
-        await startThread(current, thread, messages);
-      }
-    } catch (error) {
-      bb.log.error(
-        `Could not hand a Slack message to bb: ${errorMessage(error)}`,
+    for (const [ts, messages] of groups) {
+      const target =
+        ts === threadTs
+          ? thread
+          : current.bot.thread(chatThreadId(channelId, ts));
+      const binding = store.get(
+        slackKey(current.identity.teamId, channelId, ts),
       );
-      for (const message of messages) {
-        await react(current, channelId, message.id, FAILED, EYES);
+      if (
+        !binding &&
+        kind === "subscribed" &&
+        !messages.some((m) => m.isMention)
+      ) {
+        await thread.unsubscribe();
+        continue;
+      }
+      try {
+        for (const message of messages) {
+          await react(current, channelId, message.id, EYES);
+        }
+        if (binding) {
+          await continueThread(current, target, binding, messages);
+        } else {
+          await startThread(current, target, messages);
+        }
+      } catch (error) {
+        bb.log.error(
+          `Could not hand a Slack message to bb: ${errorMessage(error)}`,
+        );
+        for (const message of messages) {
+          await react(current, channelId, message.id, FAILED, EYES);
+        }
       }
     }
   };
@@ -388,6 +426,49 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   // ---------------------------------------------------------------------
   // bb → Slack
   // ---------------------------------------------------------------------
+
+  const labels = new Map<string, string>();
+  /** "Opus 5.5 · extra high" for the model and reasoning the thread runs. */
+  const modelFooter = async (thread: ThreadResponse) => {
+    try {
+      const options = await bb.sdk.threads.defaultExecutionOptions({
+        threadId: thread.id,
+      });
+      if (!options?.model) return null;
+      const key = `${thread.providerId}:${options.model}:${options.reasoningLevel}`;
+      const cached = labels.get(key);
+      if (cached) return cached;
+      const catalog = await bb.sdk.providers
+        .models({
+          providerId: thread.providerId,
+          projectId: thread.projectId,
+          preferCached: true,
+        })
+        .catch(() => null);
+      const model = catalog?.models.find(
+        (entry) => entry.model === options.model || entry.id === options.model,
+      );
+      const effort = model?.supportedReasoningEfforts.find(
+        (entry) => entry.reasoningEffort === options.reasoningLevel,
+      );
+      const label = [
+        model?.displayName || modelName(options.model),
+        options.reasoningLevel &&
+          (effort?.label?.toLowerCase() ||
+            EFFORTS[options.reasoningLevel] ||
+            options.reasoningLevel),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      labels.set(key, label);
+      return label;
+    } catch (error) {
+      bb.log.warn(
+        `Could not read the model of ${thread.id}: ${errorMessage(error)}`,
+      );
+      return null;
+    }
+  };
 
   /**
    * Posts to the Slack threads a bb thread answers: those with messages
@@ -399,6 +480,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     bbThreadId: string,
     text: string | null,
     reaction: string | null,
+    footer: () => Promise<string | null> = async () => null,
   ) => {
     const bindings = store.forBbThread(bbThreadId);
     if (bindings.length === 0) return;
@@ -415,9 +497,16 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       bb.log.warn(`Slack is not connected; dropped a reply for ${bbThreadId}`);
       return;
     }
+    const note = text ? await footer() : null;
     for (const binding of targets) {
       if (text) {
-        await postMarkdown(current, binding.channelId, binding.threadTs, text);
+        await postMarkdown(
+          current,
+          binding.channelId,
+          binding.threadTs,
+          text,
+          note,
+        );
       }
       store.touch(binding.slackKey);
     }
@@ -438,7 +527,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   };
 
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
-    await deliver(thread.id, lastAssistantText?.trim() || null, DONE);
+    await deliver(thread.id, lastAssistantText?.trim() || null, DONE, () =>
+      modelFooter(thread),
+    );
   });
 
   bb.events.on("thread.failed", async ({ thread, error }) => {
@@ -618,18 +709,16 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
                 },
               );
             }
-            const [head, ...tail] = chunkMarkdown(input.options.text);
-            if (!head) {
+            const threadTs = await postMarkdown(
+              current,
+              channelId,
+              "",
+              input.options.text,
+            );
+            if (!threadTs) {
               throw new PluginCliError("The text is empty.", {
                 code: "empty_text",
               });
-            }
-            const sent = await current.bot
-              .channel(`slack:${channelId}`)
-              .post({ markdown: head });
-            const threadTs = sent.id;
-            for (const chunk of tail) {
-              await postMarkdown(current, channelId, threadTs, chunk);
             }
             const link = await permalink(current, channelId, threadTs);
             const key = slackKey(current.identity.teamId, channelId, threadTs);
