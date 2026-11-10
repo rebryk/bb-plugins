@@ -7,9 +7,15 @@ description: "Work in a bb thread that is bound to a Slack thread, or post a Sla
 
 The Slack Threads plugin binds each Slack thread to one bb thread. Mentioning
 the bot in Slack, or sending it a top-level direct message, starts a bb thread
-and the bot answers in a Slack thread under that message; later messages in
-that Slack thread, mention or not, arrive in the same bb thread as
-`Slack reply from <name>: <text>`.
+with the Slack thread's history, and the bot answers in a Slack thread under
+that message.
+
+- In channels and group DMs people talk among themselves: a message reaches
+  you only when it mentions the bot. It arrives as "Answer this Slack
+  message", after the messages posted since your last turn, oldest first, as
+  context. Messages without a mention never start a turn.
+- In a one-to-one DM every message is for you and arrives as
+  `Slack reply from <name>: <text>`.
 
 ## When your thread came from Slack
 
@@ -20,7 +26,7 @@ that Slack thread, mention or not, arrive in the same bb thread as
   code); avoid Markdown tables and HTML, and use `slack-blocks` (below) for
   tables and charts.
 - A question you ask through the question or approval tools is posted to Slack
-  too, and the next Slack reply answers it.
+  too, and the next Slack reply in that thread answers it, mention or not.
 - Several people may write in one Slack thread; each message names its author.
 
 ## Charts and tables
@@ -86,13 +92,13 @@ bb slack-threads post --channel '#team' --text 'Daily report: …'
 This posts a new top-level message (the bot must be in the channel) and
 returns; it does not tie the Slack thread to your bb thread, so one thread or
 automation can post as many separate messages as it needs. The first reply
-anyone writes under the post (no mention needed) starts a new bb thread with
-the Slack thread's history and a pointer back to your thread, and that Slack
+under the post that mentions the bot starts a new bb thread with the Slack
+thread's history and a pointer back to your thread, and that Slack
 thread belongs to the new bb thread from then on.
 
 Pass `--bind` only when replies must come back to the posting thread itself:
-then replies there continue it, and your reply to each of them goes back to
-Slack (your own turn that ran `post` does not post its final text).
+then replies there that mention the bot continue it, and your reply to each
+of them goes back to Slack (your own turn that ran `post` does not post its final text).
 `--thread <bbThreadId>` names another bb thread as the source or the binding
 target.
 

@@ -38,6 +38,9 @@ const FAILED = "x";
 const INSTRUCTIONS =
   "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no Markdown tables or HTML); for a chart or table, add a `slack-blocks` fence as the slack-threads skill describes. Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
 
+const MENTION_ONLY =
+  "Messages arrive only when someone mentions you; earlier messages since your last turn are included as context.";
+
 const EFFORTS: Record<string, string> = {
   xhigh: "extra high",
   max: "max",
@@ -214,6 +217,20 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     store.touch(binding.slackKey);
   };
 
+  /** The text without the bot's own mention. */
+  const withoutMentions = (current: SlackConnection, text: string) => {
+    const name = current.identity.botName.replace(
+      /[.*+?^${}()|[\]\\]/gu,
+      "\\$&",
+    );
+    return text
+      .replace(
+        new RegExp(`<@${current.identity.botUserId}>|@${name}\\b`, "giu"),
+        "",
+      )
+      .trim();
+  };
+
   const unmark = async (
     current: SlackConnection,
     channelId: string,
@@ -268,16 +285,11 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           ]
         : []),
       ...(note ? [note] : []),
-      INSTRUCTIONS,
+      thread.isDM ? INSTRUCTIONS : `${INSTRUCTIONS} ${MENTION_ONLY}`,
     ].join("\n\n");
 
-    const botName = current.identity.botName.replace(
-      /[.*+?^${}()|[\]\\]/gu,
-      "\\$&",
-    );
-    const words = last.text
+    const words = withoutMentions(current, last.text)
       .replace(/<@[A-Z0-9]+>/gu, "")
-      .replace(new RegExp(`@${botName}\\b`, "giu"), "")
       .replace(/\s+/gu, " ")
       .trim();
     const title = `${thread.isDM ? `@${author}` : (name ?? channelId)} · ${clip(words || "Slack thread", 60)}`;
@@ -323,21 +335,27 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       channelName: name,
       permalink: link,
       origin: "slack",
+      cursor: last.id,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     store.save(binding);
+    store.setCursor(binding.slackKey, last.id);
     await thread.subscribe();
     markPending(binding, messages);
     bb.log.info(`Started bb thread ${spawned.id} for ${binding.slackKey}`);
   };
 
-  const continueThread = async (
+  /**
+   * Answers the bb thread's pending question or approval from a Slack reply.
+   * A reply that does not parse gets a hint, unless `quiet`.
+   */
+  const answerInteraction = async (
     current: SlackConnection,
-    thread: Thread,
     binding: Binding,
-    messages: Message[],
-  ) => {
+    text: string,
+    quiet: boolean,
+  ): Promise<"answered" | "hint" | "none"> => {
     // An archived or deleted thread is handled where the send fails.
     const interactions = await bb.sdk.threads.interactions
       .list({ threadId: binding.bbThreadId })
@@ -345,35 +363,89 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     const waiting = interactions
       .filter((interaction) => interaction.status === "pending")
       .sort((a, b) => a.createdAt - b.createdAt)[0];
-    if (waiting) {
-      const answer = answerFromText(
-        waiting,
-        messages.map((message) => message.text).join("\n"),
+    const answer = waiting ? answerFromText(waiting, text) : null;
+    if (!waiting || !answer) return "none";
+    if ("hint" in answer) {
+      if (quiet) return "none";
+      await postMarkdown(
+        current,
+        binding.channelId,
+        binding.threadTs,
+        answer.hint,
       );
-      if (answer && "hint" in answer) {
-        await postMarkdown(
-          current,
-          binding.channelId,
-          binding.threadTs,
-          answer.hint,
-        );
-        await unmark(current, binding.channelId, messages);
-        return;
-      }
-      if (answer) {
-        await bb.sdk.threads.interactions.resolve({
-          threadId: binding.bbThreadId,
-          interactionId: waiting.id,
-          resolution: answer.resolution,
-        });
-        markPending(binding, messages);
-        return;
-      }
+      return "hint";
+    }
+    await bb.sdk.threads.interactions.resolve({
+      threadId: binding.bbThreadId,
+      interactionId: waiting.id,
+      resolution: answer.resolution,
+    });
+    return "answered";
+  };
+
+  /** Human messages after the binding's cursor and before `until`. */
+  const messagesSince = async (
+    thread: Thread,
+    binding: Binding,
+    until: Message,
+  ) => {
+    const history = await threadHistory(thread).catch(() => []);
+    // Bindings older than the cursor start after the bot's last reply.
+    const after =
+      binding.cursor ??
+      history
+        .filter((message) => message.author.isMe)
+        .map((message) => message.id)
+        .sort()
+        .pop() ??
+      "";
+    return history.filter(
+      (message) =>
+        message.id > after && message.id < until.id && isHumanMessage(message),
+    );
+  };
+
+  /**
+   * Hands Slack messages to a bound bb thread. In a DM every message is for
+   * the bot; in a channel `answerTo` is the mention, and the messages posted
+   * since the last turn come with it as context.
+   */
+  const continueThread = async (
+    current: SlackConnection,
+    thread: Thread,
+    binding: Binding,
+    messages: Message[],
+    answerTo: Message,
+  ) => {
+    const direct = thread.isDM;
+    const forwarded = direct ? messages : [answerTo];
+    const reply = direct
+      ? messages.map((message) => message.text).join("\n")
+      : withoutMentions(current, answerTo.text);
+    const answered = await answerInteraction(current, binding, reply, false);
+    if (answered === "hint") {
+      await unmark(current, binding.channelId, forwarded);
+      return;
+    }
+    if (answered === "answered") {
+      markPending(binding, forwarded);
+      store.setCursor(binding.slackKey, answerTo.id);
+      return;
     }
 
-    const text = messages
-      .map((message) => `Slack reply from ${describeMessage(message)}`)
-      .join("\n\n");
+    const since = direct ? [] : await messagesSince(thread, binding, answerTo);
+    const text = direct
+      ? messages
+          .map((message) => `Slack reply from ${describeMessage(message)}`)
+          .join("\n\n")
+      : [
+          ...(since.length > 0
+            ? [
+                `Slack messages since your last turn, oldest first:\n${since.map(describeMessage).join("\n")}`,
+              ]
+            : []),
+          `Answer this Slack message:\n${describeMessage(answerTo)}`,
+        ].join("\n\n");
     const send = () =>
       bb.sdk.threads.send({
         threadId: binding.bbThreadId,
@@ -389,13 +461,14 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         await startThread(
           current,
           thread,
-          messages,
+          forwarded,
           `This Slack thread used to continue bb thread ${binding.bbThreadId}, which is no longer available; you take it over.`,
         );
         return;
       }
     }
-    markPending(binding, messages);
+    markPending(binding, forwarded);
+    store.setCursor(binding.slackKey, answerTo.id);
   };
 
   /**
@@ -429,6 +502,11 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
   };
 
+  /**
+   * In a one-to-one DM every message is for the bot. In channels and group
+   * DMs only a mention starts or continues a turn; other messages there only
+   * answer a pending question or approval.
+   */
   const onInbound = async (
     current: SlackConnection,
     thread: Thread,
@@ -453,27 +531,41 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       const key = slackKey(current.identity.teamId, channelId, ts);
       const binding = store.get(key);
       const watched = binding ? null : store.getWatched(key);
-      if (
-        !binding &&
-        !watched &&
-        kind === "subscribed" &&
-        !messages.some((m) => m.isMention)
-      ) {
-        await thread.unsubscribe();
-        continue;
-      }
+      const last = messages[messages.length - 1];
+      const answerTo = target.isDM
+        ? last
+        : [...messages].reverse().find((message) => message.isMention);
+      let marked: Message[] = [];
       try {
-        for (const message of messages) {
+        if (!answerTo) {
+          // Unaddressed chatter: it may still answer a pending question.
+          if (
+            binding &&
+            last &&
+            (await answerInteraction(current, binding, last.text, true)) ===
+              "answered"
+          ) {
+            marked = [last];
+            await react(current, channelId, last.id, EYES);
+            markPending(binding, marked);
+            store.setCursor(key, last.id);
+          } else if (!binding && !watched && kind === "subscribed") {
+            await thread.unsubscribe();
+          }
+          continue;
+        }
+        marked = target.isDM ? messages : [answerTo];
+        for (const message of marked) {
           await react(current, channelId, message.id, EYES);
         }
         if (binding) {
-          await continueThread(current, target, binding, messages);
+          await continueThread(current, target, binding, messages, answerTo);
         } else {
           const source = watched?.sourceBbThreadId;
           await startThread(
             current,
             target,
-            messages,
+            marked,
             source
               ? `This post came from bb thread ${source}; read it with \`bb thread messages ${source}\` if you need its context.`
               : null,
@@ -485,7 +577,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         bb.log.error(
           `Could not hand a Slack message to bb: ${errorMessage(error)}`,
         );
-        for (const message of messages) {
+        for (const message of marked) {
           await react(current, channelId, message.id, FAILED, EYES);
         }
       }
@@ -921,8 +1013,8 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
                 ? `${JSON.stringify(result)}\n`
                 : `Posted ${link ?? `${channelId}/${threadTs}`}\n${
                     bound
-                      ? `Replies there continue bb thread ${bbThreadId}.`
-                      : "The first reply there starts a new bb thread."
+                      ? `Replies there that mention the bot continue bb thread ${bbThreadId}.`
+                      : "The first reply there that mentions the bot starts a new bb thread."
                   }\n${problems.map((problem) => `Warning: blocks not rendered: ${problem}\n`).join("")}`,
             };
           },

@@ -12,6 +12,8 @@ export interface Binding {
   permalink: string | null;
   /** `slack` when a Slack message started it, `cli` for `bb slack-threads post`. */
   origin: "slack" | "cli";
+  /** ts of the last Slack message handed to the bb thread. */
+  cursor: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -44,6 +46,7 @@ interface BindingRow {
   channel_name: string | null;
   permalink: string | null;
   origin: "slack" | "cli";
+  cursor: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -60,6 +63,7 @@ const toBinding = (row: BindingRow): Binding => ({
   channelName: row.channel_name,
   permalink: row.permalink,
   origin: row.origin,
+  cursor: row.cursor,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -103,6 +107,7 @@ export function openStore(bb: BbPluginApi) {
       source_bb_thread_id TEXT,
       created_at INTEGER NOT NULL
     )`,
+    `ALTER TABLE bindings ADD COLUMN cursor TEXT`,
   ]);
 
   const toWatched = (row: {
@@ -158,7 +163,7 @@ export function openStore(bb: BbPluginApi) {
       ).n;
     },
 
-    save(binding: Omit<Binding, "createdAt" | "updatedAt">): void {
+    save(binding: Omit<Binding, "cursor" | "createdAt" | "updatedAt">): void {
       const now = Date.now();
       db.prepare(
         `INSERT INTO bindings (slack_key, bb_thread_id, team_id, channel_id,
@@ -181,6 +186,13 @@ export function openStore(bb: BbPluginApi) {
         binding.origin,
         now,
         now,
+      );
+    },
+
+    setCursor(key: string, ts: string): void {
+      db.prepare(`UPDATE bindings SET cursor = ? WHERE slack_key = ?`).run(
+        ts,
+        key,
       );
     },
 
