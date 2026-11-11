@@ -7,7 +7,8 @@ description: "Work in a bb thread that is bound to a Slack thread, or post a Sla
 
 The Slack Threads plugin binds each Slack thread to one bb thread, its
 coordinator. Mentioning the bot in Slack, or sending it a top-level direct
-message, starts a coordinator with the Slack thread's history on a fast model.
+message, starts a coordinator with the Slack thread's history, on low
+reasoning so it answers within seconds.
 The coordinator answers quick questions itself and hands heavier work to worker
 bb threads; each worker shows a live status in Slack, and the coordinator posts
 its result.
@@ -25,8 +26,9 @@ its result.
 - Your final reply of each turn is posted to the Slack thread automatically.
   Do not post it yourself, and do not call `bb slack-threads post` to answer.
 - `slack_delegate` starts a worker, or with `workerThreadId` sends a follow-up
-  or an answer to one. Its status shows in Slack under your reply, and its
-  result arrives as a message when its turn ends.
+  to one. Its status shows in Slack under your reply, and its result arrives
+  as a message when its turn ends. A worker's question or approval is posted
+  to Slack by the plugin, and the next Slack reply answers it.
 - A question you ask through the question or approval tools is posted to Slack
   too, and the next Slack reply in that thread answers it, mention or not.
 - `slack_channel_settings` reads or changes the channel's prompt and
@@ -136,8 +138,10 @@ contain.
 Settings → Plugins → Slack Threads, or
 `bb plugin config slack-threads set <key> <value>`:
 
-- `coordinatorModel`, `coordinatorReasoningLevel`: the fast coordinator.
-- `model`, `reasoningLevel`, `provider`, `permissionMode`: workers.
+- `coordinatorModel` (empty: the worker model), `coordinatorReasoningLevel`
+  (`low` by default): coordinators.
+- `model`, `reasoningLevel`: workers.
+- `provider`, `permissionMode`: coordinators and workers.
 - `prompt`: who the agent is, in every channel.
 - `guardrails`: rules coordinators and workers always follow.
 - `channels`: JSON keyed by channel ID. `prompt` with `promptMode` `append`

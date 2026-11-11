@@ -38,7 +38,7 @@ import {
   authorName,
   type SlackConnection,
 } from "./slack";
-import { fitsStatus, renderStatus } from "./status";
+import { PROGRESS_CHARS, renderStatus } from "./status";
 import { openStore, slackKey, type Binding, type Task } from "./store";
 import { describeUsage, poolStatusSchema, type PoolStatus } from "./usage";
 
@@ -51,9 +51,10 @@ const FAILED = "x";
 const USAGE_TTL_MS = 60_000;
 /** Coalesces a worker's progress calls into one Slack edit. */
 const STATUS_EDIT_MS = 1_500;
+/** A worker idle for longer than this after its task started is done. */
+const SETTLED_MS = 30_000;
 const SKILL = "slack-threads";
 const TITLE_CHARS = 80;
-const PROGRESS_CHARS = 1_500;
 
 /**
  * This plugin's metadata on a bb thread it started: a coordinator answers one
@@ -144,8 +145,8 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       type: "string",
       label: "Coordinator model",
       description:
-        "Fast model of the bb thread that answers each Slack thread and hands work to workers",
-      default: "claude-haiku-5-5",
+        "Model of the bb thread that answers each Slack thread and hands work to workers; empty uses the worker model",
+      default: "",
     },
     coordinatorReasoningLevel: {
       type: "string",
@@ -315,7 +316,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   /** Records Slack messages (already marked 👀) as waiting for a reply. */
   const markPending = (binding: Binding, messages: Message[]) => {
     for (const message of messages) {
-      store.addPending(binding.bbThreadId, binding.slackKey, message.id);
+      store.addPending(
+        binding.bbThreadId,
+        binding.slackKey,
+        message.id,
+        message.author.userId,
+      );
     }
     store.touch(binding.slackKey);
   };
@@ -428,20 +434,20 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       permalink: link,
       origin: "slack",
       cursor: last.id,
-      authorId: last.author.userId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     store.save(binding);
-    store.setCursor(binding.slackKey, last.id, last.author.userId);
+    store.setCursor(binding.slackKey, last.id);
     await thread.subscribe();
     markPending(binding, messages);
     bb.log.info(`Started bb thread ${spawned.id} for ${binding.slackKey}`);
   };
 
   /**
-   * Answers the bb thread's pending question or approval from a Slack reply.
-   * A reply that does not parse gets a hint, unless `quiet`.
+   * Answers the oldest pending question or approval of the bb thread or of
+   * its workers still at work from a Slack reply. A reply that does not parse
+   * gets a hint, unless `quiet`.
    */
   const answerInteraction = async (
     current: SlackConnection,
@@ -449,15 +455,29 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     text: string,
     quiet: boolean,
   ): Promise<"answered" | "hint" | "none"> => {
+    const tasks = store.activeTasksOf(binding.slackKey);
+    const threadIds = [
+      binding.bbThreadId,
+      ...new Set(tasks.map((task) => task.workerThreadId)),
+    ];
     // An archived or deleted thread is handled where the send fails.
-    const interactions = await bb.sdk.threads.interactions
-      .list({ threadId: binding.bbThreadId })
-      .catch(() => []);
-    const waiting = interactions
-      .filter((interaction) => interaction.status === "pending")
-      .sort((a, b) => a.createdAt - b.createdAt)[0];
+    const lists = await Promise.all(
+      threadIds.map((threadId) =>
+        bb.sdk.threads.interactions
+          .list({ threadId })
+          .then((interactions) =>
+            interactions.map((interaction) => ({ threadId, interaction })),
+          )
+          .catch(() => []),
+      ),
+    );
+    const pending = lists
+      .flat()
+      .filter(({ interaction }) => interaction.status === "pending")
+      .sort((a, b) => a.interaction.createdAt - b.interaction.createdAt)[0];
+    const waiting = pending?.interaction;
     const answer = waiting ? answerFromText(waiting, text) : null;
-    if (!waiting || !answer) return "none";
+    if (!pending || !waiting || !answer) return "none";
     if ("hint" in answer) {
       if (quiet) return "none";
       await postMarkdown(
@@ -469,10 +489,16 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       return "hint";
     }
     await bb.sdk.threads.interactions.resolve({
-      threadId: binding.bbThreadId,
+      threadId: pending.threadId,
       interactionId: waiting.id,
       resolution: answer.resolution,
     });
+    for (const task of tasks) {
+      if (task.workerThreadId !== pending.threadId) continue;
+      if (task.state !== "waiting") continue;
+      store.setTaskState(task.id, "running");
+      refreshStatus(task);
+    }
     return "answered";
   };
 
@@ -522,7 +548,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
     if (answered === "answered") {
       markPending(binding, forwarded);
-      store.setCursor(binding.slackKey, answerTo.id, answerTo.author.userId);
+      store.setCursor(binding.slackKey, answerTo.id);
       return;
     }
 
@@ -561,7 +587,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       }
     }
     markPending(binding, forwarded);
-    store.setCursor(binding.slackKey, answerTo.id, answerTo.author.userId);
+    store.setCursor(binding.slackKey, answerTo.id);
   };
 
   /**
@@ -641,7 +667,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             marked = [last];
             await react(current, channelId, last.id, EYES);
             markPending(binding, marked);
-            store.setCursor(key, last.id, last.author.userId);
+            store.setCursor(key, last.id);
           } else if (!binding && !watched && kind === "subscribed") {
             await thread.unsubscribe();
           }
@@ -763,13 +789,8 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   const editStatus = async (key: string, ts: string) => {
     const current = connection;
     const binding = store.get(key);
-    const status = store.statusMessage(key, ts);
-    if (!current || !binding || !status) return;
-    const { text, blocks } = renderStatus(
-      status.message.text,
-      status.message.footer,
-      status.tasks,
-    );
+    if (!current || !binding) return;
+    const { text, blocks } = renderStatus(store.tasksOfMessage(key, ts));
     try {
       await current.slack.webClient.chat.update({
         channel: binding.channelId,
@@ -789,7 +810,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
    * STATUS_EDIT_MS. A task not in Slack yet shows up when its coordinator's
    * turn ends.
    */
-  const refreshStatus = (task: Task) => {
+  const refreshStatus = (task: Pick<Task, "slackKey" | "messageTs">) => {
     const ts = task.messageTs;
     if (!ts) return;
     const id = `${task.slackKey}/${ts}`;
@@ -803,42 +824,110 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     );
   };
 
-  /** Posts the status of new tasks, with the coordinator's reply when given. */
+  /** Posts the status of a coordinator turn's new tasks under its reply. */
   const postStatus = async (
     current: SlackConnection,
     binding: Binding,
     tasks: Task[],
-    reply: { text: string; footer: string | null } | null,
   ) => {
-    const text = reply?.text ?? "";
-    const footer = reply?.footer ?? null;
-    const message = renderStatus(text, footer, tasks);
-    const result = await current.slack.webClient.chat.postMessage({
-      channel: binding.channelId,
-      ...(binding.threadTs ? { thread_ts: binding.threadTs } : {}),
-      text: message.text,
-      blocks: message.blocks,
-      unfurl_links: false,
-      unfurl_media: false,
-    });
-    if (!result.ts) return;
-    store.saveStatusMessage(
-      { slackKey: binding.slackKey, ts: result.ts, text, footer },
-      tasks.map((task) => task.id),
-    );
+    const message = renderStatus(tasks);
+    try {
+      const result = await current.slack.webClient.chat.postMessage({
+        channel: binding.channelId,
+        thread_ts: binding.threadTs,
+        text: message.text,
+        blocks: message.blocks,
+        unfurl_links: false,
+        unfurl_media: false,
+      });
+      if (!result.ts) return;
+      store.attachTasks(
+        result.ts,
+        tasks.map((task) => task.id),
+      );
+      // Progress or a finish that came while the post was on its way.
+      const now = renderStatus(store.tasksOfMessage(binding.slackKey, result.ts));
+      if (JSON.stringify(now) !== JSON.stringify(message)) {
+        refreshStatus({ slackKey: binding.slackKey, messageTs: result.ts });
+      }
+    } catch (error) {
+      bb.log.warn(
+        `Could not post the status in ${binding.slackKey}: ${describeSlackError(error) ?? errorMessage(error)}`,
+      );
+    }
   };
 
   /**
    * Finishes a worker's tasks when its turn ends. With a follow-up queued,
    * only the oldest finishes: the follow-up is a task that has not run yet.
    */
-  const finishTasks = (worker: ThreadResponse, state: "done" | "failed") => {
-    const active = store.activeTasks(worker.id);
-    const finished =
-      worker.queuedMessageCount > 0 ? active.slice(0, 1) : active;
-    for (const task of finished) {
+  const finishTasks = (
+    workerId: string,
+    state: "done" | "failed",
+    followUpQueued = false,
+  ) => {
+    const active = store.activeTasks(workerId);
+    for (const task of followUpQueued ? active.slice(0, 1) : active) {
       store.setTaskState(task.id, state);
       refreshStatus(task);
+    }
+  };
+
+  /**
+   * Finishes tasks whose worker can no longer report: deleted, archived,
+   * handed to another parent, or idle while the plugin was not listening.
+   */
+  const reconcileTasks = async (tasks: Task[]) => {
+    for (const task of tasks) {
+      const worker = await bb.sdk.threads
+        .get({ threadId: task.workerThreadId })
+        .catch((error: unknown) =>
+          [404, 410].includes(Number(httpStatus(error))) ? null : undefined,
+        );
+      if (worker === undefined) continue;
+      const coordinator = store.get(task.slackKey)?.bbThreadId;
+      if (
+        !worker ||
+        worker.deletedAt !== null ||
+        worker.archivedAt !== null ||
+        worker.parentThreadId !== coordinator
+      ) {
+        finishTasks(task.workerThreadId, "failed");
+      } else if (worker.status === "error") {
+        finishTasks(task.workerThreadId, "failed");
+      } else if (
+        worker.status === "idle" &&
+        worker.queuedMessageCount === 0 &&
+        Date.now() - task.startedAt > SETTLED_MS
+      ) {
+        finishTasks(task.workerThreadId, "done");
+      }
+    }
+  };
+
+  /**
+   * Swaps 👀 for `reaction` on the messages a bb thread answered, except in
+   * Slack threads whose workers still work.
+   */
+  const settlePending = async (
+    current: SlackConnection,
+    bbThreadId: string,
+    reaction: string,
+  ) => {
+    const bindings = store.forBbThread(bbThreadId);
+    for (const message of store.pending(bbThreadId)) {
+      if (store.activeTaskCount(message.slackKey) > 0) continue;
+      store.removePending(message.slackKey, message.messageTs);
+      const binding = bindings.find((b) => b.slackKey === message.slackKey);
+      if (binding) {
+        await react(
+          current,
+          binding.channelId,
+          message.messageTs,
+          reaction,
+          EYES,
+        );
+      }
     }
   };
 
@@ -846,9 +935,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
    * Posts to the Slack threads a bb thread answers: those with messages
    * waiting for a reply, else the one that started it. A thread bound by
    * `post` stays quiet until someone writes in it. Tasks a coordinator handed
-   * to workers this turn get a live status, in the reply's message when it
-   * fits. With `reaction`, the waiting messages swap 👀 for it and stop
-   * waiting, unless workers still work on their Slack thread.
+   * to workers this turn get a live status message under the reply. With
+   * `reaction`, the waiting messages swap 👀 for it and stop waiting, unless
+   * workers still work on their Slack thread.
    */
   const deliver = async (
     bbThreadId: string,
@@ -883,13 +972,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
     const footer = agentReply && text ? await modelFooter(agentReply) : null;
     for (const binding of targets) {
-      const tasks = agentReply ? store.unpostedTasks(binding.slackKey) : [];
-      const attach =
-        tasks.length > 0 &&
-        Boolean(reply.text.trim()) &&
-        reply.blocks.length === 0 &&
-        fitsStatus(reply.text);
-      if (text && !attach) {
+      if (text) {
         await postMarkdown(
           current,
           binding.channelId,
@@ -909,41 +992,23 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           },
         );
       }
-      if (tasks.length > 0) {
-        await postStatus(
-          current,
-          binding,
-          tasks,
-          attach ? { text: reply.text, footer } : null,
-        );
+      if (agentReply) {
+        const tasks = store.unpostedTasks(binding.slackKey);
+        if (tasks.length > 0) await postStatus(current, binding, tasks);
+        await reconcileTasks(store.activeTasksOf(binding.slackKey));
       }
       store.touch(binding.slackKey);
     }
-    if (!reaction) return;
-    for (const message of pending) {
-      // Workers still work on it: 👀 stays until their answer.
-      if (store.activeTaskCount(message.slackKey) > 0) continue;
-      store.removePending(message.slackKey, message.messageTs);
-      const binding = bindings.find((b) => b.slackKey === message.slackKey);
-      if (binding) {
-        await react(
-          current,
-          binding.channelId,
-          message.messageTs,
-          reaction,
-          EYES,
-        );
-      }
-    }
+    if (reaction) await settlePending(current, bbThreadId, reaction);
   };
 
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
-    finishTasks(thread, "done");
+    finishTasks(thread.id, "done", thread.queuedMessageCount > 0);
     await deliver(thread.id, lastAssistantText?.trim() || null, DONE, thread);
   });
 
   bb.events.on("thread.failed", async ({ thread, error }) => {
-    finishTasks(thread, "failed");
+    finishTasks(thread.id, "failed", thread.queuedMessageCount > 0);
     await deliver(
       thread.id,
       `⚠️ The bb thread stopped with an error${error ? `: ${clip(error, 500)}` : "."}`,
@@ -952,16 +1017,28 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   });
 
   bb.events.on("interaction.pending", async ({ thread, interaction }) => {
+    // A worker's question goes to its coordinator's Slack thread, and the
+    // next Slack reply there answers it.
     const [task] = store.activeTasks(thread.id);
     if (task) {
       store.setTaskState(task.id, "waiting");
       refreshStatus(task);
     }
-    await deliver(thread.id, describeInteraction(interaction), null);
+    const coordinator = task ? store.get(task.slackKey)?.bbThreadId : null;
+    await deliver(
+      coordinator ?? thread.id,
+      describeInteraction(interaction),
+      null,
+    );
   });
 
   bb.events.on("thread.deleted", async ({ thread }) => {
-    finishTasks({ ...thread, queuedMessageCount: 0 }, "failed");
+    const [task] = store.activeTasks(thread.id);
+    finishTasks(thread.id, "failed");
+    const coordinator = task ? store.get(task.slackKey)?.bbThreadId : null;
+    if (coordinator && connection) {
+      await settlePending(connection, coordinator, FAILED);
+    }
     const removed = store.removeBbThread(thread.id);
     const state = connection?.bot.getState();
     for (const binding of removed) {
@@ -970,6 +1047,14 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       );
     }
   });
+
+  // Tasks whose worker finished while the plugin was not running.
+  const startupCheck = setTimeout(() => {
+    void reconcileTasks(store.allActiveTasks()).catch((error: unknown) =>
+      bb.log.warn(`Could not check workers: ${errorMessage(error)}`),
+    );
+  }, SETTLED_MS);
+  bb.onDispose(() => clearTimeout(startupCheck));
 
   // ---------------------------------------------------------------------
   // Coordinators and workers
@@ -1061,22 +1146,27 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             `${workerId} is not a worker of this thread. Leave workerThreadId out to start a new one.`,
           );
         }
+        // Recorded first, so the worker's next idle finds it.
+        const taskId = store.addTask({
+          workerThreadId: workerId,
+          slackKey: binding.slackKey,
+          title,
+        });
         const send = () =>
           bb.sdk.threads.send({ threadId: workerId, mode: "auto", input });
         try {
           await send();
         } catch (error) {
-          if (!(await reviveAndSend(workerId, error, send))) {
+          const sent = await reviveAndSend(workerId, error, send).catch(
+            () => false,
+          );
+          if (!sent) {
+            store.removeTask(taskId);
             return toolError(
-              `Worker ${workerId} is gone. Leave workerThreadId out to start a new one.`,
+              `Could not reach worker ${workerId}. Leave workerThreadId out to start a new one.`,
             );
           }
         }
-        store.addTask({
-          workerThreadId: workerId,
-          slackKey: binding.slackKey,
-          title,
-        });
         return `Sent to worker ${workerId}. Its status appears in Slack under your reply, and its result comes back here. End your turn now with one short line.`;
       }
 
@@ -1117,9 +1207,8 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       label: { pending: "Updating the status", completed: "Status updated" },
     },
     execute({ status }, { threadId }) {
-      const task =
-        store.activeTasks(threadId)[0] ?? store.latestTask(threadId);
-      if (!task) return "No Slack task belongs to this thread; nothing shown.";
+      const [task] = store.activeTasks(threadId);
+      if (!task) return "No Slack task is running in this thread; nothing shown.";
       store.setTaskProgress(task.id, clip(status.trim(), PROGRESS_CHARS));
       refreshStatus(task);
       return "Shown in Slack.";
@@ -1178,11 +1267,17 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           2,
         );
       }
+      // Every message this thread still answers must come from an admin, so
+      // a request from someone else cannot ride on an admin's later message.
       const admins = list(values.adminUserIds);
-      if (!binding.authorId || !admins.includes(binding.authorId)) {
+      const authors = store.pendingAuthors(threadId);
+      if (
+        authors.length === 0 ||
+        !authors.every((author) => author && admins.includes(author))
+      ) {
         return toolError(
           admins.length > 0
-            ? `Only admins can change channel settings: ${admins.map((id) => `<@${id}>`).join(", ")}.`
+            ? `Only admins can change channel settings, and only when they asked for it: ${admins.map((id) => `<@${id}>`).join(", ")}.`
             : "No one can change channel settings from Slack yet: add admins in Settings → Plugins → Slack Threads.",
         );
       }
@@ -1204,7 +1299,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         ),
       });
       bb.log.info(
-        `${binding.authorId} changed the settings of ${binding.channelId}`,
+        `${authors.join(", ")} changed the settings of ${binding.channelId}`,
       );
       return `Saved; new Slack threads in this channel use it:\n${JSON.stringify(next, null, 2)}`;
     },

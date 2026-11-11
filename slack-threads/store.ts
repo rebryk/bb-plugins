@@ -14,8 +14,6 @@ export interface Binding {
   origin: "slack" | "cli";
   /** ts of the last Slack message handed to the bb thread. */
   cursor: string | null;
-  /** Slack user ID of that message's author. */
-  authorId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -48,14 +46,6 @@ export interface Task {
   finishedAt: number | null;
 }
 
-/** A Slack message that shows the status of tasks under a coordinator reply. */
-export interface StatusMessage {
-  slackKey: string;
-  ts: string;
-  text: string;
-  footer: string | null;
-}
-
 /** A Slack message forwarded to bb whose reply has not been posted yet. */
 export interface PendingMessage {
   slackKey: string;
@@ -72,7 +62,6 @@ interface BindingRow {
   permalink: string | null;
   origin: "slack" | "cli";
   cursor: string | null;
-  author_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -114,7 +103,6 @@ const toBinding = (row: BindingRow): Binding => ({
   permalink: row.permalink,
   origin: row.origin,
   cursor: row.cursor,
-  authorId: row.author_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -159,7 +147,7 @@ export function openStore(bb: BbPluginApi) {
       created_at INTEGER NOT NULL
     )`,
     `ALTER TABLE bindings ADD COLUMN cursor TEXT`,
-    `ALTER TABLE bindings ADD COLUMN author_id TEXT`,
+    `ALTER TABLE pending ADD COLUMN author_id TEXT`,
     `CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       worker_thread_id TEXT NOT NULL,
@@ -172,14 +160,7 @@ export function openStore(bb: BbPluginApi) {
       finished_at INTEGER
     )`,
     `CREATE INDEX IF NOT EXISTS tasks_worker ON tasks (worker_thread_id)`,
-    `CREATE INDEX IF NOT EXISTS tasks_message ON tasks (slack_key, message_ts)`,
-    `CREATE TABLE IF NOT EXISTS status_messages (
-      slack_key TEXT NOT NULL,
-      ts TEXT NOT NULL,
-      text TEXT NOT NULL,
-      footer TEXT,
-      PRIMARY KEY (slack_key, ts)
-    )`,
+    `CREATE INDEX IF NOT EXISTS tasks_slack ON tasks (slack_key, state)`,
   ]);
 
   const toWatched = (row: {
@@ -235,9 +216,7 @@ export function openStore(bb: BbPluginApi) {
       ).n;
     },
 
-    save(
-      binding: Omit<Binding, "cursor" | "authorId" | "createdAt" | "updatedAt">,
-    ): void {
+    save(binding: Omit<Binding, "cursor" | "createdAt" | "updatedAt">): void {
       const now = Date.now();
       db.prepare(
         `INSERT INTO bindings (slack_key, bb_thread_id, team_id, channel_id,
@@ -263,10 +242,11 @@ export function openStore(bb: BbPluginApi) {
       );
     },
 
-    setCursor(key: string, ts: string, authorId: string | null): void {
-      db.prepare(
-        `UPDATE bindings SET cursor = ?, author_id = ? WHERE slack_key = ?`,
-      ).run(ts, authorId, key);
+    setCursor(key: string, ts: string): void {
+      db.prepare(`UPDATE bindings SET cursor = ? WHERE slack_key = ?`).run(
+        ts,
+        key,
+      );
     },
 
     touch(key: string): void {
@@ -289,32 +269,29 @@ export function openStore(bb: BbPluginApi) {
         db.prepare(`DELETE FROM tasks WHERE slack_key = ?`).run(
           binding.slackKey,
         );
-        db.prepare(`DELETE FROM status_messages WHERE slack_key = ?`).run(
-          binding.slackKey,
-        );
       }
       return removed;
     },
 
+    /** Records a running task and returns its id. */
     addTask(task: {
       workerThreadId: string;
       slackKey: string;
       title: string;
-    }): void {
-      db.prepare(
-        `INSERT INTO tasks (worker_thread_id, slack_key, title, state, started_at)
-         VALUES (?, ?, ?, 'running', ?)`,
-      ).run(task.workerThreadId, task.slackKey, task.title, Date.now());
+    }): number {
+      return Number(
+        db
+          .prepare(
+            `INSERT INTO tasks (worker_thread_id, slack_key, title, state, started_at)
+             VALUES (?, ?, ?, 'running', ?)`,
+          )
+          .run(task.workerThreadId, task.slackKey, task.title, Date.now())
+          .lastInsertRowid,
+      );
     },
 
-    /** The task a worker works on now, or finished last. */
-    latestTask(workerThreadId: string): Task | null {
-      const row = db
-        .prepare(
-          `SELECT * FROM tasks WHERE worker_thread_id = ? ORDER BY id DESC LIMIT 1`,
-        )
-        .get(workerThreadId) as TaskRow | undefined;
-      return row ? toTask(row) : null;
+    removeTask(id: number): void {
+      db.prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
     },
 
     /** A worker's tasks that still run or wait for an answer, oldest first. */
@@ -345,6 +322,30 @@ export function openStore(bb: BbPluginApi) {
       ).run(state, finished ? Date.now() : null, id);
     },
 
+    /** Every task that still runs or waits, oldest first. */
+    allActiveTasks(): Task[] {
+      return (
+        db
+          .prepare(
+            `SELECT * FROM tasks WHERE state IN ('running', 'waiting') ORDER BY id`,
+          )
+          .all() as TaskRow[]
+      ).map(toTask);
+    },
+
+    /** A Slack thread's tasks that still run or wait, oldest first. */
+    activeTasksOf(slackKey: string): Task[] {
+      return (
+        db
+          .prepare(
+            `SELECT * FROM tasks
+             WHERE slack_key = ? AND state IN ('running', 'waiting')
+             ORDER BY id`,
+          )
+          .all(slackKey) as TaskRow[]
+      ).map(toTask);
+    },
+
     /** Tasks of a Slack thread whose status is not in Slack yet. */
     unpostedTasks(slackKey: string): Task[] {
       return (
@@ -369,47 +370,19 @@ export function openStore(bb: BbPluginApi) {
     },
 
     /** Records the Slack message that shows these tasks. */
-    saveStatusMessage(message: StatusMessage, taskIds: number[]): void {
-      db.transaction(() => {
-        db.prepare(
-          `INSERT OR REPLACE INTO status_messages (slack_key, ts, text, footer)
-           VALUES (?, ?, ?, ?)`,
-        ).run(message.slackKey, message.ts, message.text, message.footer);
-        const attach = db.prepare(
-          `UPDATE tasks SET message_ts = ? WHERE id = ?`,
-        );
-        for (const id of taskIds) attach.run(message.ts, id);
-      })();
+    attachTasks(ts: string, taskIds: number[]): void {
+      const attach = db.prepare(`UPDATE tasks SET message_ts = ? WHERE id = ?`);
+      for (const id of taskIds) attach.run(ts, id);
     },
 
-    statusMessage(
-      slackKey: string,
-      ts: string,
-    ): { message: StatusMessage; tasks: Task[] } | null {
-      const row = db
-        .prepare(
-          `SELECT * FROM status_messages WHERE slack_key = ? AND ts = ?`,
-        )
-        .get(slackKey, ts) as
-        | { slack_key: string; ts: string; text: string; footer: string | null }
-        | undefined;
-      if (!row) return null;
-      const tasks = (
+    tasksOfMessage(slackKey: string, ts: string): Task[] {
+      return (
         db
           .prepare(
             `SELECT * FROM tasks WHERE slack_key = ? AND message_ts = ? ORDER BY id`,
           )
           .all(slackKey, ts) as TaskRow[]
       ).map(toTask);
-      return {
-        message: {
-          slackKey: row.slack_key,
-          ts: row.ts,
-          text: row.text,
-          footer: row.footer,
-        },
-        tasks,
-      };
     },
 
     watch(watched: Watched): void {
@@ -452,11 +425,25 @@ export function openStore(bb: BbPluginApi) {
       ).n;
     },
 
-    addPending(bbThreadId: string, key: string, messageTs: string): void {
+    addPending(
+      bbThreadId: string,
+      key: string,
+      messageTs: string,
+      authorId: string,
+    ): void {
       db.prepare(
-        `INSERT OR IGNORE INTO pending (slack_key, message_ts, bb_thread_id, created_at)
-         VALUES (?, ?, ?, ?)`,
-      ).run(key, messageTs, bbThreadId, Date.now());
+        `INSERT OR IGNORE INTO pending (slack_key, message_ts, bb_thread_id, created_at, author_id)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(key, messageTs, bbThreadId, Date.now(), authorId);
+    },
+
+    /** Slack user IDs of the messages a bb thread still answers. */
+    pendingAuthors(bbThreadId: string): Array<string | null> {
+      return (
+        db
+          .prepare(`SELECT author_id FROM pending WHERE bb_thread_id = ?`)
+          .all(bbThreadId) as Array<{ author_id: string | null }>
+      ).map((row) => row.author_id);
     },
 
     pending(bbThreadId: string): PendingMessage[] {
