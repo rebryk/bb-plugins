@@ -144,7 +144,7 @@ const isBlank = (text: string) =>
   !text.replace(/[\s\u200b-\u200d\u2060\ufeff]/gu, "");
 
 type PostArgs = Parameters<SlackAdapter["webClient"]["chat"]["postMessage"]>[0];
-type Block = NonNullable<
+export type Block = NonNullable<
   Extract<PostArgs, { blocks?: unknown }>["blocks"]
 >[number];
 

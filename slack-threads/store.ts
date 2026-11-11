@@ -14,6 +14,8 @@ export interface Binding {
   origin: "slack" | "cli";
   /** ts of the last Slack message handed to the bb thread. */
   cursor: string | null;
+  /** Slack user ID of that message's author. */
+  authorId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -29,6 +31,29 @@ export interface Watched {
   threadTs: string;
   /** The bb thread that posted it, for context. */
   sourceBbThreadId: string | null;
+}
+
+/** A task a coordinator handed to a worker bb thread. */
+export interface Task {
+  id: number;
+  workerThreadId: string;
+  slackKey: string;
+  title: string;
+  state: "running" | "waiting" | "done" | "failed";
+  /** The worker's latest progress, as Slack Markdown. */
+  progress: string | null;
+  /** ts of the Slack message that shows its status; null until posted. */
+  messageTs: string | null;
+  startedAt: number;
+  finishedAt: number | null;
+}
+
+/** A Slack message that shows the status of tasks under a coordinator reply. */
+export interface StatusMessage {
+  slackKey: string;
+  ts: string;
+  text: string;
+  footer: string | null;
 }
 
 /** A Slack message forwarded to bb whose reply has not been posted yet. */
@@ -47,9 +72,34 @@ interface BindingRow {
   permalink: string | null;
   origin: "slack" | "cli";
   cursor: string | null;
+  author_id: string | null;
   created_at: number;
   updated_at: number;
 }
+
+interface TaskRow {
+  id: number;
+  worker_thread_id: string;
+  slack_key: string;
+  title: string;
+  state: Task["state"];
+  progress: string | null;
+  message_ts: string | null;
+  started_at: number;
+  finished_at: number | null;
+}
+
+const toTask = (row: TaskRow): Task => ({
+  id: row.id,
+  workerThreadId: row.worker_thread_id,
+  slackKey: row.slack_key,
+  title: row.title,
+  state: row.state,
+  progress: row.progress,
+  messageTs: row.message_ts,
+  startedAt: row.started_at,
+  finishedAt: row.finished_at,
+});
 
 export const slackKey = (teamId: string, channelId: string, threadTs: string) =>
   `${teamId}:${channelId}:${threadTs}`;
@@ -64,6 +114,7 @@ const toBinding = (row: BindingRow): Binding => ({
   permalink: row.permalink,
   origin: row.origin,
   cursor: row.cursor,
+  authorId: row.author_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -108,6 +159,27 @@ export function openStore(bb: BbPluginApi) {
       created_at INTEGER NOT NULL
     )`,
     `ALTER TABLE bindings ADD COLUMN cursor TEXT`,
+    `ALTER TABLE bindings ADD COLUMN author_id TEXT`,
+    `CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      worker_thread_id TEXT NOT NULL,
+      slack_key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      state TEXT NOT NULL,
+      progress TEXT,
+      message_ts TEXT,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER
+    )`,
+    `CREATE INDEX IF NOT EXISTS tasks_worker ON tasks (worker_thread_id)`,
+    `CREATE INDEX IF NOT EXISTS tasks_message ON tasks (slack_key, message_ts)`,
+    `CREATE TABLE IF NOT EXISTS status_messages (
+      slack_key TEXT NOT NULL,
+      ts TEXT NOT NULL,
+      text TEXT NOT NULL,
+      footer TEXT,
+      PRIMARY KEY (slack_key, ts)
+    )`,
   ]);
 
   const toWatched = (row: {
@@ -163,7 +235,9 @@ export function openStore(bb: BbPluginApi) {
       ).n;
     },
 
-    save(binding: Omit<Binding, "cursor" | "createdAt" | "updatedAt">): void {
+    save(
+      binding: Omit<Binding, "cursor" | "authorId" | "createdAt" | "updatedAt">,
+    ): void {
       const now = Date.now();
       db.prepare(
         `INSERT INTO bindings (slack_key, bb_thread_id, team_id, channel_id,
@@ -189,11 +263,10 @@ export function openStore(bb: BbPluginApi) {
       );
     },
 
-    setCursor(key: string, ts: string): void {
-      db.prepare(`UPDATE bindings SET cursor = ? WHERE slack_key = ?`).run(
-        ts,
-        key,
-      );
+    setCursor(key: string, ts: string, authorId: string | null): void {
+      db.prepare(
+        `UPDATE bindings SET cursor = ?, author_id = ? WHERE slack_key = ?`,
+      ).run(ts, authorId, key);
     },
 
     touch(key: string): void {
@@ -212,7 +285,131 @@ export function openStore(bb: BbPluginApi) {
       const removed = this.forBbThread(bbThreadId);
       db.prepare(`DELETE FROM bindings WHERE bb_thread_id = ?`).run(bbThreadId);
       db.prepare(`DELETE FROM pending WHERE bb_thread_id = ?`).run(bbThreadId);
+      for (const binding of removed) {
+        db.prepare(`DELETE FROM tasks WHERE slack_key = ?`).run(
+          binding.slackKey,
+        );
+        db.prepare(`DELETE FROM status_messages WHERE slack_key = ?`).run(
+          binding.slackKey,
+        );
+      }
       return removed;
+    },
+
+    addTask(task: {
+      workerThreadId: string;
+      slackKey: string;
+      title: string;
+    }): void {
+      db.prepare(
+        `INSERT INTO tasks (worker_thread_id, slack_key, title, state, started_at)
+         VALUES (?, ?, ?, 'running', ?)`,
+      ).run(task.workerThreadId, task.slackKey, task.title, Date.now());
+    },
+
+    /** The task a worker works on now, or finished last. */
+    latestTask(workerThreadId: string): Task | null {
+      const row = db
+        .prepare(
+          `SELECT * FROM tasks WHERE worker_thread_id = ? ORDER BY id DESC LIMIT 1`,
+        )
+        .get(workerThreadId) as TaskRow | undefined;
+      return row ? toTask(row) : null;
+    },
+
+    /** A worker's tasks that still run or wait for an answer, oldest first. */
+    activeTasks(workerThreadId: string): Task[] {
+      return (
+        db
+          .prepare(
+            `SELECT * FROM tasks
+             WHERE worker_thread_id = ? AND state IN ('running', 'waiting')
+             ORDER BY id`,
+          )
+          .all(workerThreadId) as TaskRow[]
+      ).map(toTask);
+    },
+
+    setTaskProgress(id: number, progress: string): void {
+      db.prepare(`UPDATE tasks SET progress = ? WHERE id = ?`).run(
+        progress,
+        id,
+      );
+    },
+
+    /** Sets the state; `done` and `failed` also stamp the finish time. */
+    setTaskState(id: number, state: Task["state"]): void {
+      const finished = state === "done" || state === "failed";
+      db.prepare(
+        `UPDATE tasks SET state = ?, finished_at = ? WHERE id = ?`,
+      ).run(state, finished ? Date.now() : null, id);
+    },
+
+    /** Tasks of a Slack thread whose status is not in Slack yet. */
+    unpostedTasks(slackKey: string): Task[] {
+      return (
+        db
+          .prepare(
+            `SELECT * FROM tasks WHERE slack_key = ? AND message_ts IS NULL ORDER BY id`,
+          )
+          .all(slackKey) as TaskRow[]
+      ).map(toTask);
+    },
+
+    /** How many tasks of a Slack thread still run or wait for an answer. */
+    activeTaskCount(slackKey: string): number {
+      return (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM tasks
+             WHERE slack_key = ? AND state IN ('running', 'waiting')`,
+          )
+          .get(slackKey) as { n: number }
+      ).n;
+    },
+
+    /** Records the Slack message that shows these tasks. */
+    saveStatusMessage(message: StatusMessage, taskIds: number[]): void {
+      db.transaction(() => {
+        db.prepare(
+          `INSERT OR REPLACE INTO status_messages (slack_key, ts, text, footer)
+           VALUES (?, ?, ?, ?)`,
+        ).run(message.slackKey, message.ts, message.text, message.footer);
+        const attach = db.prepare(
+          `UPDATE tasks SET message_ts = ? WHERE id = ?`,
+        );
+        for (const id of taskIds) attach.run(message.ts, id);
+      })();
+    },
+
+    statusMessage(
+      slackKey: string,
+      ts: string,
+    ): { message: StatusMessage; tasks: Task[] } | null {
+      const row = db
+        .prepare(
+          `SELECT * FROM status_messages WHERE slack_key = ? AND ts = ?`,
+        )
+        .get(slackKey, ts) as
+        | { slack_key: string; ts: string; text: string; footer: string | null }
+        | undefined;
+      if (!row) return null;
+      const tasks = (
+        db
+          .prepare(
+            `SELECT * FROM tasks WHERE slack_key = ? AND message_ts = ? ORDER BY id`,
+          )
+          .all(slackKey, ts) as TaskRow[]
+      ).map(toTask);
+      return {
+        message: {
+          slackKey: row.slack_key,
+          ts: row.ts,
+          text: row.text,
+          footer: row.footer,
+        },
+        tasks,
+      };
     },
 
     watch(watched: Watched): void {

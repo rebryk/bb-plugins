@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-slack-threads",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -18,7 +18,7 @@
   },
   "bb": {
     "name": "Slack Threads",
-    "description": "Mention the bot in Slack and the conversation becomes a bb thread: replies in the Slack thread reach the agent and its answers come back.",
+    "description": "Mention the bot in Slack and a fast coordinator answers in the thread, handing heavier work to bb worker threads that show a live status.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

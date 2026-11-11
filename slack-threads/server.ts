@@ -7,12 +7,23 @@ import {
   type PluginThreadEventPayloads,
 } from "@get-bb/plugin-sdk";
 import type { Logger, Message, Thread } from "chat";
+import { z } from "zod";
 import { answerFromText, describeInteraction } from "./interactions";
+import {
+  DEFAULT_GUARDRAILS,
+  DEFAULT_PROMPT,
+  channelsOrEmpty,
+  channelsSettingSchema,
+  coordinatorInstructions,
+  parseChannels,
+  workerInstructions,
+} from "./prompts";
 import {
   channelName,
   chatThreadId,
   connectSlack,
   describeMessage,
+  describeSlackError,
   extractBlocks,
   parseBlocks,
   CHART_FAILED,
@@ -27,7 +38,8 @@ import {
   authorName,
   type SlackConnection,
 } from "./slack";
-import { openStore, slackKey, type Binding } from "./store";
+import { fitsStatus, renderStatus } from "./status";
+import { openStore, slackKey, type Binding, type Task } from "./store";
 import { describeUsage, poolStatusSchema, type PoolStatus } from "./usage";
 
 type ThreadResponse = PluginThreadEventPayloads["thread.idle"]["thread"];
@@ -36,13 +48,27 @@ const EYES = "eyes";
 const DONE = "check";
 const FAILED = "x";
 
-const INSTRUCTIONS =
-  "You are answering inside this Slack thread; your final reply of each turn is posted back to the thread automatically, so do not post it yourself. Keep replies short and use Slack-friendly Markdown (no Markdown tables or HTML); for a chart or table, add a `slack-blocks` fence as the slack-threads skill describes. Use the shared bb memory: recall what is relevant before answering and save durable knowledge you learn.";
-
 const USAGE_TTL_MS = 60_000;
+/** Coalesces a worker's progress calls into one Slack edit. */
+const STATUS_EDIT_MS = 1_500;
+const SKILL = "slack-threads";
+const TITLE_CHARS = 80;
+const PROGRESS_CHARS = 1_500;
 
-const MENTION_ONLY =
-  "Messages arrive only when someone mentions you; earlier messages since your last turn are included as context.";
+/**
+ * This plugin's metadata on a bb thread it started: a coordinator answers one
+ * Slack thread, a worker does a task a coordinator handed it.
+ */
+const threadRoleSchema = z.union([
+  z.looseObject({
+    role: z.literal("coordinator"),
+    slack: z.looseObject({ channelId: z.string() }),
+  }),
+  z.looseObject({
+    role: z.literal("worker"),
+    channelId: z.string(),
+  }),
+]);
 
 const EFFORTS: Record<string, string> = {
   xhigh: "extra high",
@@ -104,33 +130,80 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     projectId: {
       type: "project",
       label: "Project",
-      description: "The bb project new threads from Slack start in",
+      description:
+        "The bb project coordinators and workers start in, unless a channel sets its own",
     },
     provider: {
       type: "string",
       label: "Provider",
       description:
-        "Provider ID for new threads; empty uses the project default",
+        "Provider ID for coordinators and workers; empty uses the project default",
       default: "",
+    },
+    coordinatorModel: {
+      type: "string",
+      label: "Coordinator model",
+      description:
+        "Fast model of the bb thread that answers each Slack thread and hands work to workers",
+      default: "claude-haiku-5-5",
+    },
+    coordinatorReasoningLevel: {
+      type: "string",
+      label: "Coordinator reasoning level",
+      description: "Reasoning level of coordinators; empty uses the default",
+      default: "low",
     },
     model: {
       type: "string",
-      label: "Model",
-      description: "Model for new threads; empty uses the project default",
+      label: "Worker model",
+      description:
+        "Model of the worker threads coordinators start; empty uses the project default",
       default: "",
     },
     reasoningLevel: {
       type: "string",
-      label: "Reasoning level",
-      description: "Reasoning level for new threads; empty uses the default",
+      label: "Worker reasoning level",
+      description: "Reasoning level of workers; empty uses the default",
       default: "",
     },
     permissionMode: {
       type: "string",
       label: "Permission mode",
       description:
-        "Permission mode for new threads: full, auto, or accept-edits; empty uses the default",
+        "Permission mode of coordinators and workers: full, auto, or accept-edits; empty uses the default",
       default: "full",
+    },
+    prompt: {
+      type: "string",
+      label: "Prompt",
+      description:
+        "Who the agent is and how it answers, in every channel; a channel can add to it or replace it",
+      experimental_multiline: true,
+      default: DEFAULT_PROMPT,
+    },
+    guardrails: {
+      type: "string",
+      label: "Guardrails",
+      description:
+        "Rules coordinators and workers always follow; a channel can add rules but never remove these",
+      experimental_multiline: true,
+      default: DEFAULT_GUARDRAILS,
+    },
+    channels: {
+      type: "string",
+      label: "Channels",
+      description:
+        'Per-channel settings as JSON keyed by channel ID: {"C0123ABCD": {"name": "#growth", "prompt": "…", "promptMode": "append" or "replace", "guardrails": "…", "projectId": "proj_…"}}. Admins can also change them from Slack by asking the bot',
+      experimental_multiline: true,
+      experimental_schema: channelsSettingSchema,
+      default: "{}",
+    },
+    adminUserIds: {
+      type: "string",
+      label: "Admins",
+      description:
+        "Comma-separated Slack user IDs (U…) who can change channel settings from Slack",
+      default: "",
     },
     allowedChannelIds: {
       type: "string",
@@ -147,6 +220,33 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       default: "",
     },
   });
+
+  type Values = Awaited<ReturnType<typeof settings.get>>;
+  /** The latest settings, for the synchronous agent configuration. */
+  let latest: Values = await settings.get();
+
+  /** Provider, model, reasoning, and permission mode of a new thread. */
+  const executionFor = (
+    values: Values,
+    model: string,
+    reasoningLevel: string,
+  ) => {
+    const permissionMode = (["full", "auto", "accept-edits"] as const).find(
+      (mode) => mode === values.permissionMode.trim(),
+    );
+    return {
+      ...(values.provider ? { providerId: values.provider } : {}),
+      ...(model ? { model } : {}),
+      ...(reasoningLevel ? { reasoningLevel } : {}),
+      ...(permissionMode ? { permissionMode } : {}),
+      executionInputSources: {
+        ...(values.provider ? { providerId: "explicit" as const } : {}),
+        ...(model ? { model: "explicit" as const } : {}),
+        ...(reasoningLevel ? { reasoningLevel: "explicit" as const } : {}),
+        ...(permissionMode ? { permissionMode: "explicit" as const } : {}),
+      },
+    };
+  };
 
   const missingSettings = async () => {
     const values = await settings.get();
@@ -288,7 +388,6 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           ]
         : []),
       ...(note ? [note] : []),
-      thread.isDM ? INSTRUCTIONS : `${INSTRUCTIONS} ${MENTION_ONLY}`,
     ].join("\n\n");
 
     const words = withoutMentions(current, last.text)
@@ -297,29 +396,19 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       .trim();
     const title = `${thread.isDM ? `@${author}` : (name ?? channelId)} · ${clip(words || "Slack thread", 60)}`;
 
-    const permissionMode = (["full", "auto", "accept-edits"] as const).find(
-      (mode) => mode === values.permissionMode.trim(),
-    );
+    const channel = channelsOrEmpty(values.channels)[channelId];
     const spawned = await bb.sdk.threads.spawn({
-      projectId: values.projectId,
+      projectId: channel?.projectId || values.projectId,
       environment: { type: "project-default" },
-      ...(values.provider ? { providerId: values.provider } : {}),
-      ...(values.model ? { model: values.model } : {}),
-      ...(values.reasoningLevel
-        ? { reasoningLevel: values.reasoningLevel }
-        : {}),
-      ...(permissionMode ? { permissionMode } : {}),
-      executionInputSources: {
-        ...(values.provider ? { providerId: "explicit" as const } : {}),
-        ...(values.model ? { model: "explicit" as const } : {}),
-        ...(values.reasoningLevel
-          ? { reasoningLevel: "explicit" as const }
-          : {}),
-        ...(permissionMode ? { permissionMode: "explicit" as const } : {}),
-      },
+      ...executionFor(
+        values,
+        values.coordinatorModel || values.model,
+        values.coordinatorReasoningLevel,
+      ),
       title,
       prompt,
       pluginMetadata: {
+        role: "coordinator",
         slack: {
           teamId: current.identity.teamId,
           channelId,
@@ -339,11 +428,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       permalink: link,
       origin: "slack",
       cursor: last.id,
+      authorId: last.author.userId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     store.save(binding);
-    store.setCursor(binding.slackKey, last.id);
+    store.setCursor(binding.slackKey, last.id, last.author.userId);
     await thread.subscribe();
     markPending(binding, messages);
     bb.log.info(`Started bb thread ${spawned.id} for ${binding.slackKey}`);
@@ -432,7 +522,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
     if (answered === "answered") {
       markPending(binding, forwarded);
-      store.setCursor(binding.slackKey, answerTo.id);
+      store.setCursor(binding.slackKey, answerTo.id, answerTo.author.userId);
       return;
     }
 
@@ -471,7 +561,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       }
     }
     markPending(binding, forwarded);
-    store.setCursor(binding.slackKey, answerTo.id);
+    store.setCursor(binding.slackKey, answerTo.id, answerTo.author.userId);
   };
 
   /**
@@ -551,7 +641,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
             marked = [last];
             await react(current, channelId, last.id, EYES);
             markPending(binding, marked);
-            store.setCursor(key, last.id);
+            store.setCursor(key, last.id, last.author.userId);
           } else if (!binding && !watched && kind === "subscribed") {
             await thread.unsubscribe();
           }
@@ -660,11 +750,105 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     return [model, usage].filter(Boolean).join(" · ") || null;
   };
 
+  // ---------------------------------------------------------------------
+  // Live status of workers
+  // ---------------------------------------------------------------------
+
+  const statusTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  bb.onDispose(() => {
+    for (const timer of statusTimers.values()) clearTimeout(timer);
+    statusTimers.clear();
+  });
+
+  const editStatus = async (key: string, ts: string) => {
+    const current = connection;
+    const binding = store.get(key);
+    const status = store.statusMessage(key, ts);
+    if (!current || !binding || !status) return;
+    const { text, blocks } = renderStatus(
+      status.message.text,
+      status.message.footer,
+      status.tasks,
+    );
+    try {
+      await current.slack.webClient.chat.update({
+        channel: binding.channelId,
+        ts,
+        text,
+        blocks,
+      });
+    } catch (error) {
+      bb.log.warn(
+        `Could not update the status in ${key}: ${describeSlackError(error) ?? errorMessage(error)}`,
+      );
+    }
+  };
+
+  /**
+   * Edits the Slack message that shows a task, at most once per
+   * STATUS_EDIT_MS. A task not in Slack yet shows up when its coordinator's
+   * turn ends.
+   */
+  const refreshStatus = (task: Task) => {
+    const ts = task.messageTs;
+    if (!ts) return;
+    const id = `${task.slackKey}/${ts}`;
+    if (statusTimers.has(id)) return;
+    statusTimers.set(
+      id,
+      setTimeout(() => {
+        statusTimers.delete(id);
+        void editStatus(task.slackKey, ts);
+      }, STATUS_EDIT_MS),
+    );
+  };
+
+  /** Posts the status of new tasks, with the coordinator's reply when given. */
+  const postStatus = async (
+    current: SlackConnection,
+    binding: Binding,
+    tasks: Task[],
+    reply: { text: string; footer: string | null } | null,
+  ) => {
+    const text = reply?.text ?? "";
+    const footer = reply?.footer ?? null;
+    const message = renderStatus(text, footer, tasks);
+    const result = await current.slack.webClient.chat.postMessage({
+      channel: binding.channelId,
+      ...(binding.threadTs ? { thread_ts: binding.threadTs } : {}),
+      text: message.text,
+      blocks: message.blocks,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    if (!result.ts) return;
+    store.saveStatusMessage(
+      { slackKey: binding.slackKey, ts: result.ts, text, footer },
+      tasks.map((task) => task.id),
+    );
+  };
+
+  /**
+   * Finishes a worker's tasks when its turn ends. With a follow-up queued,
+   * only the oldest finishes: the follow-up is a task that has not run yet.
+   */
+  const finishTasks = (worker: ThreadResponse, state: "done" | "failed") => {
+    const active = store.activeTasks(worker.id);
+    const finished =
+      worker.queuedMessageCount > 0 ? active.slice(0, 1) : active;
+    for (const task of finished) {
+      store.setTaskState(task.id, state);
+      refreshStatus(task);
+    }
+  };
+
   /**
    * Posts to the Slack threads a bb thread answers: those with messages
    * waiting for a reply, else the one that started it. A thread bound by
-   * `post` stays quiet until someone writes in it. With `reaction`, the
-   * waiting messages swap 👀 for it and stop waiting.
+   * `post` stays quiet until someone writes in it. Tasks a coordinator handed
+   * to workers this turn get a live status, in the reply's message when it
+   * fits. With `reaction`, the waiting messages swap 👀 for it and stop
+   * waiting, unless workers still work on their Slack thread.
    */
   const deliver = async (
     bbThreadId: string,
@@ -699,7 +883,13 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
     const footer = agentReply && text ? await modelFooter(agentReply) : null;
     for (const binding of targets) {
-      if (text) {
+      const tasks = agentReply ? store.unpostedTasks(binding.slackKey) : [];
+      const attach =
+        tasks.length > 0 &&
+        Boolean(reply.text.trim()) &&
+        reply.blocks.length === 0 &&
+        fitsStatus(reply.text);
+      if (text && !attach) {
         await postMarkdown(
           current,
           binding.channelId,
@@ -719,10 +909,20 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           },
         );
       }
+      if (tasks.length > 0) {
+        await postStatus(
+          current,
+          binding,
+          tasks,
+          attach ? { text: reply.text, footer } : null,
+        );
+      }
       store.touch(binding.slackKey);
     }
     if (!reaction) return;
     for (const message of pending) {
+      // Workers still work on it: 👀 stays until their answer.
+      if (store.activeTaskCount(message.slackKey) > 0) continue;
       store.removePending(message.slackKey, message.messageTs);
       const binding = bindings.find((b) => b.slackKey === message.slackKey);
       if (binding) {
@@ -738,10 +938,12 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   };
 
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
+    finishTasks(thread, "done");
     await deliver(thread.id, lastAssistantText?.trim() || null, DONE, thread);
   });
 
   bb.events.on("thread.failed", async ({ thread, error }) => {
+    finishTasks(thread, "failed");
     await deliver(
       thread.id,
       `⚠️ The bb thread stopped with an error${error ? `: ${clip(error, 500)}` : "."}`,
@@ -750,10 +952,16 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   });
 
   bb.events.on("interaction.pending", async ({ thread, interaction }) => {
+    const [task] = store.activeTasks(thread.id);
+    if (task) {
+      store.setTaskState(task.id, "waiting");
+      refreshStatus(task);
+    }
     await deliver(thread.id, describeInteraction(interaction), null);
   });
 
   bb.events.on("thread.deleted", async ({ thread }) => {
+    finishTasks({ ...thread, queuedMessageCount: 0 }, "failed");
     const removed = store.removeBbThread(thread.id);
     const state = connection?.bot.getState();
     for (const binding of removed) {
@@ -764,11 +972,251 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   });
 
   // ---------------------------------------------------------------------
+  // Coordinators and workers
+  // ---------------------------------------------------------------------
+
+  const toolError = (text: string) => ({
+    content: [{ type: "text" as const, text }],
+    isError: true,
+  });
+
+  bb.agents.configure((context) => {
+    const parsed = threadRoleSchema.safeParse(context.pluginMetadata);
+    if (!parsed.success) return { tools: [], skills: [SKILL] };
+    const thread = parsed.data;
+    const channels = channelsOrEmpty(latest.channels);
+    if (thread.role === "worker") {
+      return {
+        tools: ["slack_progress"],
+        skills: [SKILL],
+        instructions: workerInstructions(latest, channels[thread.channelId]),
+      };
+    }
+    const { channelId, channelName } = thread.slack;
+    const directMessage = channelId.startsWith("D");
+    return {
+      tools: ["slack_delegate", "slack_channel_settings"],
+      skills: [SKILL],
+      instructions: coordinatorInstructions(latest, channels[channelId], {
+        channelLabel: directMessage
+          ? "a direct message"
+          : typeof channelName === "string"
+            ? channelName
+            : channelId,
+        directMessage,
+      }),
+    };
+  });
+
+  bb.agents.registerTool({
+    name: "slack_delegate",
+    description:
+      "Hand a task to a worker bb thread, or send a follow-up or an answer to a worker you started. The worker's live status appears in the Slack thread under your reply, and its result comes back to you as a message when its turn ends.",
+    parameters: z
+      .object({
+        task: z
+          .string()
+          .min(1)
+          .describe(
+            "Everything the worker needs: the request, the context from the conversation, and the result expected. Not a step-by-step plan.",
+          ),
+        title: z
+          .string()
+          .min(1)
+          .describe(
+            "A few words for the status line in Slack, in the people's language",
+          ),
+        workerThreadId: z
+          .string()
+          .optional()
+          .describe("A worker you started earlier, to continue it"),
+        projectId: z
+          .string()
+          .optional()
+          .describe(
+            "bb project of a new worker, only when the task belongs to another project (`bb project list`)",
+          ),
+        model: z
+          .string()
+          .optional()
+          .describe("Model of a new worker, only when people ask for one"),
+      })
+      .strict(),
+    presentation: {
+      label: { pending: "Handing off to a worker", completed: "Handed off" },
+    },
+    async execute(params, { threadId }) {
+      const [binding] = store.forBbThread(threadId);
+      if (!binding) return toolError("This thread answers no Slack thread.");
+      const title = clip(params.title.trim(), TITLE_CHARS);
+      const input = [{ type: "text" as const, text: params.task, mentions: [] }];
+
+      if (params.workerThreadId) {
+        const workerId = params.workerThreadId;
+        const worker = await bb.sdk.threads
+          .get({ threadId: workerId })
+          .catch(() => null);
+        if (!worker || worker.parentThreadId !== threadId) {
+          return toolError(
+            `${workerId} is not a worker of this thread. Leave workerThreadId out to start a new one.`,
+          );
+        }
+        const send = () =>
+          bb.sdk.threads.send({ threadId: workerId, mode: "auto", input });
+        try {
+          await send();
+        } catch (error) {
+          if (!(await reviveAndSend(workerId, error, send))) {
+            return toolError(
+              `Worker ${workerId} is gone. Leave workerThreadId out to start a new one.`,
+            );
+          }
+        }
+        store.addTask({
+          workerThreadId: workerId,
+          slackKey: binding.slackKey,
+          title,
+        });
+        return `Sent to worker ${workerId}. Its status appears in Slack under your reply, and its result comes back here. End your turn now with one short line.`;
+      }
+
+      const values = await settings.get();
+      const channel = channelsOrEmpty(values.channels)[binding.channelId];
+      const projectId =
+        params.projectId || channel?.projectId || values.projectId;
+      if (!projectId) return toolError("Slack Threads has no project set.");
+      const worker = await bb.sdk.threads.spawn({
+        projectId,
+        environment: { type: "project-default" },
+        ...executionFor(
+          values,
+          params.model || values.model,
+          values.reasoningLevel,
+        ),
+        parentThreadId: threadId,
+        title,
+        input,
+        pluginMetadata: { role: "worker", channelId: binding.channelId },
+      });
+      store.addTask({
+        workerThreadId: worker.id,
+        slackKey: binding.slackKey,
+        title,
+      });
+      bb.log.info(`Coordinator ${threadId} started worker ${worker.id}`);
+      return `Started worker ${worker.id}. Its live status appears in Slack under your reply, and its result comes back here when it finishes. End your turn now with one short line saying what you started.`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "slack_progress",
+    description:
+      "Show your plan and progress to the people in Slack as a live status. Pass the whole checklist every time: 2–5 short steps, one per line, each starting with ✅ (done), ⏳ (in progress), or ▫️ (next).",
+    parameters: z.object({ status: z.string().min(1) }).strict(),
+    presentation: {
+      label: { pending: "Updating the status", completed: "Status updated" },
+    },
+    execute({ status }, { threadId }) {
+      const task =
+        store.activeTasks(threadId)[0] ?? store.latestTask(threadId);
+      if (!task) return "No Slack task belongs to this thread; nothing shown.";
+      store.setTaskProgress(task.id, clip(status.trim(), PROGRESS_CHARS));
+      refreshStatus(task);
+      return "Shown in Slack.";
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "slack_channel_settings",
+    description:
+      "Read or change how coordinators work in this Slack channel: a prompt added to the global one or used instead of it, and guardrails added to the global ones. Changes apply to new Slack threads. Only admins can change them.",
+    parameters: z
+      .object({
+        action: z.enum(["get", "set"]),
+        prompt: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("The channel's prompt; null removes it"),
+        promptMode: z
+          .enum(["append", "replace"])
+          .optional()
+          .describe(
+            "append (the default) adds the prompt to the global one; replace uses it alone",
+          ),
+        guardrails: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "The channel's extra guardrails; null removes them. The global guardrails always apply",
+          ),
+      })
+      .strict(),
+    async execute(params, { threadId }) {
+      const [binding] = store.forBbThread(threadId);
+      if (!binding) return toolError("This thread answers no Slack thread.");
+      const values = await settings.get();
+      let channels;
+      try {
+        channels = parseChannels(values.channels);
+      } catch (error) {
+        return toolError(
+          `The channels setting is invalid (${errorMessage(error)}); fix it in Settings → Plugins → Slack Threads.`,
+        );
+      }
+      const channel = channels[binding.channelId] ?? {};
+      if (params.action === "get") {
+        return JSON.stringify(
+          {
+            channelId: binding.channelId,
+            channel,
+            globalPrompt: values.prompt,
+            globalGuardrails: values.guardrails,
+          },
+          null,
+          2,
+        );
+      }
+      const admins = list(values.adminUserIds);
+      if (!binding.authorId || !admins.includes(binding.authorId)) {
+        return toolError(
+          admins.length > 0
+            ? `Only admins can change channel settings: ${admins.map((id) => `<@${id}>`).join(", ")}.`
+            : "No one can change channel settings from Slack yet: add admins in Settings → Plugins → Slack Threads.",
+        );
+      }
+      const next = {
+        ...channel,
+        ...(binding.channelName ? { name: binding.channelName } : {}),
+        ...(params.promptMode ? { promptMode: params.promptMode } : {}),
+      };
+      for (const key of ["prompt", "guardrails"] as const) {
+        const value = params[key];
+        if (value === null) delete next[key];
+        else if (value !== undefined) next[key] = value;
+      }
+      await settings.experimental_set({
+        channels: JSON.stringify(
+          { ...channels, [binding.channelId]: next },
+          null,
+          2,
+        ),
+      });
+      bb.log.info(
+        `${binding.authorId} changed the settings of ${binding.channelId}`,
+      );
+      return `Saved; new Slack threads in this channel use it:\n${JSON.stringify(next, null, 2)}`;
+    },
+  });
+
+  // ---------------------------------------------------------------------
   // Connection
   // ---------------------------------------------------------------------
 
   let wake: (() => void) | null = null;
   settings.onChange((next, prev) => {
+    latest = next;
     if (next.botToken !== prev.botToken || next.appToken !== prev.appToken) {
       wake?.();
     }

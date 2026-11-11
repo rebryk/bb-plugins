@@ -5,29 +5,44 @@ description: "Work in a bb thread that is bound to a Slack thread, or post a Sla
 
 # Slack Threads
 
-The Slack Threads plugin binds each Slack thread to one bb thread. Mentioning
-the bot in Slack, or sending it a top-level direct message, starts a bb thread
-with the Slack thread's history, and the bot answers in a Slack thread under
-that message.
+The Slack Threads plugin binds each Slack thread to one bb thread, its
+coordinator. Mentioning the bot in Slack, or sending it a top-level direct
+message, starts a coordinator with the Slack thread's history on a fast model.
+The coordinator answers quick questions itself and hands heavier work to worker
+bb threads; each worker shows a live status in Slack, and the coordinator posts
+its result.
 
 - In channels and group DMs people talk among themselves: a message reaches
-  you only when it mentions the bot. It arrives as "Answer this Slack
-  message", after the messages posted since your last turn, oldest first, as
-  context. Messages without a mention never start a turn.
-- In a one-to-one DM every message is for you and arrives as
+  the coordinator only when it mentions the bot. It arrives as "Answer this
+  Slack message", after the messages posted since its last turn, oldest
+  first, as context. Messages without a mention never start a turn.
+- In a one-to-one DM every message is for the bot and arrives as
   `Slack reply from <name>: <text>`.
+- Several people may write in one Slack thread; each message names its author.
 
-## When your thread came from Slack
+## Coordinators
 
-- Your final reply of each turn is posted back to the Slack thread
-  automatically. Do not post it yourself, and do not call
-  `bb slack-threads post` to answer.
+- Your final reply of each turn is posted to the Slack thread automatically.
+  Do not post it yourself, and do not call `bb slack-threads post` to answer.
+- `slack_delegate` starts a worker, or with `workerThreadId` sends a follow-up
+  or an answer to one. Its status shows in Slack under your reply, and its
+  result arrives as a message when its turn ends.
+- A question you ask through the question or approval tools is posted to Slack
+  too, and the next Slack reply in that thread answers it, mention or not.
+- `slack_channel_settings` reads or changes the channel's prompt and
+  guardrails. Changes apply to new Slack threads; only admins can make them.
+
+## Workers
+
+- You never talk to Slack. `slack_progress` shows your plan and progress as a
+  live status in the Slack thread; your final reply goes to the coordinator,
+  who posts it, so make it ready for Slack.
+
+## Replies
+
 - Keep replies short. Slack renders standard Markdown (bold, lists, links,
   code); avoid Markdown tables and HTML, and use `slack-blocks` (below) for
   tables and charts.
-- A question you ask through the question or approval tools is posted to Slack
-  too, and the next Slack reply in that thread answers it, mention or not.
-- Several people may write in one Slack thread; each message names its author.
 
 ## Charts and tables
 
@@ -115,6 +130,32 @@ contain.
   first reply.
 - `bb slack-threads list [--limit N]` — recently active Slack threads and their
   bb threads.
+
+## Settings
+
+Settings → Plugins → Slack Threads, or
+`bb plugin config slack-threads set <key> <value>`:
+
+- `coordinatorModel`, `coordinatorReasoningLevel`: the fast coordinator.
+- `model`, `reasoningLevel`, `provider`, `permissionMode`: workers.
+- `prompt`: who the agent is, in every channel.
+- `guardrails`: rules coordinators and workers always follow.
+- `channels`: JSON keyed by channel ID. `prompt` with `promptMode` `append`
+  (default) or `replace`, extra `guardrails`, and `projectId`:
+
+  ```json
+  {
+    "C0123ABCD": {
+      "name": "#growth",
+      "prompt": "You help the growth team with ads and funnels.",
+      "promptMode": "append",
+      "guardrails": "- Never change live ad budgets.",
+      "projectId": "proj_…"
+    }
+  }
+  ```
+
+- `adminUserIds`: Slack users who can change channel settings from Slack.
 
 ## Rules
 
