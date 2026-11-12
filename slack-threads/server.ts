@@ -38,7 +38,7 @@ import {
   authorName,
   type SlackConnection,
 } from "./slack";
-import { PROGRESS_CHARS, renderStatus } from "./status";
+import { progressSchema, renderStatus } from "./status";
 import { openStore, slackKey, type Binding, type Task } from "./store";
 import { describeUsage, poolStatusSchema, type PoolStatus } from "./usage";
 
@@ -846,8 +846,11 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         tasks.map((task) => task.id),
       );
       // Progress or a finish that came while the post was on its way.
-      const now = renderStatus(store.tasksOfMessage(binding.slackKey, result.ts));
-      if (JSON.stringify(now) !== JSON.stringify(message)) {
+      const now = store.tasksOfMessage(binding.slackKey, result.ts);
+      if (
+        JSON.stringify(renderStatus(now, "")) !==
+        JSON.stringify(renderStatus(tasks, ""))
+      ) {
         refreshStatus({ slackKey: binding.slackKey, messageTs: result.ts });
       }
     } catch (error) {
@@ -1201,15 +1204,15 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   bb.agents.registerTool({
     name: "slack_progress",
     description:
-      "Show your plan and progress to the people in Slack as a live status. Pass the whole checklist every time: 2–5 short steps, one per line, each starting with ✅ (done), ⏳ (in progress), or ▫️ (next).",
-    parameters: z.object({ status: z.string().min(1) }).strict(),
+      "Show your progress to the people in Slack as a live status: the running step and the time left, with every step folded under it. Pass every step each time, in order, 2–5 short steps in the people's language, and `remaining`: your estimate of the time left for the whole task, in their language, without \"~\" (e.g. \"6 мин\").",
+    parameters: progressSchema.strict(),
     presentation: {
       label: { pending: "Updating the status", completed: "Status updated" },
     },
-    execute({ status }, { threadId }) {
+    execute(progress, { threadId }) {
       const [task] = store.activeTasks(threadId);
       if (!task) return "No Slack task is running in this thread; nothing shown.";
-      store.setTaskProgress(task.id, clip(status.trim(), PROGRESS_CHARS));
+      store.setTaskProgress(task.id, JSON.stringify(progress));
       refreshStatus(task);
       return "Shown in Slack.";
     },

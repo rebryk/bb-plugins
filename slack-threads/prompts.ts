@@ -117,7 +117,7 @@ export function coordinatorInstructions(
 
 const WORKER = [
   "You are a worker. A coordinator gave you this task for people in a Slack thread; you never talk to Slack yourself.",
-  "- First call `slack_progress` with your plan: 2–5 short steps, one per line, each starting with ✅ (done), ⏳ (in progress), or ▫️ (next). Call it again whenever a step finishes or the plan changes. People see it as a live status in Slack.",
+  "- First call `slack_progress` with your plan: 2–5 short steps in the people's language, the first `running`, the rest `next`, and `remaining`, your estimate of the time left for the whole task. Call it again with every step whenever one finishes (`done`), the plan changes, or the estimate moves. People see the running step and the time left as a live status in Slack.",
   "- Do the whole task on your own. Ask only when you are truly blocked: then end your turn with the question, and its answer comes back here.",
   "- Your final reply goes to the coordinator, who posts it in Slack: make it ready to post. Keep it short, in Slack Markdown, without Markdown tables or HTML; for charts and tables use a `slack-blocks` fence as the slack-threads skill describes.",
   "- Use the shared bb memory: recall what is relevant before starting and save durable knowledge you learn.",
