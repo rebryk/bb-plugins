@@ -178,7 +178,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       type: "string",
       label: "Prompt",
       description:
-        "Who the agent is and how it answers, in every channel; a channel can add to it or replace it",
+        "Who the agent is, what it knows, and how it answers, for coordinators and workers in every channel; a channel can add to it or replace it",
       experimental_multiline: true,
       default: DEFAULT_PROMPT,
     },

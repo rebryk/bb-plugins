@@ -74,6 +74,14 @@ const guardrailsOf = (settings: PromptSettings, channel?: ChannelSettings) =>
 const section = (title: string, body: string) =>
   body ? [`## ${title}`, body].join("\n\n") : "";
 
+/** The global prompt and the channel's, or the channel's alone on `replace`. */
+const rolePrompt = (settings: PromptSettings, channel?: ChannelSettings) => {
+  const replace = channel?.promptMode === "replace" && channel.prompt?.trim();
+  return [replace ? "" : settings.prompt.trim(), channel?.prompt?.trim() ?? ""]
+    .filter(Boolean)
+    .join("\n\n");
+};
+
 const COORDINATOR = [
   "You coordinate one Slack thread. Your final reply of each turn is posted to that Slack thread automatically; never post it yourself. People wait for you, so reply within seconds.",
   "- Answer yourself only what takes a few quick steps: a fact from memory, a short lookup, a clarifying question.",
@@ -95,15 +103,8 @@ export function coordinatorInstructions(
   channel: ChannelSettings | undefined,
   options: { channelLabel: string; directMessage: boolean },
 ): string {
-  const replace = channel?.promptMode === "replace" && channel.prompt?.trim();
-  const role = [
-    replace ? "" : settings.prompt.trim(),
-    channel?.prompt?.trim() ?? "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
   return [
-    role,
+    rolePrompt(settings, channel),
     section("Guardrails", guardrailsOf(settings, channel)),
     section(
       `How you work in ${options.channelLabel}`,
@@ -128,6 +129,7 @@ export function workerInstructions(
   channel: ChannelSettings | undefined,
 ): string {
   return [
+    rolePrompt(settings, channel),
     section("Guardrails", guardrailsOf(settings, channel)),
     section("How you work", WORKER),
   ]
