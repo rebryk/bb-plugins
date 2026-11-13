@@ -22,6 +22,11 @@ and paste with **⌘V** / **Ctrl+V**, within the same canvas or into another
 thread. Copies preserve styles and layout; Undo removes a pasted group in one
 step. Zoom and fit keep navigation simple.
 
+## Say yes or no
+
+Select an image and press **Y** or **N**: a badge marks it and the next image
+is selected. Agents lay out such boards and read the answers back.
+
 ## Capture a browser block
 
 Desktop BB's built-in browser has a **Canvas** toolbar button. Hover to

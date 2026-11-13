@@ -989,6 +989,153 @@ describe("image boundary and exports", () => {
     });
   });
 
+  it("adds images and text from a layout file on the thread's host", async () => {
+    const png = (await samplePng()).toString("base64");
+    const files: Record<string, string> = {
+      "/work/layout.json": JSON.stringify({
+        elements: [
+          { type: "text", text: "Sidebars", x: 0, y: -60, fontSize: 32 },
+          { type: "image", path: "shots/a.png", x: 0, y: 0, width: 400 },
+        ],
+      }),
+      "/work/shots/a.png": png,
+    };
+    const { harness, read } = setup({
+      sdk: {
+        threads: {
+          storageLocation: async () => ({
+            hostId: "host-remote",
+            storageRootPath: "/remote/thread-storage/thread-a",
+          }),
+        },
+        files: {
+          read: (async ({ path }: { path: string }) => ({
+            path,
+            content: files[path],
+            contentEncoding: path.endsWith(".png") ? "base64" : "utf8",
+            sha256: "",
+            sizeBytes: files[path]!.length,
+          })) as never,
+        },
+      },
+    });
+    const result = await harness.behavior.runCli(
+      ["add", "layout.json", "--thread", "thread-a", "--json"],
+      { cwd: "/work" },
+    );
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout).ids).toHaveLength(2);
+    const reads = harness.inspection.sdk.callsTo("files.read") as [
+      { hostId: string; path: string },
+    ][];
+    expect(reads.map(([args]) => args)).toEqual([
+      { hostId: "host-remote", path: "/work/layout.json" },
+      { hostId: "host-remote", path: "/work/shots/a.png" },
+    ]);
+    const [title, image] = (await read()).elements;
+    expect(title).toMatchObject({
+      type: "text",
+      text: "Sidebars",
+      fontSize: 32,
+      color: "#242424",
+      height: 32 * 1.3,
+    });
+    expect(image).toMatchObject({
+      type: "image",
+      name: "a.png",
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 300,
+    });
+  });
+
+  it("adds nothing when one image of a layout fails, naming its path", async () => {
+    const png = (await samplePng()).toString("base64");
+    const files: Record<string, string> = {
+      "/work/layout.json": JSON.stringify({
+        elements: [
+          { type: "image", path: "/work/a.png", x: 0, y: 0, width: 40 },
+          { type: "image", path: "/work/bad.png", x: 60, y: 0, width: 40 },
+        ],
+      }),
+      "/work/a.png": png,
+      "/work/bad.png": Buffer.from("not a png").toString("base64"),
+    };
+    const { harness, read } = setup({
+      sdk: {
+        threads: {
+          storageLocation: async () => ({
+            hostId: "host-a",
+            storageRootPath: "/thread-storage/thread-a",
+          }),
+        },
+        files: {
+          read: (async ({ path }: { path: string }) => ({
+            path,
+            content: files[path],
+            contentEncoding: path.endsWith(".png") ? "base64" : "utf8",
+            sha256: "",
+            sizeBytes: 0,
+          })) as never,
+        },
+      },
+    });
+    const result = await harness.behavior.runCli(
+      ["add", "/work/layout.json", "--thread", "thread-a"],
+      {},
+    );
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("/work/bad.png: Use a PNG image.");
+    expect((await read()).elements).toEqual([]);
+  });
+
+  it("keeps verdicts on images and draws them in exports", async () => {
+    const { harness, update, upload, read } = setup();
+    const asset = await upload((await samplePng()).toString("base64"));
+    await update(
+      patch(
+        {
+          ...(picture("yes", asset.id) as ImageElement),
+          width: 400,
+          height: 300,
+          verdict: "yes",
+        },
+        {
+          ...(picture("no", asset.id) as ImageElement),
+          x: 500,
+          width: 400,
+          height: 300,
+          verdict: "no",
+        },
+      ),
+    );
+    expect(
+      (await read()).elements.map(
+        (element) => element.type === "image" && element.verdict,
+      ),
+    ).toEqual(["yes", "no"]);
+    await expect(
+      update(patch({ ...picture("bad", asset.id), verdict: "maybe" } as never)),
+    ).rejects.toThrow();
+    const response = await harness.behavior.fetchHttp(
+      "GET",
+      "/export?threadId=thread-a&format=png",
+    );
+    const exported = PNG.sync.read(Buffer.from(await response.arrayBuffer()));
+    // The board starts 24 px before the first image. A 300-unit-high image
+    // gets a 21-unit badge centered 29.4 units inside its top-right corner;
+    // sample the badge above its glyph.
+    const badge = (right: number) =>
+      pixel(
+        exported,
+        Math.round(24 + right - 29.4),
+        Math.round(24 + 29.4 - 15),
+      ).slice(0, 3);
+    expect(badge(400)).toEqual([0x26, 0x83, 0x4a]);
+    expect(badge(900)).toEqual([0xe5, 0x48, 0x4d]);
+  });
+
   it("captures the exact Browser tab on its owning desktop host", async () => {
     // BB 0.46 names a Browser tab `browser:<id>:<environment>`.
     const tabId = "browser:IerUSsiWilmHE7CfYs_Gu:env_iihkzqcd2i";

@@ -8,6 +8,7 @@ import {
   contentBounds,
   imageViewport,
   isTextElement,
+  verdictMark,
   type CanvasElement,
   type Bounds,
 } from "./model";
@@ -61,9 +62,12 @@ export function boardSvg(
       if (e.type === "image") {
         const view = imageViewport(e);
         const source = `<use href="#asset-${assets.indexOf(e.assetId)}" transform="translate(${view.x} ${view.y}) scale(${view.width} ${view.height})"/>`;
-        return e.crop
+        const picture = e.crop
           ? `<g clip-path="url(#crop-${index})">${source}</g>`
           : source;
+        if (!e.verdict) return picture;
+        const mark = verdictMark({ ...e, verdict: e.verdict });
+        return `<g opacity="${e.verdict === "no" ? 0.4 : 1}">${picture}</g><rect x="${e.x}" y="${e.y}" width="${e.width}" height="${e.height}" fill="none" stroke="${mark.color}" stroke-width="${mark.frame}"/><circle cx="${mark.cx}" cy="${mark.cy}" r="${mark.radius}" fill="${mark.color}" stroke="#fff" stroke-width="${mark.radius * 0.12}"/><path d="${mark.path}" fill="none" stroke="#fff" stroke-width="${mark.radius * 0.22}" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
       if (isTextElement(e)) {
         const layout = e.type === "sticky" ? layoutSticky(e) : null;
