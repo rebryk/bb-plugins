@@ -50,9 +50,11 @@ write a JSON file and run `bb canvas add <file> --json`:
 PNG files (at most 4096 px per side, 8 MB) on the thread's machine; relative
 paths resolve from the working directory. Give each image a `name` you can
 map back, keep a row of images on one `y` so reading order follows the rows,
-and stay within 500 elements and 100 MB of images per thread.
+and stay within 500 elements and 100 MB of images per thread. To make room,
+`bb canvas remove <id>... --json` deletes elements by ID (for example the
+declined images and their captions, once their answers are recorded).
 
 The Canvas is local to the BB server, with one JSON document and separate
 PNG assets per thread in the plugin database. Deleting a thread deletes its
 canvas. `canvas_read`, `canvas_screenshot`, `read`, and `export` are read-only;
-`add` only adds elements and never changes the user's annotations.
+`add` only adds elements, and `remove` deletes only the IDs it is given.

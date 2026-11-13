@@ -11,6 +11,8 @@ gets a new version. Each version is tagged `canvas/v<version>`.
   selected. `canvas_read` returns each answer as the image's `verdict`.
 - Add `bb canvas add <file>`, which places PNG files and text from a JSON
   layout, so an agent can lay out references for the user to judge.
+- Add `bb canvas remove <id>...`, which deletes elements by ID, so an agent can
+  clear declined references before the next round.
 
 ## 0.1.13 (2026-10-11)
 

@@ -518,6 +518,45 @@ export default function plugin(bb: BbPluginApi) {
             };
           },
         }),
+        remove: cliCommand({
+          summary: "Remove elements by ID",
+          description:
+            "Removes the given elements, such as ones placed with add. Unknown IDs are ignored; removed images can be restored with Undo for a day.",
+          positionals: [
+            {
+              name: "ids",
+              description: "Element IDs",
+              required: true,
+              variadic: true,
+            },
+          ] as const,
+          options: {
+            thread: {
+              type: "string",
+              description: "Thread ID (defaults to current)",
+            },
+            json: { type: "boolean", description: "Print JSON" },
+          },
+          async run(input, ctx) {
+            const threadId = idSchema.parse(
+              input.options.thread ?? ctx.threadId,
+            );
+            const removeIds = z
+              .array(idSchema)
+              .max(500)
+              .parse(input.positionals.ids);
+            const before = read(threadId).elements.length;
+            const board = save(threadId, { upserts: [], removeIds });
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({
+                threadId,
+                revision: board.revision,
+                removed: before - board.elements.length,
+              }),
+            };
+          },
+        }),
         export: cliCommand({
           summary: "Save a PNG in the thread's storage directory",
           options: {

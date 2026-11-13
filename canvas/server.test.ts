@@ -1050,6 +1050,23 @@ describe("image boundary and exports", () => {
     });
   });
 
+  it("removes elements by ID and ignores unknown ones", async () => {
+    const { harness, update, read } = setup();
+    await update(patch(note("keep"), note("drop-a"), note("drop-b")));
+    const result = await harness.behavior.runCli([
+      "remove",
+      "drop-a",
+      "drop-b",
+      "missing",
+      "--thread",
+      "thread-a",
+      "--json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ removed: 2 });
+    expect((await read()).elements.map(({ id }) => id)).toEqual(["keep"]);
+  });
+
   it("adds nothing when one image of a layout fails, naming its path", async () => {
     const png = (await samplePng()).toString("base64");
     const files: Record<string, string> = {

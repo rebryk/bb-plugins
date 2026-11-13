@@ -88,6 +88,7 @@ bb canvas read --json
 bb canvas read --offset 20 --json
 bb canvas export --json
 bb canvas add layout.json --json
+bb canvas remove <id>... --json
 ```
 
 `--thread <id>` chooses a thread explicitly. Export writes a PNG into that
@@ -112,7 +113,8 @@ thread's storage on its owning machine and returns its path and host ID.
 
 Images keep their proportions at the given width; relative paths resolve
 from the command's working directory. Read answers back with `canvas_read`:
-each judged image carries `"verdict": "yes"` or `"no"`.
+each judged image carries `"verdict": "yes"` or `"no"`. `remove` deletes
+elements by ID, for example the declined ones before the next round.
 
 ## How it works
 
