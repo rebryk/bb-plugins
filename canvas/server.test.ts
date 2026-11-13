@@ -995,7 +995,14 @@ describe("image boundary and exports", () => {
       "/work/layout.json": JSON.stringify({
         elements: [
           { type: "text", text: "Sidebars", x: 0, y: -60, fontSize: 32 },
-          { type: "image", path: "shots/a.png", x: 0, y: 0, width: 400 },
+          {
+            type: "image",
+            path: "shots/a.png",
+            x: 0,
+            y: 0,
+            width: 400,
+            verdict: "yes",
+          },
         ],
       }),
       "/work/shots/a.png": png,
@@ -1047,6 +1054,7 @@ describe("image boundary and exports", () => {
       y: 0,
       width: 400,
       height: 300,
+      verdict: "yes",
     });
   });
 

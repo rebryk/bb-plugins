@@ -111,8 +111,9 @@ thread's storage on its owning machine and returns its path and host ID.
 }
 ```
 
-Images keep their proportions at the given width; relative paths resolve
-from the command's working directory. Read answers back with `canvas_read`:
+Images keep their proportions at the given width and may carry a `verdict`
+to bring an earlier answer along; relative paths resolve from the command's
+working directory. Read answers back with `canvas_read`:
 each judged image carries `"verdict": "yes"` or `"no"`. `remove` deletes
 elements by ID, for example the declined ones before the next round.
 

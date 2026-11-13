@@ -20,6 +20,7 @@ import {
   emptyBoard,
   idSchema,
   patchSchema,
+  verdictSchema,
   type Board,
   type CanvasElement,
   type Patch,
@@ -43,6 +44,7 @@ export const additionsSchema = z
               y: coordinate,
               width: dimension,
               name: z.string().max(240).optional(),
+              verdict: verdictSchema.optional(),
             })
             .strict(),
           z
@@ -412,7 +414,7 @@ export default function plugin(bb: BbPluginApi) {
         add: cliCommand({
           summary: "Add PNG images and text from a JSON layout file",
           description:
-            'The file holds {"elements": [...]}: {"type": "image", "path", "x", "y", "width", "name"?} places a PNG scaled to width; {"type": "text", "text", "x", "y", "fontSize"?, "color"?} places text. Coordinates are canvas units.',
+            'The file holds {"elements": [...]}: {"type": "image", "path", "x", "y", "width", "name"?, "verdict"?} places a PNG scaled to width; {"type": "text", "text", "x", "y", "fontSize"?, "color"?} places text. Coordinates are canvas units.',
           positionals: [
             {
               name: "file",
@@ -495,6 +497,7 @@ export default function plugin(bb: BbPluginApi) {
                       y: item.y,
                       width: item.width,
                       height: (item.width * asset.height) / asset.width,
+                      ...(item.verdict && { verdict: item.verdict }),
                     };
                   } catch (cause) {
                     throw new Error(

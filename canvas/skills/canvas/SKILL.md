@@ -45,12 +45,13 @@ and moves on to the next one in reading order.
 
 To lay out images for the user (references to judge, screens to compare),
 write a JSON file and run `bb canvas add <file> --json`:
-`{"elements": [{"type": "image", "path", "x", "y", "width", "name"?},
-{"type": "text", "text", "x", "y", "fontSize"?, "color"?}]}`. Images must be
-PNG files (at most 4096 px per side, 8 MB) on the thread's machine; relative
-paths resolve from the working directory. Give each image a `name` you can
-map back, keep a row of images on one `y` so reading order follows the rows,
-and stay within 500 elements and 100 MB of images per thread. To make room,
+`{"elements": [{"type": "image", "path", "x", "y", "width", "name"?,
+"verdict"?}, {"type": "text", "text", "x", "y", "fontSize"?, "color"?}]}`.
+Images must be PNG files (at most 4096 px per side, 8 MB) on the thread's
+machine; relative paths resolve from the working directory. A `verdict`
+carries an earlier answer along. Give each image a `name` you can map back,
+keep a row of images on one `y` so reading order follows the rows, and stay
+within 500 elements and 100 MB of images per thread. To make room,
 `bb canvas remove <id>... --json` deletes elements by ID (for example the
 declined images and their captions, once their answers are recorded).
 
