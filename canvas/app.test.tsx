@@ -2090,6 +2090,52 @@ describe("Canvas editing workflows", () => {
     });
   });
 
+  it("judges images with Y, N and the footer, then moves on in reading order", async () => {
+    // Placed by hand: the left image sits a little lower than the right one.
+    const left = { ...picture, y: 5 };
+    const right = { ...picture, id: "right", x: 300 };
+    const below = { ...picture, id: "below", y: 200 };
+    const { slot, surface, board } = await open([below, right, left]);
+    const canvas = slot.getByLabelText("Canvas");
+    const verdicts = () =>
+      Object.fromEntries(
+        board().elements.map((element) => [
+          element.id,
+          element.type === "image" ? element.verdict : undefined,
+        ]),
+      );
+    const selected = () =>
+      slot.container.querySelectorAll(".cv-selection").length;
+    select(surface, slot.container.querySelector('[data-element="image"]')!);
+    expect(slot.getByText("Y: yes · N: no")).toBeTruthy();
+    fireEvent.keyDown(canvas, { key: "y" });
+    await waitFor(() => expect(verdicts().image).toBe("yes"));
+    // A held key does not sweep through the board.
+    fireEvent.keyDown(canvas, { key: "y", repeat: true });
+    // The next image to the right is selected, then the row below.
+    expect(selected()).toBe(1);
+    expect(
+      slot
+        .getByRole("button", { name: "Yes (Y)" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(verdicts().right).toBeUndefined();
+    fireEvent.click(slot.getByRole("button", { name: "No (N)" }));
+    await waitFor(() => expect(verdicts().right).toBe("no"));
+    fireEvent.keyDown(canvas, { key: "N" });
+    await waitFor(() =>
+      expect(verdicts()).toEqual({ image: "yes", right: "no", below: "no" }),
+    );
+    expect(
+      slot.container.querySelectorAll('[data-verdict="no"] circle'),
+    ).toHaveLength(2);
+    // The last image stays selected; judging it again clears its verdict.
+    fireEvent.keyDown(canvas, { key: "n" });
+    await waitFor(() => expect(verdicts().below).toBeUndefined());
+    fireEvent.keyDown(canvas, { key: "z", metaKey: true });
+    await waitFor(() => expect(verdicts().below).toBe("no"));
+  });
+
   it("moves and proportionally resizes an image with Select in canvas units", async () => {
     const image: CanvasElement = {
       id: "image",

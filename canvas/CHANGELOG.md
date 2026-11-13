@@ -3,6 +3,17 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `canvas/v<version>`.
 
+## 0.1.14 (2026-11-13)
+
+- Answer yes or no on images: select one and press **Y** or **N**, or use the
+  footer buttons. A green or red frame and badge mark it on the board and in
+  exports, declined images fade, and the next image in reading order is
+  selected. `canvas_read` returns each answer as the image's `verdict`.
+- Add `bb canvas add <file>`, which places PNG files and text from a JSON
+  layout, so an agent can lay out references for the user to judge.
+- Add `bb canvas remove <id>...`, which deletes elements by ID, so an agent can
+  clear declined references before the next round.
+
 ## 0.1.13 (2026-10-11)
 
 - Fix the browser toolbar's **Canvas** button, which added nothing in BB 0.46

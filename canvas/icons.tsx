@@ -44,6 +44,8 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   fit: <path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5" />,
+  yes: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  no: <path d="M6.5 6.5l11 11m0-11-11 11" />,
   minus: <path d="M5 12h14" />,
   plus: <path d="M5 12h14M12 5v14" />,
   capture: (

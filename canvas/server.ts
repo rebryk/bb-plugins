@@ -7,20 +7,62 @@ import {
 } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { PNG } from "pngjs";
+import { basename, resolve } from "node:path";
 import {
   CHANNEL,
   MAX_IMAGE_BYTES,
   applyPatch,
   boardSchema,
+  color,
+  COLORS,
+  coordinate,
+  dimension,
   emptyBoard,
   idSchema,
   patchSchema,
+  verdictSchema,
   type Board,
+  type CanvasElement,
   type Patch,
 } from "./model";
+import { textAdvance } from "./layout";
 import { boardSvg, fontBytes, rasterize } from "./render";
 
 const threadInput = z.object({ threadId: idSchema }).strict();
+// What `bb canvas add` places: PNG files by path and plain text, both at
+// canvas coordinates, so an agent can lay out a board of references.
+export const additionsSchema = z
+  .object({
+    elements: z
+      .array(
+        z.discriminatedUnion("type", [
+          z
+            .object({
+              type: z.literal("image"),
+              path: z.string().min(1),
+              x: coordinate,
+              y: coordinate,
+              width: dimension,
+              name: z.string().max(240).optional(),
+              verdict: verdictSchema.optional(),
+            })
+            .strict(),
+          z
+            .object({
+              type: z.literal("text"),
+              text: z.string().min(1).max(10_000),
+              x: coordinate,
+              y: coordinate,
+              fontSize: z.number().min(8).max(160).default(24),
+              color: color.default(COLORS[0][1]),
+            })
+            .strict(),
+        ]),
+      )
+      .min(1)
+      .max(500),
+  })
+  .strict();
 export const rpcContract = defineRpcContract({
   getCanvas: { input: threadInput, output: boardSchema },
   updateCanvas: {
@@ -303,7 +345,7 @@ export default function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "canvas_read",
     description:
-      "Read this thread's Canvas: image references and crops, text, sticky notes, drawing points, arrow endpoints, positions and dimensions. Coordinates are canvas units; array order is back to front. Follow nextOffset to read more elements.",
+      "Read this thread's Canvas: image references and crops, the user's yes/no verdict on images, text, sticky notes, drawing points, arrow endpoints, positions and dimensions. Coordinates are canvas units; array order is back to front. Follow nextOffset to read more elements.",
     parameters: z
       .object({
         offset: z.number().int().min(0).max(500).optional(),
@@ -339,7 +381,7 @@ export default function plugin(bb: BbPluginApi) {
   bb.cli.register(
     defineCli({
       name: "canvas",
-      summary: "Read and export a thread's Canvas",
+      summary: "Read, export, and add to a thread's Canvas",
       commands: {
         read: cliCommand({
           summary: "Read up to 20 saved elements; use --offset for more",
@@ -366,6 +408,155 @@ export default function plugin(bb: BbPluginApi) {
               stdout: JSON.stringify(
                 boundedRead(threadId, input.options.offset),
               ),
+            };
+          },
+        }),
+        add: cliCommand({
+          summary: "Add PNG images and text from a JSON layout file",
+          description:
+            'The file holds {"elements": [...]}: {"type": "image", "path", "x", "y", "width", "name"?, "verdict"?} places a PNG scaled to width; {"type": "text", "text", "x", "y", "fontSize"?, "color"?} places text. Coordinates are canvas units.',
+          positionals: [
+            {
+              name: "file",
+              description: "JSON layout file",
+              required: true,
+            },
+          ] as const,
+          options: {
+            thread: {
+              type: "string",
+              description: "Thread ID (defaults to current)",
+            },
+            json: { type: "boolean", description: "Print JSON" },
+          },
+          async run(input, ctx) {
+            const threadId = idSchema.parse(
+              input.options.thread ?? ctx.threadId,
+            );
+            const { hostId } = await bb.sdk.threads.storageLocation({
+              threadId,
+            });
+            const readFile = async (path: string) => {
+              if (!ctx.cwd && !path.startsWith("/"))
+                throw new Error(`Use an absolute path: ${path}`);
+              const file = await bb.sdk.files.read({
+                hostId,
+                path: resolve(ctx.cwd ?? "/", path),
+              });
+              return file.contentEncoding === "base64"
+                ? Buffer.from(file.content, "base64")
+                : Buffer.from(file.content, "utf8");
+            };
+            const { elements } = additionsSchema.parse(
+              JSON.parse(
+                (await readFile(input.positionals.file)).toString("utf8"),
+              ),
+            );
+            if (read(threadId).elements.length + elements.length > 500)
+              throw new Error("This canvas has room for at most 500 elements.");
+            const files = new Map<string, Buffer>();
+            for (const item of elements)
+              if (item.type === "image" && !files.has(item.path))
+                files.set(
+                  item.path,
+                  await readFile(item.path).catch((cause: Error) => {
+                    throw new Error(`${item.path}: ${cause.message}`);
+                  }),
+                );
+            // One transaction: a failed image rolls back the uploads before it,
+            // so a retry does not count them against the thread's image limit.
+            const board = db.transaction(() =>
+              update(threadId, {
+                removeIds: [],
+                upserts: elements.map((item): CanvasElement => {
+                  if (item.type === "text") {
+                    const lines = item.text.split("\n");
+                    return {
+                      ...item,
+                      id: randomUUID(),
+                      width: Math.max(
+                        24,
+                        ...lines.map(
+                          (line) => textAdvance(line, item.fontSize) + 4,
+                        ),
+                      ),
+                      height: lines.length * item.fontSize * 1.3,
+                    };
+                  }
+                  try {
+                    const asset = upload(
+                      threadId,
+                      files.get(item.path)!.toString("base64"),
+                    );
+                    return {
+                      type: "image",
+                      id: randomUUID(),
+                      assetId: asset.id,
+                      name: item.name ?? basename(item.path),
+                      x: item.x,
+                      y: item.y,
+                      width: item.width,
+                      height: (item.width * asset.height) / asset.width,
+                      ...(item.verdict && { verdict: item.verdict }),
+                    };
+                  } catch (cause) {
+                    throw new Error(
+                      `${item.path}: ${cause instanceof Error ? cause.message : cause}`,
+                    );
+                  }
+                }),
+              }),
+            )();
+            bb.realtime.publish(CHANNEL, {
+              threadId,
+              revision: board.revision,
+            });
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({
+                threadId,
+                revision: board.revision,
+                ids: board.elements.slice(-elements.length).map(({ id }) => id),
+              }),
+            };
+          },
+        }),
+        remove: cliCommand({
+          summary: "Remove elements by ID",
+          description:
+            "Removes the given elements, such as ones placed with add. Unknown IDs are ignored; removed images can be restored with Undo for a day.",
+          positionals: [
+            {
+              name: "ids",
+              description: "Element IDs",
+              required: true,
+              variadic: true,
+            },
+          ] as const,
+          options: {
+            thread: {
+              type: "string",
+              description: "Thread ID (defaults to current)",
+            },
+            json: { type: "boolean", description: "Print JSON" },
+          },
+          async run(input, ctx) {
+            const threadId = idSchema.parse(
+              input.options.thread ?? ctx.threadId,
+            );
+            const removeIds = z
+              .array(idSchema)
+              .max(500)
+              .parse(input.positionals.ids);
+            const before = read(threadId).elements.length;
+            const board = save(threadId, { upserts: [], removeIds });
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({
+                threadId,
+                revision: board.revision,
+                removed: before - board.elements.length,
+              }),
             };
           },
         }),

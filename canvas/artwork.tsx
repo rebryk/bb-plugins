@@ -4,7 +4,10 @@ import {
   boardInk,
   drawPath,
   isTextElement,
+  verdictMark,
   type CanvasElement,
+  type ImageElement,
+  type Verdict,
 } from "./model";
 import { CanvasImage } from "./image-crop";
 import { layoutSticky } from "./layout";
@@ -37,7 +40,14 @@ export const CanvasArtwork = memo(function CanvasArtwork({
   return (
     <g data-element={element.id} data-element-type={element.type}>
       {element.type === "image" ? (
-        <CanvasImage image={element} threadId={threadId} />
+        <>
+          <g opacity={element.verdict === "no" ? 0.4 : undefined}>
+            <CanvasImage image={element} threadId={threadId} />
+          </g>
+          {element.verdict && (
+            <VerdictMark image={{ ...element, verdict: element.verdict }} />
+          )}
+        </>
       ) : isTextElement(element) ? (
         <>
           <rect
@@ -113,3 +123,39 @@ export const CanvasArtwork = memo(function CanvasArtwork({
     </g>
   );
 });
+function VerdictMark({
+  image,
+}: {
+  image: ImageElement & { verdict: Verdict };
+}) {
+  const mark = verdictMark(image);
+  return (
+    <g pointerEvents="none" data-verdict={image.verdict}>
+      <rect
+        x={image.x}
+        y={image.y}
+        width={image.width}
+        height={image.height}
+        fill="none"
+        stroke={mark.color}
+        strokeWidth={mark.frame}
+      />
+      <circle
+        cx={mark.cx}
+        cy={mark.cy}
+        r={mark.radius}
+        fill={mark.color}
+        stroke="#fff"
+        strokeWidth={mark.radius * 0.12}
+      />
+      <path
+        d={mark.path}
+        fill="none"
+        stroke="#fff"
+        strokeWidth={mark.radius * 0.22}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}

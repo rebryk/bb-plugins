@@ -39,6 +39,8 @@ import {
   type ArrowElement,
   type DrawElement,
   type ImageElement,
+  type Verdict,
+  VERDICT_COLORS,
   type TextLikeElement,
   type Point,
   type Bounds,
@@ -271,6 +273,9 @@ function CanvasPanel({ threadId }: { threadId: string }) {
   const elements = [...drafts.values()];
   const selection = elements.filter((element) => selected.includes(element.id));
   const single = selection.length === 1 ? selection[0]! : null;
+  const images = selection.filter(
+    (element): element is ImageElement => element.type === "image",
+  );
   const canMove = (element: CanvasElement) =>
     tool === "select" || element.type !== "image";
   const styled = editing ?? (single?.type === "image" ? null : single);
@@ -513,6 +518,39 @@ function CanvasPanel({ threadId }: { threadId: string }) {
       y: (size.height - box.height * zoom) / 2 - box.y * zoom,
       zoom,
     };
+  }
+  function bringIntoView(box: Bounds) {
+    if (
+      view.x + box.x * view.zoom < 24 ||
+      view.y + box.y * view.zoom < 24 ||
+      view.x + (box.x + box.width) * view.zoom > size.width - 24 ||
+      view.y + (box.y + box.height) * view.zoom > size.height - 24
+    )
+      setView(frameView(box, view.zoom, 24));
+  }
+  function judge(verdict: Verdict) {
+    if (!images.length) return;
+    const clear = images.every((image) => image.verdict === verdict);
+    const judged = images.map(({ verdict: _, ...image }) =>
+      clear ? image : { ...image, verdict },
+    );
+    if (!commit(judged) || clear || images.length > 1) return;
+    // Judging one image moves on to the next in reading order (rows top to
+    // bottom, each left to right), so references go by with Y and N alone.
+    // An image starts a new row once it begins below the row's first half.
+    const rows: ImageElement[][] = [];
+    for (const image of elements
+      .filter((element): element is ImageElement => element.type === "image")
+      .sort((a, b) => a.y - b.y)) {
+      const row = rows.at(-1);
+      if (row && image.y < row[0]!.y + row[0]!.height / 2) row.push(image);
+      else rows.push([image]);
+    }
+    const order = rows.flatMap((row) => row.sort((a, b) => a.x - b.x));
+    const next = order[order.findIndex(({ id }) => id === images[0]!.id) + 1];
+    if (!next) return;
+    setSelected([next.id]);
+    bringIntoView(boundsOf(next));
   }
   function zoomAt(
     factor: number,
@@ -1178,6 +1216,17 @@ function CanvasPanel({ threadId }: { threadId: string }) {
           event.preventDefault();
           event.stopPropagation();
           space.current = true;
+        } else if (
+          !command &&
+          !event.altKey &&
+          !event.repeat &&
+          !gesture.current &&
+          images.length &&
+          (event.key.toLowerCase() === "y" || event.key.toLowerCase() === "n")
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          judge(event.key.toLowerCase() === "y" ? "yes" : "no");
         } else if (!command && !event.altKey) {
           const next = TOOLS.find(({ key }) => key === event.key.toLowerCase());
           if (next) {
@@ -1389,14 +1438,7 @@ function CanvasPanel({ threadId }: { threadId: string }) {
             cancelGesture();
             setSelected([element.id]);
             setCropping({ image: element, frame: boundsOf(element) });
-            const full = imageViewport(element);
-            if (
-              view.x + full.x * view.zoom < 24 ||
-              view.y + full.y * view.zoom < 24 ||
-              view.x + (full.x + full.width) * view.zoom > size.width - 24 ||
-              view.y + (full.y + full.height) * view.zoom > size.height - 24
-            )
-              setView(frameView(full, view.zoom, 24));
+            bringIntoView(imageViewport(element));
             focus();
           }
         }}
@@ -1589,14 +1631,36 @@ function CanvasPanel({ threadId }: { threadId: string }) {
         {selected.length > 0 && (
           <Button icon="trash" label="Delete selection" onClick={remove} />
         )}
+        {images.length > 0 && !cropping && (
+          <>
+            <Button
+              icon="yes"
+              label="Yes (Y)"
+              className="cv-button cv-verdict"
+              style={{ color: VERDICT_COLORS.yes }}
+              active={images.every((image) => image.verdict === "yes")}
+              onClick={() => judge("yes")}
+            />
+            <Button
+              icon="no"
+              label="No (N)"
+              className="cv-button cv-verdict"
+              style={{ color: VERDICT_COLORS.no }}
+              active={images.every((image) => image.verdict === "no")}
+              onClick={() => judge("no")}
+            />
+          </>
+        )}
         <span className="cv-hint">
           {cropping
             ? "Click outside to crop · Esc: cancel"
-            : tool === "draw" || tool === "arrow"
-              ? "Shift: straight · ⌥/Alt: draw over"
-              : tool === "text" || tool === "sticky"
-                ? "⌥/Alt: write over annotations"
-                : "Space + drag to pan"}
+            : images.length
+              ? "Y: yes · N: no"
+              : tool === "draw" || tool === "arrow"
+                ? "Shift: straight · ⌥/Alt: draw over"
+                : tool === "text" || tool === "sticky"
+                  ? "⌥/Alt: write over annotations"
+                  : "Space + drag to pan"}
         </span>
         <span className="cv-spacer" />
         <Button
