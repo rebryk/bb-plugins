@@ -382,9 +382,16 @@ describe("sourceAccount", () => {
   });
 });
 
+interface PoolerRequest {
+  method: string;
+  outputSchema: { parse: (value: unknown) => unknown };
+}
+
 function poolerRpc(accounts: PoolAccount[], switchThreshold = 0.95) {
-  return async (request: { method: string }) =>
-    request.method === "config.get" ? { switchThreshold } : { accounts };
+  return async (request: PoolerRequest) =>
+    request.outputSchema.parse(
+      request.method === "config.get" ? { switchThreshold } : { accounts },
+    );
 }
 
 const cursorUsage = {
@@ -440,7 +447,8 @@ describe("plugin", () => {
     id: "RateLimitResetCredit_1",
     status: "available",
     is_supported_by_plan: true,
-    expires_at: "2026-10-22T20:28:26Z",
+    // Expired resets don't count, so keep this one in the future.
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString(),
   };
   const dataDirs: string[] = [];
 
@@ -544,6 +552,55 @@ describe("plugin", () => {
     ]);
     expect(result.accounts).toMatchObject([{ weight: 20, offline: null }]);
     expect(harness.inspection.sdk.callsTo("plugins.callRpc")).toHaveLength(2);
+    await harness.lifecycle.dispose();
+  });
+
+  it("reads accounts that report only their limit windows", async () => {
+    const {
+      fiveHourUtilization,
+      fiveHourResetAt,
+      fiveHourStatus,
+      sevenDayUtilization,
+      sevenDayResetAt,
+      sevenDayStatus,
+      ...current
+    } = account({
+      observedAt: Date.now(),
+      limitWindows: [
+        {
+          slot: "secondary",
+          windowMinutes: 10_080,
+          utilization: 0.48,
+          resetAt: 700_000,
+          status: "allowed",
+        },
+      ],
+    });
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "pool-usage",
+      sdk: {
+        plugins: { callRpc: poolerRpc([current as PoolAccount]) },
+      },
+    });
+    await plugin(bb);
+
+    const result = (await harness.behavior.callRpc(
+      "usage_get",
+    )) as UsageSnapshot;
+
+    expect(result.accounts).toMatchObject([
+      {
+        offline: null,
+        windows: [
+          {
+            minutes: 10_080,
+            utilization: 0.48,
+            resetAt: 700_000,
+            rejected: false,
+          },
+        ],
+      },
+    ]);
     await harness.lifecycle.dispose();
   });
 
@@ -761,7 +818,7 @@ describe("plugin", () => {
       dataDir: await storeLogins(accounts),
       sdk: {
         plugins: {
-          callRpc: async (request: { method: string }) => {
+          callRpc: async (request: PoolerRequest) => {
             if (!reachable) throw new Error("missing plugin");
             return poolerRpc(accounts)(request);
           },
@@ -908,7 +965,9 @@ describe("plugin", () => {
                   {
                     ...credit,
                     id: "later",
-                    expires_at: "2027-06-01T00:00:00Z",
+                    expires_at: new Date(
+                      Date.now() + 30 * 24 * 60 * 60_000,
+                    ).toISOString(),
                   },
                   credit,
                   { ...credit, id: "unsupported", is_supported_by_plan: false },
