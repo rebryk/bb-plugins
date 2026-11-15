@@ -3,6 +3,14 @@
 Newest version first. [Releases](../README.md#releases) explains when a change
 gets a new version. Each version is tagged `pool-usage/v<version>`.
 
+## 0.2.7 (2026-11-15)
+
+- Pool Usage counts every Account Pooler account again. Newer Account Pooler
+  versions report quota windows only in `limitWindows`, so the plugin failed to
+  read them and fell back to BB's own usage sources, which know only each
+  provider's signed-in account. Claude could then show one account's 99%
+  instead of the pool's total, and Codex the signed-in account or nothing.
+
 ## 0.2.6 (2026-10-02)
 
 - **Reset to** now picks the reset that frees the most quota across all the
