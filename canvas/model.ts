@@ -11,9 +11,11 @@ export const idSchema = z
   .min(1)
   .max(200)
   .regex(/^[\w-]+$/);
-const coordinate = z.number().finite().min(-100_000).max(100_000);
-const dimension = z.number().finite().min(1).max(20_000);
-const color = z.string().regex(/^#[\da-fA-F]{6}$/);
+export const coordinate = z.number().finite().min(-100_000).max(100_000);
+export const dimension = z.number().finite().min(1).max(20_000);
+export const color = z.string().regex(/^#[\da-fA-F]{6}$/);
+export const verdictSchema = z.enum(["yes", "no"]);
+export type Verdict = z.infer<typeof verdictSchema>;
 const base = { id: idSchema, x: coordinate, y: coordinate };
 const box = z.object({ ...base, width: dimension, height: dimension }).strict();
 const text = box.extend({
@@ -45,6 +47,7 @@ export const elementSchema = z.discriminatedUnion("type", [
       assetId: idSchema,
       name: z.string().max(240),
       crop: cropSchema.optional(),
+      verdict: verdictSchema.optional(),
     })
     .refine((image) => {
       if (!image.crop) return true;
@@ -241,3 +244,29 @@ export const COLORS = [
 // theme's text color so it stays readable on a dark background.
 export const boardInk = (color: string) =>
   color === COLORS[0][1] ? "var(--cv-graphite)" : color;
+export const VERDICT_COLORS: Record<Verdict, string> = {
+  yes: COLORS[3][1],
+  no: COLORS[1][1],
+};
+// A verdict shows as a colored frame and a corner badge sized to the image,
+// so it reads at any zoom and in exports alike.
+export function verdictMark(image: Bounds & { verdict: Verdict }) {
+  const radius = Math.min(
+    48,
+    Math.max(12, Math.min(image.width, image.height) * 0.07),
+  );
+  const cx = image.x + image.width - radius * 1.4,
+    cy = image.y + radius * 1.4,
+    s = radius * 0.45;
+  return {
+    color: VERDICT_COLORS[image.verdict],
+    frame: Math.max(3, radius * 0.25),
+    radius,
+    cx,
+    cy,
+    path:
+      image.verdict === "yes"
+        ? `M${cx - s} ${cy}l${s * 0.7} ${s * 0.7} ${s * 1.3} ${-s * 1.4}`
+        : `M${cx - s * 0.75} ${cy - s * 0.75}l${s * 1.5} ${s * 1.5}M${cx + s * 0.75} ${cy - s * 0.75}l${-s * 1.5} ${s * 1.5}`,
+  };
+}

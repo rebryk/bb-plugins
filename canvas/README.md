@@ -41,6 +41,11 @@ Open **Canvas** from the right panel's new-tab menu, or run
   **⌘Z** / **Ctrl+Z** undoes an edit, including an entire pasted group;
   add Shift to redo. **V**, **S**, **T**, **A**, and **D** switch to Select,
   Sticky note, Text, Arrow, and Draw while the canvas has focus.
+- **Yes or no.** Select an image and press **Y** or **N**, or choose **Yes**
+  or **No** in the footer. A green or red frame and badge mark the image, and
+  a declined image fades. The next image in reading order (rows top to
+  bottom, then left to right) is selected, so a board of references can be
+  judged with the two keys alone. Pressing the same answer again clears it.
 - **Navigate.** Scroll to pan; hold Space and drag to pan with a mouse.
   Pinch a trackpad or use the zoom buttons to zoom. **Fit canvas** shows all
   elements. On a touch screen, drag empty canvas to pan.
@@ -82,10 +87,35 @@ Agents can also run:
 bb canvas read --json
 bb canvas read --offset 20 --json
 bb canvas export --json
+bb canvas add layout.json --json
+bb canvas remove <id>... --json
 ```
 
 `--thread <id>` chooses a thread explicitly. Export writes a PNG into that
 thread's storage on its owning machine and returns its path and host ID.
+`add` places PNG files and text from a JSON layout on that thread's machine:
+
+```json
+{
+  "elements": [
+    { "type": "text", "text": "Sidebars", "x": 0, "y": 0, "fontSize": 44 },
+    {
+      "type": "image",
+      "path": "shots/linear.png",
+      "x": 0,
+      "y": 80,
+      "width": 480,
+      "name": "linear-sidebar"
+    }
+  ]
+}
+```
+
+Images keep their proportions at the given width and may carry a `verdict`
+to bring an earlier answer along; relative paths resolve from the command's
+working directory. Read answers back with `canvas_read`:
+each judged image carries `"verdict": "yes"` or `"no"`. `remove` deletes
+elements by ID, for example the declined ones before the next round.
 
 ## How it works
 
