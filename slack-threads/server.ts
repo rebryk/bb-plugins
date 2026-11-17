@@ -7,7 +7,14 @@ import {
   type PluginThreadEventPayloads,
 } from "@get-bb/plugin-sdk";
 import type { Logger, Message, Thread } from "chat";
+import { dirname, resolve } from "node:path";
 import { z } from "zod";
+import {
+  removeFiles,
+  saveFiles,
+  threadFilesDir,
+  type SavedFile,
+} from "./files";
 import { answerFromText, describeInteraction } from "./interactions";
 import {
   DEFAULT_GUARDRAILS,
@@ -23,6 +30,7 @@ import {
   chatThreadId,
   connectSlack,
   describeMessage,
+  describeFiles,
   describeSlackError,
   extractBlocks,
   parseBlocks,
@@ -313,6 +321,21 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     return thread.isDM || channels.length === 0 || channels.includes(channelId);
   };
 
+  /**
+   * One Slack thread's files: next to the plugin's database, so they are
+   * there before its bb thread starts, and its workers read them too.
+   */
+  const filesDir = (key: string) =>
+    threadFilesDir(
+      resolve(dirname(bb.storage.database().name), "slack-files"),
+      key,
+    );
+
+  /** Each message as the agent reads it, with the files saved for it. */
+  const describeWith =
+    (files: Map<string, SavedFile[]>) => (message: Message) =>
+      describeMessage(message, files.get(message.id));
+
   /** Records Slack messages (already marked 👀) as waiting for a reply. */
   const markPending = (binding: Binding, messages: Message[]) => {
     for (const message of messages) {
@@ -383,14 +406,19 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     ]);
     const fresh = new Set(messages.map((message) => message.id));
     const earlier = history.filter((message) => !fresh.has(message.id));
+    const key = slackKey(current.identity.teamId, channelId, threadTs);
+    // The new messages' files first, then the latest earlier ones.
+    const describe = describeWith(
+      await saveFiles(filesDir(key), [...messages, ...[...earlier].reverse()]),
+    );
     const where = thread.isDM ? "a direct message" : (name ?? channelId);
     const author = authorName(last);
     const prompt = [
       `Slack message from ${author} in ${where}${link ? ` (${link})` : ""}:`,
-      messages.map(describeMessage).join("\n\n"),
+      messages.map(describe).join("\n\n"),
       ...(earlier.length > 0
         ? [
-            `Earlier messages in this Slack thread, oldest first:\n${earlier.map(describeMessage).join("\n")}`,
+            `Earlier messages in this Slack thread, oldest first:\n${earlier.map(describe).join("\n")}`,
           ]
         : []),
       ...(note ? [note] : []),
@@ -425,7 +453,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       },
     });
     const binding: Binding = {
-      slackKey: slackKey(current.identity.teamId, channelId, threadTs),
+      slackKey: key,
       bbThreadId: spawned.id,
       teamId: current.identity.teamId,
       channelId,
@@ -454,6 +482,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     binding: Binding,
     text: string,
     quiet: boolean,
+    messages: Message[],
   ): Promise<"answered" | "hint" | "none"> => {
     const tasks = store.activeTasksOf(binding.slackKey);
     const threadIds = [
@@ -488,11 +517,42 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
       );
       return "hint";
     }
+    const files = await saveFiles(filesDir(binding.slackKey), messages);
+    const context = describeFiles([...files.values()].flat());
+    let followup = context;
+    if (context) {
+      const question =
+        waiting.payload.kind === "user_question"
+          ? waiting.payload.questions.find(
+              (item) => item.allowFreeText || !item.options?.length,
+            )
+          : undefined;
+      if (question && "answers" in answer.resolution) {
+        const value = answer.resolution.answers[question.id];
+        if (value) {
+          value.freeText = [value.freeText, context].filter(Boolean).join("\n\n");
+          followup = "";
+        }
+      }
+    }
     await bb.sdk.threads.interactions.resolve({
       threadId: pending.threadId,
       interactionId: waiting.id,
       resolution: answer.resolution,
     });
+    if (followup) {
+      // Option-only answers and approvals have no field for file context.
+      // Send it separately to the thread that asked, which may be a worker.
+      await bb.sdk.threads.send({
+        threadId: pending.threadId,
+        mode: "auto",
+        input: [{
+          type: "text",
+          text: `Files attached to the Slack reply:\n${followup}`,
+          mentions: [],
+        }],
+      });
+    }
     for (const task of tasks) {
       if (task.workerThreadId !== pending.threadId) continue;
       if (task.state !== "waiting") continue;
@@ -541,7 +601,9 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     const reply = direct
       ? messages.map((message) => message.text).join("\n")
       : withoutMentions(current, answerTo.text);
-    const answered = await answerInteraction(current, binding, reply, false);
+    const answered = await answerInteraction(
+      current, binding, reply, false, forwarded,
+    );
     if (answered === "hint") {
       await unmark(current, binding.channelId, forwarded);
       return;
@@ -553,17 +615,23 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     }
 
     const since = direct ? [] : await messagesSince(thread, binding, answerTo);
+    const describe = describeWith(
+      await saveFiles(
+        filesDir(binding.slackKey),
+        direct ? messages : [answerTo, ...[...since].reverse()],
+      ),
+    );
     const text = direct
       ? messages
-          .map((message) => `Slack reply from ${describeMessage(message)}`)
+          .map((message) => `Slack reply from ${describe(message)}`)
           .join("\n\n")
       : [
           ...(since.length > 0
             ? [
-                `Slack messages since your last turn, oldest first:\n${since.map(describeMessage).join("\n")}`,
+                `Slack messages since your last turn, oldest first:\n${since.map(describe).join("\n")}`,
               ]
             : []),
-          `Answer this Slack message:\n${describeMessage(answerTo)}`,
+          `Answer this Slack message:\n${describe(answerTo)}`,
         ].join("\n\n");
     const send = () =>
       bb.sdk.threads.send({
@@ -661,7 +729,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
           if (
             binding &&
             last &&
-            (await answerInteraction(current, binding, last.text, true)) ===
+            (await answerInteraction(current, binding, last.text, true, [last])) ===
               "answered"
           ) {
             marked = [last];
@@ -1047,6 +1115,11 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     for (const binding of removed) {
       await state?.unsubscribe(
         chatThreadId(binding.channelId, binding.threadTs),
+      );
+      await removeFiles(filesDir(binding.slackKey)).catch((error: unknown) =>
+        bb.log.warn(
+          `Could not delete the Slack files of ${binding.slackKey}: ${errorMessage(error)}`,
+        ),
       );
     }
   });

@@ -2,6 +2,7 @@ import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { Chat, type Logger, type Message, type Thread } from "chat";
 import { blockPointers, sanitizeBlocks } from "./blocks";
+import type { SavedFile } from "./files";
 
 /** Slack's `markdown_text` holds 12,000 characters; leave room. */
 const CHUNK_CHARS = 11_000;
@@ -349,12 +350,23 @@ export const authorName = (message: Message) =>
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
-/** One message as the agent reads it. */
-export function describeMessage(message: Message): string {
-  const files = message.attachments.length
-    ? ` [${message.attachments.length} attachment(s) not forwarded]`
-    : "";
-  return `${authorName(message)}: ${clip(message.text.trim(), HISTORY_MESSAGE_CHARS)}${files}`;
+/** Saved attachments as prompt lines, also used for interaction answers. */
+export const describeFiles = (files: SavedFile[]) =>
+  files.map((file) =>
+    "path" in file
+      ? `  [file] ${file.path}`
+      : `  [file not downloaded] ${file.name}: ${file.error}`,
+  ).join("\n");
+
+/** One message as the agent reads it, with its files from `saveFiles`. */
+export function describeMessage(
+  message: Message,
+  files: SavedFile[] = [],
+): string {
+  return [
+    `${authorName(message)}: ${clip(message.text.trim(), HISTORY_MESSAGE_CHARS)}`,
+    ...(files.length ? [describeFiles(files)] : []),
+  ].join("\n");
 }
 
 /** The latest messages of a Slack thread, oldest first. */

@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-slack-threads",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "author": "Yurii Rebryk",
   "repository": {
@@ -29,7 +29,8 @@
   },
   "scripts": {
     "build": "bb plugin build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@chat-adapter/slack": "4.44.0",
@@ -45,6 +46,7 @@
     "better-sqlite3": "^12.0.0",
     "cron-parser": "^5.5.0",
     "hono": "^4.11.9",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
   }
 }
