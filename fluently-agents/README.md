@@ -53,17 +53,19 @@ lead. The plugin draws the messages, tool activity and composer; BB owns the
 history, permissions and execution. Drafts stay in this browser per thread.
 The text field spans the composer width. Attachments and agent selection sit
 below it, with voice and send controls on the right. Task conversations omit
-the agent selector.
+the agent selector. Recording animates the microphone button; press it again
+to finish. Processing and retry states use that same button.
 
-Queued messages, file uploads and stop controls use BB APIs. While work runs,
+Queued messages and file uploads use BB APIs. While work runs,
 Enter sends immediately; Cmd+Enter on Mac or Ctrl+Enter elsewhere queues the
-message. This follows BB's Enter behavior setting, including its reversed
-mapping. Queued messages have Send now and Remove actions. Complex permission
+message. Queued messages stay directly above the composer and have Send now
+and Remove actions. Complex permission
 and question requests open BB's own controls from the conversation.
 
 Paste screenshots or drop files into the chat to attach them. Raster images
 appear in a scrollable preview strip; remove a draft image with its corner
-button. Open an image to see it whole, with a corner close button. Other files
+button. Open an image to see it whole; click outside or press Escape to close.
+Other files
 keep their download link. Uploads finish before
 sending. Internal activity stays collapsed until you expand it.
 
@@ -107,8 +109,8 @@ Model choice happens at launch; an existing conversation keeps its model.
   turn does not mark a task done.
 - Inbox lists tasks needing attention above the conversation. Resize either
   panel to change their shared width; this browser remembers it.
-- Mark done archives settled work. Stop running or queued work in its
-  conversation before closing the task.
+- Mark done archives settled work. Let active work finish and resolve queued
+  messages before closing the task.
 - Snooze hides a card for three hours, until tomorrow at 09:00, or indefinitely.
   It does not stop work. Time-based snoozes expire on the next refresh.
 - Right-click the microphone button to choose text or voice mode. N focuses the

@@ -4,24 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderSlot } from '@get-bb/plugin-sdk/testing/app';
 import type { PluginBrowserBbSdk } from '@get-bb/plugin-sdk/app';
 import { Chat, mergeRows, reconcileRows, removeSubmittedDraft, type ChatProps, type ChatRow } from './chat';
-const voice = vi.hoisted(() => ({ state: 'idle' as const, level: 0, toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), onTranscript: null as ((value: string) => void) | null }));
-vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: string): void }) => { voice.onTranscript = options.onTranscript; return voice; } }));
+const voice = vi.hoisted(() => ({ state: 'idle' as import('./voice').VoiceState, level: 0, failedRecording: null as Blob | null, toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), onTranscript: null as ((value: string) => void) | null, onError: null as ((value: string) => void) | null }));
+vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: string): void; onError(value: string): void }) => { voice.onTranscript = options.onTranscript; voice.onError = options.onError; return voice; } }));
 beforeEach(() => { const values = new Map<string, string>(); vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) }); });
 beforeEach(() => {
   for (const method of ['showModal', 'close']) if (!(method in HTMLDialogElement.prototype)) Object.defineProperty(HTMLDialogElement.prototype, method, { configurable: true, writable: true, value() {} });
   vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function(this: HTMLDialogElement) {
-    this.open = true; this.querySelector<HTMLButtonElement>('button')?.focus();
+    this.open = true;
   });
   vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function(this: HTMLDialogElement) {
     this.open = false;
   });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); voice.state = 'idle'; voice.failedRecording = null; voice.level = 0; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const row = (id: string, seq: number, text: string, role: 'assistant' | 'user' = 'assistant') => ({ kind: 'conversation', role, id, sourceSeqStart: seq, sourceSeqEnd: seq, text, attachments: null }) as ChatRow;
 type Upload = PluginBrowserBbSdk['projects']['attachments']['upload'];
 type ReadAttachment = PluginBrowserBbSdk['projects']['attachments']['read'];
-function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; steerOnEnter?: boolean; config?: () => Promise<unknown>; queued?: unknown[]; sendQueued?: () => Promise<unknown>; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
-  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { system: { config: options.config ?? (async () => ({ generalSettings: { steerActiveThreadOnEnter: options.steerOnEnter ?? true } })) } as PluginBrowserBbSdk['system'], projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
+function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; queued?: unknown[]; sendQueued?: () => Promise<unknown>; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
+  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
     storageLocation: async () => ({ hostId: 'host-a', storageRootPath: '/storage/thread-a' }),
     timeline: async () => ({ rows: options.rows ?? [row('a', 1, 'Hello'), row('b', 2, 'My reply', 'user')], timelinePage: { olderCursor: null }, maxSeq: 2 }),
     get: async () => ({ id: 'thread-a', projectId: 'project-a', status: options.status || 'idle' }),
@@ -32,6 +32,38 @@ function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send
   } as unknown as PluginBrowserBbSdk['threads'] } });
 }
 describe('Custom conversation', () => {
+  it('shows an empty-recording error on the mic even when capture returns idle', async () => {
+    const slot = mount(); await slot.findByText('Hello');
+    await act(async () => { voice.onError?.('No audio was recorded'); });
+    const retry = slot.getByRole('button', { name: 'Retry voice message: No audio was recorded' });
+    expect(retry.querySelector('svg')).toBeTruthy(); expect(slot.queryByRole('alert')).toBeNull();
+    fireEvent.click(retry);
+    expect(slot.getByRole('button', { name: 'Record voice message' })).toBeTruthy();
+  });
+  it('keeps voice recording, processing and retry inside the microphone button', async () => {
+    voice.state = 'recording'; voice.level = .7;
+    const recording = mount(); await recording.findByText('Hello');
+    expect(recording.queryByText('Cancel')).toBeNull();
+    const finish = recording.getByRole('button', { name: 'Finish recording' });
+    expect(finish.querySelector('.fa-voice-orb')).toBeTruthy();
+    expect(finish.style.getPropertyValue('--voice-level')).toBe('0.7');
+    voice.toggle.mockClear(); fireEvent.click(finish); expect(voice.toggle).toHaveBeenCalledTimes(1); recording.unmount();
+    voice.state = 'transcribing';
+    const processing = mount(); await processing.findByText('Hello');
+    const spinner = processing.getByRole('button', { name: 'Transcribing voice message' });
+    expect((spinner as HTMLButtonElement).disabled).toBe(true);
+    expect(spinner.querySelector('.fa-voice-spinner')).toBeTruthy();
+    expect(processing.queryByText('Transcribing…')).toBeNull(); processing.unmount();
+    voice.state = 'error'; voice.failedRecording = new Blob(['audio']); voice.retry.mockClear();
+    const failed = mount(); await failed.findByText('Hello');
+    fireEvent.click(failed.getByRole('button', { name: 'Retry voice message' }));
+    expect(voice.retry).toHaveBeenCalledTimes(1); expect(failed.queryByText('Retry voice')).toBeNull(); failed.unmount();
+    voice.failedRecording = null; voice.toggle.mockClear();
+    const unavailable = mount(); await unavailable.findByText('Hello');
+    fireEvent.click(unavailable.getByRole('button', { name: 'Retry voice message' }));
+    expect(voice.toggle).toHaveBeenCalledTimes(1);
+  });
+
   it('attaches pasted screenshots once and keeps ordinary text paste untouched', async () => {
     const image = new File(['png'], 'Screenshot.png', { type: 'image/png' });
     const upload = vi.fn(async () => ({ type: 'localImage' as const, path: 'attachments/shot.png', name: image.name, sizeBytes: image.size }));
@@ -119,9 +151,11 @@ describe('Custom conversation', () => {
       const modal = slot.getByRole('dialog', { name: 'Preview preview.png' });
       expect(modal.textContent).toBe('');
       const bubbled = vi.fn(); window.addEventListener('keydown', bubbled);
-      fireEvent.keyDown(slot.getByRole('button', { name: 'Close image preview' }), { key: 'n' });
+      expect(slot.queryByRole('button', { name: 'Close image preview' })).toBeNull();
+      expect(document.activeElement).toBe(modal);
+      fireEvent.keyDown(modal, { key: 'n' });
       expect(bubbled).not.toHaveBeenCalled(); window.removeEventListener('keydown', bubbled);
-      fireEvent.click(slot.getByRole('button', { name: 'Close image preview' }));
+      fireEvent.click(modal, { clientX: -1, clientY: -1 });
       expect(slot.queryByRole('dialog')).toBeNull();
       expect(revoke).not.toHaveBeenCalled();
       preview.focus(); fireEvent.click(preview);
@@ -198,7 +232,7 @@ describe('Custom conversation', () => {
     expect(slot.queryByText('Later completed step')).toBeNull();
     expect(slot.getAllByRole('status')).toHaveLength(1);
     expect(slot.getByRole('status').textContent).toBe('Working…');
-    expect(slot.getByRole('status').closest('[role="log"]')).toBeNull();
+    expect(slot.getByRole('status').closest('[role="log"]')).toBeTruthy();
   });
 
   it('does not label failed activity as completed or show processing behind an interaction', async () => {
@@ -218,23 +252,24 @@ describe('Custom conversation', () => {
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Not an approval' } }); expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(slot.getByRole('button', { name: 'Review request' })); expect(slot.getByRole('dialog').getAttribute('aria-label')).toBe('Review agent request'); expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('thread-a');
   });
-  it('uses native default Enter steering without a visible queue toggle', async () => {
-    const slot = mount({ status: 'active' }); await slot.findByRole('button', { name: 'Stop work' }); expect(slot.queryByRole('button', { name: 'Queue' })).toBeNull();
+  it('steers normal sends without Stop or queue mode controls', async () => {
+    const slot = mount({ status: 'active' }); await slot.findByText('Hello'); expect(slot.queryByRole('button', { name: 'Stop work' })).toBeNull(); expect(slot.queryByRole('button', { name: 'Queue' })).toBeNull();
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Change direction' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'steer-if-active' }] }));
   });
-  it.each([['MacIntel', true, 'metaKey', 'queue-if-active'], ['Win32', true, 'ctrlKey', 'queue-if-active'], ['MacIntel', false, 'metaKey', 'steer-if-active']])('matches BB modifier on %s with preference %s', async (platform, preference, modifier, mode) => {
+  it.each([['MacIntel', 'metaKey'], ['Win32', 'ctrlKey']])('queues modified Enter on %s', async (platform, modifier) => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform as string);
-    const slot = mount({ status: 'active', steerOnEnter: preference as boolean }); await slot.findByText('Hello');
+    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Follow up' } });
     fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', [modifier as string]: true });
-    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode }] }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
   });
-  it('honors native queue-on-Enter preference', async () => {
-    const slot = mount({ status: 'active', steerOnEnter: false }); await slot.findByText('Hello');
+  it('steers Enter without reading the BB send preference', async () => {
+    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After this' } });
     fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
-    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'steer-if-active' }] }));
+    expect(slot.inspection.sdkCalls.some(call => call.method === 'system.config')).toBe(false);
   });
   it('never sends unsupported modifiers, IME composition, key repeat or Shift+Enter', async () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
@@ -244,18 +279,20 @@ describe('Custom conversation', () => {
     expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
     expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep editing');
   });
-  it('queues ordinary sends while stopping and ignores the unavailable modifier action', async () => {
+  it.each([false, true])('queues while stopping with modifier=%s', async modified => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
     const slot = mount({ status: 'stopping' }); await slot.findByText('Hello');
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After stopping' } });
-    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', metaKey: true });
-    expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
-    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', metaKey: modified });
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
   });
   it('renders the queue and sends an existing item now without submitting the draft', async () => {
     const slot = mount({ status: 'active', queued: [{ id: 'queue-a', content: [{ type: 'text', text: 'Do this later' }] }] }); await slot.findByText('Do this later');
     expect(slot.getByText('Queued')).toBeTruthy();
+    const queue = slot.getByRole('region', { name: 'Queued messages' });
+    expect(queue.closest('[role=log]')).toBeNull();
+    expect(queue.nextElementSibling).toBe(slot.getByRole('textbox').closest('form'));
+    expect(slot.getByRole('status').closest('[role=log]')).toBeTruthy();
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Unsent draft' } });
     fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.queuedMessages.send')).toMatchObject({ args: [{ threadId: 'thread-a', queuedMessageId: 'queue-a', mode: 'steer' }] }));
@@ -270,15 +307,6 @@ describe('Custom conversation', () => {
     const slot = mount({ queued, sendQueued }); await slot.findByText('Still queued');
     fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
     await slot.findByRole('alert'); expect(slot.getByText('Still queued')).toBeTruthy(); expect(sendQueued).toHaveBeenCalledTimes(1);
-  });
-  it('retries a failed settings read through Refresh before enabling send', async () => {
-    const config = vi.fn().mockRejectedValueOnce(new Error('Settings unavailable')).mockResolvedValue({ generalSettings: { steerActiveThreadOnEnter: true } });
-    const slot = mount({ config, status: 'active' }); await slot.findByRole('alert');
-    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Draft' } });
-    expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(slot.getByRole('button', { name: 'Refresh' }));
-    await waitFor(() => expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
-    expect(config).toHaveBeenCalledTimes(2);
   });
   it('merges streaming updates without losing paginated history', () => {
     expect(mergeRows([row('old', 1, 'Earlier'), row('live', 3, 'Hel')], [row('live', 3, 'Hello'), row('new', 4, 'Next')]).map(item => item.id)).toEqual(['old', 'live', 'new']);

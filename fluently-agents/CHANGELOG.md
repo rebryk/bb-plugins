@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.13 — 2026-11-20
+
+- Keep recording, processing and retry controls inside the voice button.
+- Remove the standalone Stop control and dock the queue above the composer.
+- Send immediately with Enter; queue with Cmd/Ctrl+Enter during active work.
+- Close image previews through the backdrop or Escape without an extra button.
+
 ## 0.1.12 — 2026-11-20
 
 - Show full images in a minimal preview with a close icon.

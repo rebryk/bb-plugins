@@ -20,16 +20,17 @@
 .fa-app .fa-compose-actions { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
 .fa-app .fa-compose-left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .fa-app .fa-compose-right { display: flex; align-items: center; gap: 2px; flex: none; }
-.fa-app .fa-compose-actions .fa-composer-tool, .fa-app .fa-compose-status button { display: flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 28px; height: 28px; padding: 4px 6px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
+.fa-app .fa-compose-actions .fa-composer-tool { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; min-width: 28px; height: 28px; padding: 4px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
 .fa-app .fa-compose-actions .fa-send-message { background: var(--fa-control); color: var(--fa-text); }
-.fa-app .fa-compose-actions .fa-recording { background: #5b8def; color: white; box-shadow: 0 0 0 calc(2px + var(--voice-level, 0) * 5px) rgba(91,141,239,.22); transition: box-shadow 80ms linear; }
 .fa-app .fa-chat-error { display: flex; gap: 8px; align-items: center; padding: 10px; color: var(--fa-amber); font-size: 11px; }
 .fa-app .fa-chat-error button, .fa-app .fa-load-history, .fa-app .fa-interaction button { border: 0; background: var(--fa-control); color: inherit; border-radius: 10px; padding: 6px 9px; font-size: 11px; }
 .fa-app .fa-draft-files, .fa-app .fa-message-files { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; font-size: 10px; }
 .fa-app .fa-draft-files > span, .fa-app .fa-message-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--fa-control); border-radius: 8px; }
 .fa-app .fa-draft-files button, .fa-app .fa-queued-message button { padding: 0; border: 0; background: none; }
 .fa-app .fa-interaction { margin: 10px 0; padding: 10px; border: 1px solid color-mix(in srgb, var(--fa-amber) 40%, var(--fa-line)); border-radius: 14px; font-size: 12px; }
-.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: var(--fa-control); border-radius: 12px; padding: 9px; margin-top: 8px; font-size: 11px; }
+.fa-app .fa-message-queue { flex: 0 1 auto; min-height: 0; max-height: min(144px, 25%); overflow-y: auto; scrollbar-width: thin; margin: 0 6px 6px; }
+.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: var(--fa-control); border-radius: 12px; padding: 6px 8px; font-size: 11px; }
+.fa-app .fa-queued-message + .fa-queued-message { margin-top: 4px; }
 .fa-app .fa-queued-message > span { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fa-app .fa-queued-message > small { color: var(--fa-muted); }
 .fa-app .fa-queued-message button { flex: 0 0 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
@@ -41,7 +42,6 @@
 .fa-app .fa-advanced-overlay p { color: var(--fa-muted); font-size: 11px; }
 @media (hover: hover) { .fa-app .fa-compose-actions .fa-composer-tool:hover { background: var(--fa-hover); } }
 
-.fa-app .fa-compose-status { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 3px 10px; font-size: 10px; color: var(--fa-muted); }
 @media (max-width: 700px) { .fa-app .fa-message-composer textarea { font-size: 16px; } }
 
 .fa-app .fa-message-files button { border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; }
@@ -76,5 +76,9 @@
 .fa-app .fa-image-dialog { position: fixed; inset: 0; width: fit-content; height: fit-content; max-width: none; max-height: none; margin: auto; padding: 0; border: 0; background: transparent; overflow: visible; box-shadow: none; }
 .fa-app .fa-image-dialog::backdrop { background: rgba(0,0,0,.65); }
 .fa-app .fa-image-dialog > img { display: block; width: auto; height: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); object-fit: contain; border-radius: 8px; }
-.fa-app .fa-image-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: rgba(0,0,0,.6); color: white; }
-@media (hover: hover) { .fa-app .fa-image-close:hover { background: rgba(0,0,0,.8); } }
+
+.fa-app .fa-compose-actions .fa-recording { background: transparent; }
+.fa-app .fa-voice-orb { width: 20px; height: 20px; border-radius: 50%; background: conic-gradient(#75d6ff, #7e79ff, #ec8ed9, #75d6ff); box-shadow: 0 0 calc(3px + var(--voice-level, 0) * 7px) rgba(91,141,239,.6); scale: calc(.85 + var(--voice-level, 0) * .3); animation: fa-voice-spin 3s linear infinite; transition: scale 80ms linear, box-shadow 80ms linear; }
+.fa-app .fa-voice-spinner { width: 16px; height: 16px; border: 2px solid var(--fa-line); border-top-color: var(--fa-blue); border-radius: 50%; animation: fa-voice-spin .8s linear infinite; }
+@keyframes fa-voice-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fa-app .fa-voice-orb, .fa-app .fa-voice-spinner { animation: none; transition: none; scale: 1; } }

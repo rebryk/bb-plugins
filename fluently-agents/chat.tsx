@@ -13,6 +13,7 @@ type MarkdownDocument = NonNullable<ComponentProps<typeof Markdown>['experimenta
 type StorageLocation = Awaited<ReturnType<Sdk['threads']['storageLocation']>>;
 type Queue = Awaited<ReturnType<Sdk['threads']['queuedMessages']['list']>>;
 export interface ChatProps { threadId: string; focusRequest?: number; voiceRequest?: number; onVoiceRequestHandled?(nonce: number): void; onVoiceState?(value: { state: VoiceState; level: number }): void; composerAgents?: ReactNode; onVoiceContextMenu?(event: MouseEvent<HTMLButtonElement>): void; className?: string; }
+function RetryIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 3v7h7" /></svg>; }
 export function mergeRows(old: ChatRow[], next: ChatRow[]) { const map = new Map(old.map(row => [row.id, row])); next.forEach(row => map.set(row.id, row)); return [...map.values()].sort((a, b) => a.sourceSeqStart - b.sourceSeqStart); }
 export function reconcileRows(old: ChatRow[], snapshot: ChatRow[]) {
   if (!snapshot.length) return [];
@@ -45,14 +46,14 @@ function ImagePreview({ src, name, onClose }: { src: string; name: string; onClo
   useEffect(() => {
     const element = dialog.current!;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    element.showModal();
+    element.showModal(); element.focus();
     return () => { if (element.open) element.close(); if (opener?.isConnected) opener.focus(); };
   }, []);
-  return <dialog ref={dialog} className="fa-image-dialog" aria-label={`Preview ${name}`} onClose={onClose} onCancel={onClose} onKeyDown={event => event.stopPropagation()} onClick={event => {
+  return <dialog ref={dialog} className="fa-image-dialog" tabIndex={-1} aria-label={`Preview ${name}`} onClose={onClose} onCancel={onClose} onKeyDown={event => event.stopPropagation()} onClick={event => {
     if (event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
-  }}><img src={src} alt={name} /><button type="button" className="fa-image-close" aria-label="Close image preview" onClick={onClose}><Icon name="X" /></button></dialog>;
+  }}><img src={src} alt={name} /></dialog>;
 }
 function AttachmentPreview({ file, projectId, onRemove, fallback }: { file: Pick<Attachment, "type" | "path" | "name">; projectId?: string; onRemove?(): void; fallback?: ReactNode }) {
   const sdk = useSdk(); const [src, setSrc] = useState<string>(); const [open, setOpen] = useState(false), [failed, setFailed] = useState(false);
@@ -121,7 +122,7 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
   const [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(() => activeRequests.has(threadId)), [uploading, setUploading] = useState(() => !!pendingUploads.get(threadId));
   const [failedFiles, setFailedFiles] = useState<FailedUpload[]>(() => failedUploads.get(threadId) ?? []);
   const uploadingFiles = useRef(new WeakSet<File>());
-  const [error, setError] = useState<string | null>(null), [advanced, setAdvanced] = useState(false), [steerOnEnter, setSteerOnEnter] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null), [advanced, setAdvanced] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null), files = useRef<HTMLInputElement>(null), scroll = useRef<HTMLDivElement>(null);
   const alive = useRef(true), sending = useRef(false), stick = useRef(true), olderLoaded = useRef(false);
   const abort = useRef(new AbortController());
@@ -133,12 +134,13 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
   }, [threadId]);
   const report = useCallback((cause: unknown) => { if (alive.current) setError(cause instanceof Error ? cause.message : String(cause)); }, []);
   const deliverVoice = useRef<(value: string) => void>(() => {});
-  const voice = useVoiceTranscript({ threadId, onTranscript: value => deliverVoice.current(value), onError: report });
+  const [voiceError, setVoiceError] = useState<string>();
+  const voice = useVoiceTranscript({ threadId, onTranscript: value => deliverVoice.current(value), onError: setVoiceError });
   const notifyVoice = useRef(onVoiceState); notifyVoice.current = onVoiceState;
   useEffect(() => { onVoiceState?.({ state: voice.state, level: voice.level }); }, [voice.state, voice.level, onVoiceState]);
   useEffect(() => () => { notifyVoice.current?.({ state: 'idle', level: 0 }); }, []);
   const lastVoice = useRef(0);
-  useEffect(() => { if (voiceRequest && voiceRequest !== lastVoice.current) { lastVoice.current = voiceRequest; input.current?.blur(); onVoiceRequestHandled?.(voiceRequest); void voice.toggle(); } }, [voiceRequest, voice.toggle, onVoiceRequestHandled]);
+  useEffect(() => { if (voiceRequest && voiceRequest !== lastVoice.current) { lastVoice.current = voiceRequest; input.current?.blur(); onVoiceRequestHandled?.(voiceRequest); setVoiceError(undefined); void voice.toggle(); } }, [voiceRequest, voice.toggle, onVoiceRequestHandled]);
   const lastFocus = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (focusRequest === lastFocus.current) return;
@@ -159,16 +161,6 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
     void sdk.threads.storageLocation({ threadId }).then(location => { if (current) setStorage(location); }).catch(report);
     return () => { current = false; };
   }, [sdk, threadId, report]);
-  const configSequence = useRef(0);
-  const refreshConfig = useCallback(async () => {
-    const sequence = ++configSequence.current;
-    const config = await sdk.system.config();
-    if (alive.current && sequence === configSequence.current) setSteerOnEnter(config.generalSettings.steerActiveThreadOnEnter);
-  }, [sdk]);
-  useEffect(() => {
-    void refreshConfig().catch(report);
-    return sdk.subscribe({ event: 'system:config-changed', callback: () => { void refreshConfig().catch(report); } });
-  }, [sdk, report, refreshConfig]);
   const openStorageLink = (event: MouseEvent) => {
     if (!storage || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target instanceof Element ? event.target.closest('a') : null;
@@ -214,11 +206,12 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
   useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; }, [rows, queue, interactions]);
   const mutate = async (operation: () => Promise<unknown>) => { if (sending.current || activeRequests.has(threadId)) return; sending.current = true; activeRequests.add(threadId); notifyRequest(threadId); setBusy(true); setError(null); try { await operation(); await refresh(); } catch (cause) { report(cause); } finally { sending.current = false; activeRequests.delete(threadId); notifyRequest(threadId); if (alive.current) setBusy(false); } };
   const voiceBusy = ['starting', 'recording', 'transcribing'].includes(voice.state);
+  const voiceLabel = voice.state === 'recording' ? 'Finish recording' : voice.state === 'starting' ? 'Starting microphone' : voice.state === 'transcribing' ? 'Transcribing voice message' : (voice.state === 'error' || voiceError) ? `Retry voice message${voiceError ? `: ${voiceError}` : ''}` : 'Record voice message';
   const canSteer = !!thread && ['active', 'provisioning', 'starting', 'waiting-for-host'].includes(thread.runtime?.displayStatus ?? thread.status);
   const send = (submitted = draft, fromVoice = false, alternate = false) => {
-    if ((!submitted.text.trim() && !submitted.attachments.length) || pendingUploads.get(threadId) || failedUploads.get(threadId)?.length || uploading || !loaded || steerOnEnter === null || interactions.length || (voiceBusy && !fromVoice)) return;
+    if ((!submitted.text.trim() && !submitted.attachments.length) || pendingUploads.get(threadId) || failedUploads.get(threadId)?.length || uploading || !loaded || interactions.length || (voiceBusy && !fromVoice)) return;
     void mutate(async () => {
-      await sdk.threads.send({ threadId, mode: canSteer && (alternate ? !steerOnEnter : steerOnEnter) ? 'steer-if-active' : 'queue-if-active', input: [...(submitted.text.trim() ? [{ type: 'text' as const, text: submitted.text, mentions: [] }] : []), ...submitted.attachments] });
+      await sdk.threads.send({ threadId, mode: canSteer && !alternate ? 'steer-if-active' : 'queue-if-active', input: [...(submitted.text.trim() ? [{ type: 'text' as const, text: submitted.text, mentions: [] }] : []), ...submitted.attachments] });
       let saved = false;
       try { localStorage.setItem(`fluently-agents.draft.${threadId}`, JSON.stringify(removeSubmittedDraft(draftFor(threadId), submitted))); saved = true; } catch { /* Storage may be unavailable. */ }
       if (saved) notifyRequest(threadId, true);
@@ -227,6 +220,7 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
     });
   };
   deliverVoice.current = value => {
+    setVoiceError(undefined);
     const next = { ...draft, text: [draft.text, value].filter(Boolean).join('\n') }; setDraft(next);
     if (!draft.text.trim() && !draft.attachments.length && !interactions.length && !uploading && !failedFiles.length && loaded) send(next, true);
   };
@@ -273,27 +267,26 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
       {!loaded && <p className="fa-chat-note">Loading conversation…</p>}{loaded && !rows.length && <p className="fa-chat-note">What would you like to work on?</p>}
       <Rows rows={rows} document={documentContext} storage={storage} projectId={thread?.projectId} />
       {interactions.map(item => <div className="fa-interaction" key={item.id}><strong>{item.payload.kind === 'approval' ? 'Permission requested' : 'Your input is needed'}</strong>{item.payload.kind === 'approval' && item.payload.reason && <p>{item.payload.reason}</p>}<details><summary>Request details</summary><Detail value={item.payload} /></details>{item.payload.kind === 'approval' && item.payload.subject.kind !== 'permission_grant' && item.payload.availableDecisions.filter(decision => decision !== 'allow_for_session').map(decision => <button key={decision} disabled={busy} onClick={() => void mutate(() => sdk.threads.interactions.resolve({ threadId, interactionId: item.id, resolution: decision === 'deny' ? { decision } : { decision, grantedPermissions: null } }))}>{decision === 'allow_once' ? 'Allow once' : 'Deny'}</button>)}<button onClick={() => setAdvanced(true)}>Review request</button></div>)}
-      {queue && queue.map(item => <div className="fa-queued-message" key={item.id}><small>Queued</small><span>{item.content.filter(part => part.visibility !== 'agent-only').filter(part => part.type === 'text').map(part => part.text).join('\n') || 'Attachments'}</span><button className="fa-queue-send" aria-label="Send queued message now" title="Send now" disabled={busy || !loaded || !!interactions.length} onClick={() => void mutate(() => sdk.threads.queuedMessages.send({ threadId, queuedMessageId: item.id, mode: 'steer' }))}><Icon name="ArrowUp" /></button><button aria-label="Remove queued message" title="Remove" disabled={busy} onClick={() => void mutate(() => sdk.threads.queuedMessages.delete({ threadId, queuedMessageId: item.id }))}><Icon name="X" /></button></div>)}
-    </div>
     {running && !interactions.length && <div className="fa-chat-activity" role="status"><i />{thread.status === 'pending' ? 'Waiting to start…' : thread.status === 'starting' ? 'Starting…' : thread.status === 'stopping' ? 'Stopping…' : 'Working…'}</div>}
-    {error && <div role="alert" className="fa-chat-error">{error}<button onClick={() => { setError(null); void Promise.all([refresh(), refreshConfig()]).catch(report); }}>Refresh</button></div>}
+    </div>
+    {error && <div role="alert" className="fa-chat-error">{error}<button aria-label="Refresh" title="Refresh" onClick={() => { setError(null); void refresh().catch(report); }}><RetryIcon /></button></div>}
     {!!draft.attachments.length && <div className="fa-draft-files">{draft.attachments.map((file, index) => { const remove = () => setDraft(old => ({ ...old, attachments: old.attachments.filter((_, i) => i !== index) })); return file.type === 'localImage' ? <AttachmentPreview key={`${file.path}-${index}`} file={file} projectId={thread?.projectId} onRemove={remove} /> : <span key={`${file.path}-${index}`}>{file.name}<button aria-label={`Remove ${file.name}`} onClick={remove}><Icon name="X" /></button></span>; })}</div>}
     {uploading && <div className="fa-upload-status" role="status">Attaching files…</div>}
-    {failedFiles.map((item, index) => <div className="fa-upload-error" role="alert" key={index}><span>{item.file.name}: {item.error}</span><button type="button" onClick={() => uploadFiles([item.file])}>Retry upload</button><button type="button" aria-label={`Dismiss ${item.file.name}`} onClick={() => { const remaining = (failedUploads.get(threadId) ?? []).filter(entry => entry !== item); if (remaining.length) failedUploads.set(threadId, remaining); else failedUploads.delete(threadId); notifyRequest(threadId); }}>×</button></div>)}
-    {(running || voiceBusy || voice.state === 'error') && <div className="fa-compose-status">        {voice.state === 'recording' && <button type="button" onClick={voice.cancel}>Cancel</button>}{voice.state === 'transcribing' && <small>Transcribing…</small>}{voice.state === 'error' && <button type="button" onClick={() => void voice.retry()}>Retry voice</button>}
-        {running && <button type="button" aria-label="Stop work" disabled={busy} onClick={() => void mutate(() => sdk.threads.stop({ threadId }))}><Icon name="Square" /></button>}
-</div>}
+    {failedFiles.map((item, index) => <div className="fa-upload-error" role="alert" key={index}><span>{item.file.name}: {item.error}</span><button type="button" aria-label="Retry upload" title="Retry upload" onClick={() => uploadFiles([item.file])}><RetryIcon /></button><button type="button" aria-label={`Dismiss ${item.file.name}`} title={`Dismiss ${item.file.name}`} onClick={() => { const remaining = (failedUploads.get(threadId) ?? []).filter(entry => entry !== item); if (remaining.length) failedUploads.set(threadId, remaining); else failedUploads.delete(threadId); notifyRequest(threadId); }}><Icon name="X" /></button></div>)}
+    {!!queue?.length && <div className="fa-message-queue" role="region" aria-label="Queued messages">{queue.map(item => <div className="fa-queued-message" key={item.id}><small>Queued</small><span>{item.content.filter(part => part.visibility !== 'agent-only').filter(part => part.type === 'text').map(part => part.text).join('\n') || 'Attachments'}</span><button className="fa-queue-send" aria-label="Send queued message now" title="Send now" disabled={busy || !loaded || !!interactions.length} onClick={() => void mutate(() => sdk.threads.queuedMessages.send({ threadId, queuedMessageId: item.id, mode: 'steer' }))}><Icon name="ArrowUp" /></button><button aria-label="Remove queued message" title="Remove" disabled={busy} onClick={() => void mutate(() => sdk.threads.queuedMessages.delete({ threadId, queuedMessageId: item.id }))}><Icon name="X" /></button></div>)}</div>}
     <form className="fa-message-composer" onSubmit={event => { event.preventDefault(); send(); }}><textarea ref={input} value={draft.text} placeholder="Message…" aria-label="Message" rows={1} onChange={event => setDraft(old => ({ ...old, text: event.target.value }))} onKeyDown={event => {
       if (event.defaultPrevented || event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229 || event.shiftKey) return;
       // BB's modifier is Command on Apple platforms, Control elsewhere.
       const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
       const alternate = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       event.preventDefault();
-      if (event.repeat || event.altKey || ((event.metaKey || event.ctrlKey) && !alternate) || (alternate && !canSteer)) return;
+      if (event.repeat || event.altKey || ((event.metaKey || event.ctrlKey) && !alternate) || (alternate && !running)) return;
       send(draft, false, alternate);
     }} />
-      <div className="fa-compose-actions"><div className="fa-compose-left"><button className="fa-composer-tool" type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11-8 8a6 6 0 0 1-8.5-8.5L13 2a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8L15 6" /></svg></button>{composerAgents}</div><div className="fa-compose-right"><button type="button" aria-label={voice.state === 'recording' ? 'Finish recording' : 'Record voice message'} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={`fa-composer-tool${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} onContextMenu={onVoiceContextMenu} onClick={() => void voice.toggle()}><Icon name={voice.state === 'recording' ? 'Square' : 'Mic'} /></button>
-        <button type="submit" className="fa-composer-tool fa-send-message" aria-label="Send message" disabled={busy || uploading || !!failedFiles.length || !loaded || steerOnEnter === null || !!interactions.length || voiceBusy || (!draft.text.trim() && !draft.attachments.length)}><Icon name="ArrowUp" /></button>
+      <div className="fa-compose-actions"><div className="fa-compose-left"><button className="fa-composer-tool" type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11-8 8a6 6 0 0 1-8.5-8.5L13 2a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8L15 6" /></svg></button>{composerAgents}</div><div className="fa-compose-right"><button type="button" aria-label={voiceLabel} title={voiceLabel} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={`fa-composer-tool fa-voice-button${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} onContextMenu={onVoiceContextMenu} onClick={() => { setVoiceError(undefined); if (voice.state === 'error' && voice.failedRecording) voice.retry(); else void voice.toggle(); }}>
+          {voice.state === 'recording' ? <span className="fa-voice-orb" aria-hidden="true" /> : voice.state === 'starting' || voice.state === 'transcribing' ? <span className="fa-voice-spinner" aria-hidden="true" /> : (voice.state === 'error' || voiceError) ? <RetryIcon /> : <Icon name="Mic" />}
+        </button>
+        <button type="submit" className="fa-composer-tool fa-send-message" aria-label="Send message" disabled={busy || uploading || !!failedFiles.length || !loaded || !!interactions.length || voiceBusy || (!draft.text.trim() && !draft.attachments.length)}><Icon name="ArrowUp" /></button>
       </div></div>
     </form>
     <input className="fa-file-input" type="file" multiple ref={files} aria-label="Message attachments" onChange={event => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ''; uploadFiles(selected); }} />
