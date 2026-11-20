@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-fluently-agents",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "type": "module",
   "engines": {
     "bb": ">=0.50",
@@ -10,7 +10,7 @@
     "name": "Fluently Agents",
     "description": "Delegate tasks to persistent agents and review their work on a live board.",
     "branding": {
-      "icon": "Bot"
+      "icon": "GridView"
     },
     "server": "./server.ts",
     "app": "./app.tsx"

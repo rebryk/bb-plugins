@@ -426,7 +426,7 @@
       "id": "fluently-agents",
       "displayName": "Fluently Agents",
       "description": "Delegate tasks to persistent agents and review their work on a live board.",
-      "icon": "Bot",
+      "icon": "GridView",
       "tags": [
         "agents",
         "tasks",

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.16 — 2026-11-20
+
+- Use the same board-grid icon as Gen-UI Gallery in navigation and plugin
+  branding.
+
 ## 0.1.15 — 2026-11-20
 
 - Use BB's native transcript for streaming, history and plugin embeds inside

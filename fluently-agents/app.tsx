@@ -266,5 +266,5 @@ function AgentsPage() {
 }
 
 export default definePluginApp(app => {
-  app.slots.navPanel({ id: 'board', title: 'Agents', icon: 'Bot', path: 'board', component: AgentsPage });
+  app.slots.navPanel({ id: 'board', title: 'Agents', icon: 'GridView', path: 'board', component: AgentsPage });
 });
