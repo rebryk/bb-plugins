@@ -55,12 +55,16 @@ The text field spans the composer width. Attachments and agent selection sit
 below it, with voice and send controls on the right. Task conversations omit
 the agent selector.
 
-Queued messages, file uploads and stop controls use BB APIs. Complex permission
+Queued messages, file uploads and stop controls use BB APIs. While work runs,
+Enter sends immediately; Cmd+Enter on Mac or Ctrl+Enter elsewhere queues the
+message. This follows BB's Enter behavior setting, including its reversed
+mapping. Queued messages have Send now and Remove actions. Complex permission
 and question requests open BB's own controls from the conversation.
 
 Paste screenshots or drop files into the chat to attach them. Raster images
 appear in a scrollable preview strip; remove a draft image with its corner
-button. Other files keep their download link. Uploads finish before
+button. Open an image to see it whole, with a corner close button. Other files
+keep their download link. Uploads finish before
 sending. Internal activity stays collapsed until you expand it.
 
 The custom chat uses BB Markdown. Message-specific plugin embeds require

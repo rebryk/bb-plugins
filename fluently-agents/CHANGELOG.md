@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 — 2026-11-20
+
+- Show full images in a minimal preview with a close icon.
+- Match the Inbox heading and attachment icon to the design.
+- Follow BB send and queue shortcuts; send queued messages immediately when needed.
+
 ## 0.1.11 — 2026-11-20
 
 - Keep Inbox corner radii fixed while expanding and collapsing.

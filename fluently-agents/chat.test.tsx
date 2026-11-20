@@ -7,17 +7,26 @@ import { Chat, mergeRows, reconcileRows, removeSubmittedDraft, type ChatProps, t
 const voice = vi.hoisted(() => ({ state: 'idle' as const, level: 0, toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), onTranscript: null as ((value: string) => void) | null }));
 vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: string): void }) => { voice.onTranscript = options.onTranscript; return voice; } }));
 beforeEach(() => { const values = new Map<string, string>(); vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) }); });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+  for (const method of ['showModal', 'close']) if (!(method in HTMLDialogElement.prototype)) Object.defineProperty(HTMLDialogElement.prototype, method, { configurable: true, writable: true, value() {} });
+  vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function(this: HTMLDialogElement) {
+    this.open = true; this.querySelector<HTMLButtonElement>('button')?.focus();
+  });
+  vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function(this: HTMLDialogElement) {
+    this.open = false;
+  });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const row = (id: string, seq: number, text: string, role: 'assistant' | 'user' = 'assistant') => ({ kind: 'conversation', role, id, sourceSeqStart: seq, sourceSeqEnd: seq, text, attachments: null }) as ChatRow;
 type Upload = PluginBrowserBbSdk['projects']['attachments']['upload'];
 type ReadAttachment = PluginBrowserBbSdk['projects']['attachments']['read'];
-function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
-  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
+function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; steerOnEnter?: boolean; config?: () => Promise<unknown>; queued?: unknown[]; sendQueued?: () => Promise<unknown>; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
+  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { system: { config: options.config ?? (async () => ({ generalSettings: { steerActiveThreadOnEnter: options.steerOnEnter ?? true } })) } as PluginBrowserBbSdk['system'], projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
     storageLocation: async () => ({ hostId: 'host-a', storageRootPath: '/storage/thread-a' }),
     timeline: async () => ({ rows: options.rows ?? [row('a', 1, 'Hello'), row('b', 2, 'My reply', 'user')], timelinePage: { olderCursor: null }, maxSeq: 2 }),
     get: async () => ({ id: 'thread-a', projectId: 'project-a', status: options.status || 'idle' }),
     interactions: { list: async () => options.interactions ?? [], resolve: async () => ({}) },
-    queuedMessages: { list: async () => [] },
+    queuedMessages: { list: async () => options.queued ?? [], send: options.sendQueued ?? (async () => ({})), delete: async () => ({}) },
     send: options.send ?? (async () => ({})),
     stop: async () => ({}),
   } as unknown as PluginBrowserBbSdk['threads'] } });
@@ -107,6 +116,19 @@ describe('Custom conversation', () => {
       const preview = slot.getByRole('button', { name: 'Preview preview.png' });
       fireEvent.click(preview);
       expect(slot.getAllByRole('img', { name: 'preview.png' })).toHaveLength(2);
+      const modal = slot.getByRole('dialog', { name: 'Preview preview.png' });
+      expect(modal.textContent).toBe('');
+      const bubbled = vi.fn(); window.addEventListener('keydown', bubbled);
+      fireEvent.keyDown(slot.getByRole('button', { name: 'Close image preview' }), { key: 'n' });
+      expect(bubbled).not.toHaveBeenCalled(); window.removeEventListener('keydown', bubbled);
+      fireEvent.click(slot.getByRole('button', { name: 'Close image preview' }));
+      expect(slot.queryByRole('dialog')).toBeNull();
+      expect(revoke).not.toHaveBeenCalled();
+      preview.focus(); fireEvent.click(preview);
+      fireEvent(slot.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+      expect(slot.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(preview);
+      fireEvent.click(preview);
       fireEvent.error(preview.querySelector('img')!);
       expect(slot.getByRole('img', { name: 'Preview unavailable: preview.png' })).toBeTruthy();
       expect(slot.queryByRole('button', { name: 'Preview preview.png' })).toBeNull();
@@ -196,10 +218,67 @@ describe('Custom conversation', () => {
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Not an approval' } }); expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(slot.getByRole('button', { name: 'Review request' })); expect(slot.getByRole('dialog').getAttribute('aria-label')).toBe('Review agent request'); expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('thread-a');
   });
-  it('uses actual active status for stop and steer controls', async () => {
-    const slot = mount({ status: 'active' }); await slot.findByRole('button', { name: 'Stop work' }); fireEvent.click(slot.getByRole('button', { name: 'Queue' }));
+  it('uses native default Enter steering without a visible queue toggle', async () => {
+    const slot = mount({ status: 'active' }); await slot.findByRole('button', { name: 'Stop work' }); expect(slot.queryByRole('button', { name: 'Queue' })).toBeNull();
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Change direction' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'steer-if-active' }] }));
+  });
+  it.each([['MacIntel', true, 'metaKey', 'queue-if-active'], ['Win32', true, 'ctrlKey', 'queue-if-active'], ['MacIntel', false, 'metaKey', 'steer-if-active']])('matches BB modifier on %s with preference %s', async (platform, preference, modifier, mode) => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform as string);
+    const slot = mount({ status: 'active', steerOnEnter: preference as boolean }); await slot.findByText('Hello');
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Follow up' } });
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', [modifier as string]: true });
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode }] }));
+  });
+  it('honors native queue-on-Enter preference', async () => {
+    const slot = mount({ status: 'active', steerOnEnter: false }); await slot.findByText('Hello');
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After this' } });
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
+  });
+  it('never sends unsupported modifiers, IME composition, key repeat or Shift+Enter', async () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Keep editing' } });
+    for (const keys of [{ ctrlKey: true }, { metaKey: true, ctrlKey: true }, { altKey: true }, { metaKey: true, altKey: true }, { shiftKey: true }, { isComposing: true }, { keyCode: 229 }, { repeat: true }]) fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', ...keys });
+    expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
+    expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep editing');
+  });
+  it('queues ordinary sends while stopping and ignores the unavailable modifier action', async () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const slot = mount({ status: 'stopping' }); await slot.findByText('Hello');
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After stopping' } });
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', metaKey: true });
+    expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
+  });
+  it('renders the queue and sends an existing item now without submitting the draft', async () => {
+    const slot = mount({ status: 'active', queued: [{ id: 'queue-a', content: [{ type: 'text', text: 'Do this later' }] }] }); await slot.findByText('Do this later');
+    expect(slot.getByText('Queued')).toBeTruthy();
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Unsent draft' } });
+    fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.queuedMessages.send')).toMatchObject({ args: [{ threadId: 'thread-a', queuedMessageId: 'queue-a', mode: 'steer' }] }));
+    expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
+    expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Unsent draft');
+  });
+  it('blocks queued dispatch behind an interaction and retains queued messages after failure', async () => {
+    const queued = [{ id: 'queue-a', content: [{ type: 'text', text: 'Still queued' }] }];
+    const blocked = mount({ queued, interactions: [{ id: 'i', payload: { kind: 'form', title: 'Question' } }] }); await blocked.findByText('Still queued');
+    expect((blocked.getByRole('button', { name: 'Send queued message now' }) as HTMLButtonElement).disabled).toBe(true); blocked.unmount();
+    const sendQueued = vi.fn(async () => { throw new Error('Dispatch failed'); });
+    const slot = mount({ queued, sendQueued }); await slot.findByText('Still queued');
+    fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
+    await slot.findByRole('alert'); expect(slot.getByText('Still queued')).toBeTruthy(); expect(sendQueued).toHaveBeenCalledTimes(1);
+  });
+  it('retries a failed settings read through Refresh before enabling send', async () => {
+    const config = vi.fn().mockRejectedValueOnce(new Error('Settings unavailable')).mockResolvedValue({ generalSettings: { steerActiveThreadOnEnter: true } });
+    const slot = mount({ config, status: 'active' }); await slot.findByRole('alert');
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Draft' } });
+    expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(slot.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(config).toHaveBeenCalledTimes(2);
   });
   it('merges streaming updates without losing paginated history', () => {
     expect(mergeRows([row('old', 1, 'Earlier'), row('live', 3, 'Hel')], [row('live', 3, 'Hello'), row('new', 4, 'Next')]).map(item => item.id)).toEqual(['old', 'live', 'new']);

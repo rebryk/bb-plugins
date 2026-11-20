@@ -59,7 +59,7 @@
 .fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; box-shadow: 0 3px 5px -3px rgba(0,0,0,.24); pointer-events: auto; }
 .fa-app .fa-inbox { max-height: 40%; min-height: 70px; flex: 0 1 auto; display: flex; flex-direction: column; }
 .fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 38px; }
-.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 20px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-muted); text-align: left; font-size: 11px; }
+.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 20px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
 .fa-app .fa-inbox-header span { flex: 1; }
 .fa-app .fa-inbox-header small { color: var(--fa-faint); font-size: 10px; }
 .fa-app .fa-inbox-header svg { width: 12px; height: 12px; }

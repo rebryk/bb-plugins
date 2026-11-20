@@ -131,7 +131,7 @@ function AgentsPage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { setMenu(null); setRenaming(null); setWorkerThread(null); }
-      if (workerThread || renaming) return;
+      if (workerThread || renaming || root.current?.querySelector('dialog[open]')) return;
       const target = event.target;
       const editing = target instanceof HTMLElement && (target.isContentEditable || !!target.closest('input,textarea,select,[role="textbox"],[role="dialog"]'));
       if (event.key.toLowerCase() === 'n' && !event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !editing) {

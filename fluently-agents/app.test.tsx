@@ -44,6 +44,17 @@ function mount(overrides: {
 }
 
 describe('Agents board interactions', () => {
+  it('does not activate composer shortcuts behind an open image dialog', async () => {
+    const slot = mount(); await slot.findByRole('button', { name: 'Chat with General' });
+    const chat = slot.getByTestId('agents-chat');
+    const initial = chat.getAttribute('data-focus-request');
+    const dialog = document.createElement('dialog'); dialog.open = true; chat.append(dialog);
+    fireEvent.keyDown(document, { key: 'n' });
+    expect(chat.getAttribute('data-focus-request')).toBe(initial);
+    dialog.remove(); fireEvent.keyDown(document, { key: 'n' });
+    expect(chat.getAttribute('data-focus-request')).not.toBe(initial);
+  });
+
   it('routes agent, task, and blocked worker conversations independently', async () => {
     const slot = mount();
     await slot.findByRole('button', { name: 'Chat with Ads' });
