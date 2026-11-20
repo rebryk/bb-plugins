@@ -26,7 +26,8 @@
 .fa-app .fa-pill { height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--fa-line); border-radius: 999px; background: var(--fa-raised); }
 .fa-app .fa-breadcrumb { padding-right: 12px; min-width: 0; max-width: calc(100% - 100px); }
 .fa-app .fa-icon-button { width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 50%; flex-shrink: 0; }
-.fa-app .fa-root-crumb { height: 28px; padding: 0; border: 0; background: none; text-align: left; flex-shrink: 0; }
+.fa-app .fa-root-crumb { position: relative; isolation: isolate; height: 28px; padding: 0; border: 0; background: none; text-align: left; flex-shrink: 0; }
+.fa-app .fa-root-crumb::before { content: ""; position: absolute; inset: 0 -3px; border-radius: 8px; z-index: -1; pointer-events: none; }
 .fa-app .fa-crumb-divider { color: var(--fa-faint); padding: 0 3px; }
 .fa-app .fa-task-crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0; }
 .fa-app .fa-agent-count { padding: 0 12px; gap: 7px; white-space: nowrap; }
@@ -61,11 +62,9 @@
 .fa-app .fa-inbox h2 { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 17px 20px 8px; color: var(--fa-muted); font-size: 11px; font-weight: 500; }
 .fa-app .fa-inbox h2 span { color: var(--fa-faint); }
 .fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 7px 10px; border-radius: 0 0 26px 26px; }
-.fa-app .fa-inbox-item { display: flex; align-items: start; gap: 10px; width: 100%; padding: 9px 12px; text-align: left; border: 0; background: none; border-radius: 13px; }
-.fa-app .fa-inbox-item > .fa-dot { margin-top: 6px; }
-.fa-app .fa-inbox-item > span { min-width: 0; }
-.fa-app .fa-inbox-item strong { display: block; font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fa-app .fa-inbox-item small { display: block; margin-top: 3px; font-size: 10px; color: var(--fa-faint); }
+.fa-app .fa-inbox-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 4px 12px; text-align: left; border: 0; background: none; border-radius: 13px; }
+.fa-app .fa-inbox-item strong { display: block; flex: 1; min-width: 0; font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-app .fa-inbox-item small { flex-shrink: 0; white-space: nowrap; font-size: 10px; color: var(--fa-faint); }
 .fa-app .fa-inbox-item.fa-active { background: var(--fa-hover); }
 .fa-app .fa-inbox-empty { margin: 5px 12px 7px; color: var(--fa-faint); font-size: 12px; }
 .fa-app .fa-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 6px 8px; }
@@ -101,6 +100,7 @@
 .fa-app .fa-rename-dialog > div { display: flex; justify-content: end; gap: 8px; margin-top: 16px; }
 .fa-app .fa-rename-dialog button { border: 0; background: var(--fa-control); padding: 7px 12px; border-radius: 12px; }
 @media (hover: hover) {
+  .fa-app .fa-root-crumb:hover::before { background: var(--fa-hover); }
   .fa-app .fa-icon-button:hover, .fa-app .fa-menu button:hover, .fa-app .fa-inbox-item:hover { background: var(--fa-hover); }
   .fa-app .fa-task-card:hover { border-color: var(--fa-muted); background: var(--fa-hover); }
   .fa-app .fa-avatar:hover { opacity: 1; }

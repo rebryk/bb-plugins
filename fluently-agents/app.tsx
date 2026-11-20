@@ -218,7 +218,7 @@ function AgentsPage() {
     {(view === 'inbox' || chatOpen) && <aside className="fa-communications" aria-label="Conversations">
       {view === 'inbox' && <section className="fa-inbox fa-panel" aria-label="Needs you">
         <h2>Needs you<span>{needs.length}</span></h2>
-        <div className="fa-inbox-list">{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><span><strong>{item.title}</strong><small>Waiting · {elapsed(item.needsSince ?? item.updatedAt, now)}</small></span></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
+        <div className="fa-inbox-list">{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><strong title={item.title}>{item.title}</strong><small title="Waiting for you">{elapsed(item.needsSince ?? item.updatedAt, now)}</small></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
         {resizeHandle}
       </section>}
       {chatOpen && <section className="fa-chat fa-panel" aria-label="Chat">

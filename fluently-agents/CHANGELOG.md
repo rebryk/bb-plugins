@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5 — 2026-11-20
+
+- Use compact single-line inbox rows and highlight breadcrumb navigation.
+- Reduce spacing around chat activity.
+- Attach files by paste or drag and drop, with raster image previews.
+
 ## 0.1.4 — 2026-11-20
 
 - Align breadcrumb spacing without moving the Board label on task navigation.

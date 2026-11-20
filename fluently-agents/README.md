@@ -41,6 +41,17 @@ history, permissions and execution. Drafts stay in this browser per thread.
 Queued messages, file uploads and stop controls use BB APIs. Complex permission
 and question requests open BB's own controls from the conversation.
 
+Paste screenshots or drop files into the chat to attach them. Raster images
+have a preview; other files keep their download link. Uploads finish before
+sending. Internal activity stays collapsed until you expand it.
+
+The custom chat uses BB Markdown. Message-specific plugin embeds require
+BB's native chat renderer and are not rendered inline here.
+
+[UI reference and chat variants](https://an.dev/a/d783ae026b2314ef678e)
+keep the visual direction alongside the implementation. Processing animations
+and HTML result previews in the design study are illustrative.
+
 All threads retain global BB memory and the memory of their selected project.
 Memory does not copy another thread's live context: agents must pass a brief
 with decisions, acceptance criteria and relevant memory references.

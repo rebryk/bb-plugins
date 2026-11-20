@@ -9,8 +9,10 @@ vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: 
 beforeEach(() => { const values = new Map<string, string>(); vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) }); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const row = (id: string, seq: number, text: string, role: 'assistant' | 'user' = 'assistant') => ({ kind: 'conversation', role, id, sourceSeqStart: seq, sourceSeqEnd: seq, text, attachments: null }) as ChatRow;
-function mount(options: { send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
-  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { subscribe: options.subscribe ?? (() => () => {}), threads: {
+type Upload = PluginBrowserBbSdk['projects']['attachments']['upload'];
+type ReadAttachment = PluginBrowserBbSdk['projects']['attachments']['read'];
+function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
+  return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
     storageLocation: async () => ({ hostId: 'host-a', storageRootPath: '/storage/thread-a' }),
     timeline: async () => ({ rows: options.rows ?? [row('a', 1, 'Hello'), row('b', 2, 'My reply', 'user')], timelinePage: { olderCursor: null }, maxSeq: 2 }),
     get: async () => ({ id: 'thread-a', projectId: 'project-a', status: options.status || 'idle' }),
@@ -21,6 +23,104 @@ function mount(options: { send?: () => Promise<unknown>; interactions?: unknown[
   } as unknown as PluginBrowserBbSdk['threads'] } });
 }
 describe('Custom conversation', () => {
+  it('attaches pasted screenshots once and keeps ordinary text paste untouched', async () => {
+    const image = new File(['png'], 'Screenshot.png', { type: 'image/png' });
+    const upload = vi.fn(async () => ({ type: 'localImage' as const, path: 'attachments/shot.png', name: image.name, sizeBytes: image.size }));
+    const slot = mount({ upload }); await slot.findByText('Hello');
+    const textbox = slot.getByRole('textbox');
+    expect(fireEvent.paste(textbox, { clipboardData: { files: [], items: [{ kind: 'string' }], getData: () => 'plain text' } })).toBe(true);
+    expect(upload).not.toHaveBeenCalled();
+    expect(fireEvent.paste(textbox, { clipboardData: { files: [image], items: [{ kind: 'file', getAsFile: () => image }] } })).toBe(false);
+    await slot.findByText('Screenshot.png'); expect(upload).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledWith({ projectId: 'project-a', clientFile: image });
+    fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ input: [{ type: 'localImage', path: 'attachments/shot.png' }] }] }));
+  });
+
+
+  it('does not upload a paste already handled by a nested BB control', async () => {
+    const upload = vi.fn<Upload>(); const slot = mount({ upload }); await slot.findByText('Hello');
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files: [new File(['x'], 'nested.txt')] } });
+    event.preventDefault(); fireEvent(slot.getByRole('textbox'), event);
+    expect(upload).not.toHaveBeenCalled();
+  });
+  it('waits for every concurrent drop and paste upload before sending', async () => {
+    const finish = new Map<string, (attachment: Awaited<ReturnType<Upload>>) => void>();
+    const upload = vi.fn<Upload>(({ clientFile }) => new Promise(resolve => { finish.set((clientFile as File).name, resolve); }));
+    const slot = mount({ upload }); await slot.findByText('Hello');
+    const first = new File(['a'], 'a.txt'), second = new File(['b'], 'b.txt');
+    fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [first], types: ['Files'] } });
+    fireEvent.paste(slot.getByRole('textbox'), { clipboardData: { files: [], items: [{ kind: 'file', getAsFile: () => second }] } });
+    expect(upload).toHaveBeenCalledTimes(2);
+    await act(async () => finish.get('a.txt')!({ type: 'localFile', path: 'a.txt', name: 'a.txt', sizeBytes: 1 }));
+    expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
+    expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
+    await act(async () => finish.get('b.txt')!({ type: 'localFile', path: 'b.txt', name: 'b.txt', sizeBytes: 1 }));
+    fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ input: [{ path: 'a.txt' }, { path: 'b.txt' }] }] }));
+  });
+
+  it('retains failed files for retry alongside successful attachments', async () => {
+    const upload = vi.fn<Upload>().mockRejectedValueOnce(new Error('Upload failed')).mockResolvedValueOnce({ type: 'localFile', path: 'good.txt', name: 'good.txt', sizeBytes: 1 }).mockResolvedValueOnce({ type: 'localFile', path: 'retry.txt', name: 'retry.txt', sizeBytes: 1 });
+    const slot = mount({ upload }); await slot.findByText('Hello');
+    const failed = new File(['retry'], 'retry.txt');
+    fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [failed, new File(['good'], 'good.txt')], types: ['Files'] } });
+    await slot.findByText('good.txt'); await slot.findByText('retry.txt: Upload failed');
+    expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(slot.getByRole('button', { name: 'Retry upload' }));
+    await slot.findByText('retry.txt'); expect(slot.queryByRole('alert')).toBeNull();
+    expect(upload).toHaveBeenLastCalledWith({ projectId: 'project-a', clientFile: failed });
+    fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ input: [{ path: 'good.txt' }, { path: 'retry.txt' }] }] }));
+  });
+
+  it('preserves a pending upload and failure across chat navigation', async () => {
+    let fail!: (error: Error) => void;
+    const upload = vi.fn<Upload>(() => new Promise((_resolve, reject) => { fail = reject; }));
+    const first = mount({ upload }); await first.findByText('Hello');
+    fireEvent.paste(first.getByRole('textbox'), { clipboardData: { files: [new File(['file'], 'pending.txt')] } });
+    first.unmount(); const second = mount(); await second.findByText('Hello');
+    expect(second.getByRole('status').textContent).toBe('Attaching files…');
+    await act(async () => fail(new Error('Connection lost')));
+    await second.findByText('pending.txt: Connection lost');
+    fireEvent.click(second.getByRole('button', { name: 'Dismiss pending.txt' }));
+    expect(second.queryByRole('alert')).toBeNull();
+  });
+
+  it('previews only safe raster images and releases Blob URLs', async () => {
+    const create = vi.fn(() => 'blob:preview'), revoke = vi.fn();
+    const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = create; URL.revokeObjectURL = revoke;
+    try {
+      const upload = vi.fn<Upload>(async ({ clientFile }) => ({ type: 'localImage', path: (clientFile as File).name, name: (clientFile as File).name, sizeBytes: 1 }));
+      const readAttachment = vi.fn<ReadAttachment>(async ({ path }) => ({ bytes: new Uint8Array([1]), mimeType: path.endsWith('.svg') ? 'image/svg+xml' : 'image/png', sizeBytes: 1 }));
+      const slot = mount({ upload, readAttachment }); await slot.findByText('Hello');
+      fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [new File(['png'], 'preview.png'), new File(['svg'], 'unsafe.svg')], types: ['Files'] } });
+      await slot.findByRole('button', { name: 'Preview preview.png' });
+      expect(slot.queryByRole('button', { name: 'Preview unsafe.svg' })).toBeNull();
+      expect(create).toHaveBeenCalledTimes(1);
+      fireEvent.click(slot.getByRole('button', { name: 'Remove preview.png' }));
+      expect(revoke).toHaveBeenCalledWith('blob:preview');
+    } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; }
+  });
+
+
+  it('renders sent local images through BB attachment reads with a link fallback', async () => {
+    const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => 'blob:sent'); URL.revokeObjectURL = vi.fn();
+    try {
+      const sent = { ...row('image', 1, 'Attached screenshot', 'user'), attachments: { imageUrls: [], localFileDetails: [], localImagePaths: ['attachments/sent.png', 'attachments/missing.png'], localFilePaths: [], localFiles: 0, localImages: 2, webImages: 0 } } as ChatRow;
+      const readAttachment = vi.fn<ReadAttachment>(async ({ path }) => { if (path.includes('missing')) throw new Error('Unavailable'); return { bytes: new Uint8Array([1]), mimeType: 'image/png', sizeBytes: 1 }; });
+      const slot = mount({ rows: [sent], readAttachment });
+      await slot.findByRole('button', { name: 'Preview sent.png' });
+      expect(slot.queryByRole('button', { name: 'Preview missing.png' })).toBeNull();
+      expect(slot.getByRole('button', { name: 'missing.png' })).toBeTruthy();
+      expect(readAttachment).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'project-a', path: 'attachments/sent.png' }));
+      slot.unmount();
+    } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; }
+  });
   it('renders custom messages and sends through the original thread without permission overrides', async () => {
     const slot = mount(); await slot.findByText('Hello');
     expect(slot.container.querySelector('.fa-message-user')?.textContent).toBe('My reply');
