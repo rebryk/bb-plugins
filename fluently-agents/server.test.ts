@@ -21,6 +21,7 @@ afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 
 async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), threads = new Map<string, FakeThread>()) {
   const storage = seed;
+  const queues = new Map<string, any[]>();
   const tools = new Map<string, { parameters: z.ZodType; execute: Handler }>();
   const events = new Map<string, Handler>();
   let rpc: Record<string, Handler> = {};
@@ -38,13 +39,21 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
         environmentId: options.environment.environmentId ?? 'environment', status: 'active',
         archivedAt: null, deletedAt: null, hasPendingInteraction: false, queuedWork: 'none',
         activity: { activeBackgroundAgentCount: 0 }, parentThreadId: options.parentThreadId,
-        pluginMetadata: options.pluginMetadata,
+        pluginMetadata: options.pluginMetadata ?? {}, visibility: options.visibility,
       };
-      threads.set(thread.id, thread); return thread;
+      threads.set(thread.id, thread);
+      queues.set(thread.id, [{ id: `initial-${thread.id}`, sendAt: options.sendAt, state: 'scheduled' }]);
+      return thread;
     }),
     list: vi.fn(async (options: any) => [...threads.values()].filter(thread =>
       (!options.threadIds || options.threadIds.includes(thread.id)) && Boolean(thread.archivedAt) === Boolean(options.archived)
     ).slice(options.offset ?? 0, (options.offset ?? 0) + (options.limit ?? 100))),
+    update: vi.fn(async ({ threadId, ...patch }: any) => Object.assign(threads.get(threadId)!, patch)),
+    updatePluginMetadata: vi.fn(async ({ threadId, set }: any) => Object.assign(threads.get(threadId)!.pluginMetadata, set)),
+    queuedMessages: {
+      list: vi.fn(async ({ threadId }: any) => queues.get(threadId) ?? []),
+      send: vi.fn(async ({ threadId, queuedMessageId }: any) => { queues.set(threadId, (queues.get(threadId) ?? []).filter(row => row.id !== queuedMessageId)); }),
+    },
     listRunning: vi.fn(async () => [...threads.values()].filter(thread => thread.status === 'active')),
     experimental_listPluginMetadata: vi.fn(async ({ threadIds }: { threadIds: string[] }) => ({ threads: threadIds.map(threadId => ({ threadId, metadata: threads.get(threadId)!.pluginMetadata })) })),
     experimental_listDescendants: vi.fn(async ({ threadIds }: { threadIds: string[] }) => ({ threads: threadIds.map(threadId => {
@@ -72,7 +81,10 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
     } },
     realtime: { publish: vi.fn() }, log: { warn: vi.fn() },
     sdk: {
-      plugins: { callRpc: vi.fn().mockResolvedValue({ facts: {} }) },
+      plugins: { callRpc: vi.fn(async ({ method }: any): Promise<any> => method === 'track_outline' ? { tracked: true } : ({ phases: Object.fromEntries([...threads.values()].filter(thread => thread.pluginMetadata.launchId || thread.status === 'active').map(thread => [thread.id,
+        thread.status === 'active' || thread.activity.activeBackgroundAgentCount > 0
+          ? { kind: 'running', reason: 'Working', etaAt: 999999, since: 1 }
+          : { kind: 'done', unread: false }])) })) },
       threads: threadApi,
       projects: { get: vi.fn(async ({ projectId }: { projectId: string }) => ({ ...project, id: projectId })), list: vi.fn(async () => [project]) },
       environments: { get: vi.fn(async ({ environmentId }: { environmentId: string }) => ({ id: environmentId, projectId: environmentId === 'wrong-project' ? 'other' : 'project' })) },
@@ -117,7 +129,11 @@ describe('task orchestration', () => {
     expect(options).not.toHaveProperty('parentThreadId');
     expect(options.senderThreadId).toBe(agent.threadId);
     expect(options.environment.workspace.type).toBe('managed-worktree');
-    expect(options.visibility).toBe('hidden');
+    expect(options.visibility).toBe('visible');
+    expect(options.origin).toBe('sdk');
+    expect(options).not.toHaveProperty('pluginMetadata');
+    expect(h.threads.get(a.threadId)?.title).toBe('Build');
+    expect(h.threadApi.queuedMessages.send).toHaveBeenCalledTimes(2);
     expect((await h.call('board')).tasks).toHaveLength(1);
   });
   it('recovers a lost spawn response by durable metadata without repeating work', async () => {
@@ -131,6 +147,40 @@ describe('task orchestration', () => {
     expect(recovered.threadId).toBe('thread-2');
     expect(h.threadApi.spawn).toHaveBeenCalledTimes(2);
     expect((await h.call('board')).tasks).toHaveLength(1);
+  });
+  it('holds the first prompt until the durable role mapping exists', async () => {
+    const h = await harness();
+    const original = h.threadApi.queuedMessages.send.getMockImplementation()!;
+    h.threadApi.queuedMessages.send.mockImplementation(async args => {
+      const launch = [...h.storage.values()].find((row: any) => row?.threadId === args.threadId && row?.role) as any;
+      expect(launch).toBeDefined();
+      expect(h.session(args.threadId).instructions).toContain('shared memory');
+      return original(args);
+    });
+    await h.setupTask();
+  });
+  it('recovers a lost initial dispatch response without sending the prompt twice', async () => {
+    const h = await harness();
+    const coordinator = await h.call('openAgent', { agentId: 'general' });
+    const send = h.threadApi.queuedMessages.send.getMockImplementation()!;
+    h.threadApi.queuedMessages.send.mockImplementationOnce(async args => { await send(args); throw new Error('Send response lost'); });
+    const input = { title: 'Build', prompt: 'Acceptance criteria.', requestKey: 'stable' };
+    await expect(h.tool('agents_create_task', coordinator.threadId, input)).rejects.toThrow('Send response lost');
+    const task = await h.tool('agents_create_task', coordinator.threadId, input);
+    expect(task.threadId).toBe('thread-2');
+    expect(h.threadApi.spawn).toHaveBeenCalledTimes(2);
+    expect(h.threadApi.queuedMessages.send).toHaveBeenCalledTimes(2);
+  });
+  it('retries metadata setup before releasing the initial prompt', async () => {
+    const h = await harness();
+    const coordinator = await h.call('openAgent', { agentId: 'general' });
+    h.threadApi.updatePluginMetadata.mockRejectedValueOnce(new Error('Metadata unavailable'));
+    const input = { title: 'Build', prompt: 'Acceptance criteria.', requestKey: 'stable' };
+    await expect(h.tool('agents_create_task', coordinator.threadId, input)).rejects.toThrow('Metadata unavailable');
+    expect(h.threadApi.queuedMessages.send).toHaveBeenCalledTimes(1);
+    await h.tool('agents_create_task', coordinator.threadId, input);
+    expect(h.threadApi.spawn).toHaveBeenCalledTimes(2);
+    expect(h.threadApi.queuedMessages.send).toHaveBeenCalledTimes(2);
   });
   it('explicitly abandons a confirmed absent worker launch to free its budget', async () => {
     const h = await harness(1); const task = await h.setupTask();
@@ -215,16 +265,36 @@ describe('task orchestration', () => {
   it('only lets the task leader update aggregate progress', async () => {
     const h = await harness(); const task = await h.setupTask();
     const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('first'));
-    await expect(h.tool('agents_update_task', worker.threadId, update)).rejects.toThrow('Only the task leader');
-    await expect(h.tool('agents_update_task', task.coordinatorId, update)).rejects.toThrow('Only the task leader');
-    await expect(h.tool('agents_update_task', task.threadId, { ...update, completed: 3 })).rejects.toThrow('cannot exceed');
-    await expect(h.tool('agents_update_task', task.threadId, { ...update, state: 'needs-you' })).rejects.toThrow('Say what');
-    await h.tool('agents_update_task', task.threadId, update);
+    await expect(h.tool('agents_update_task_details', worker.threadId, update)).rejects.toThrow('Only the task leader');
+    await expect(h.tool('agents_update_task_details', task.coordinatorId, update)).rejects.toThrow('Only the task leader');
+    await expect(h.tool('agents_update_task_details', task.threadId, { ...update, completed: 3 })).rejects.toThrow('cannot exceed');
+    await h.tool('agents_update_task_details', task.threadId, update);
     expect(await h.boardTask(task.taskId)).toMatchObject({ completed: 1, total: 2, state: 'running' });
   });
 });
 
 describe('task state and durable conversations', () => {
+  it('does not opt deleted legacy leads into Sidebar or block the board', async () => {
+    const h = await harness(); const task = await h.setupTask();
+    for (const [key, value] of h.storage) if (key.startsWith('launch:') && (value as any).role === 'task') {
+      h.storage.set(key, { ...(value as any), ordinary: undefined });
+    }
+    h.patch(task.threadId, { deletedAt: Date.now() });
+    const restarted = await harness(2, h.storage, h.threads);
+    expect(await restarted.boardTask(task.taskId)).toMatchObject({ state: 'needs-you', ask: 'Task conversation was deleted' });
+    expect(restarted.bb.sdk.plugins.callRpc.mock.calls.some(([args]) => args.method === 'track_outline')).toBe(false);
+  });
+  it('opts a legacy lead in once, preserving its thread and history', async () => {
+    const h = await harness(); const task = await h.setupTask();
+    for (const [key, value] of h.storage) if (key.startsWith('launch:') && (value as any).role === 'task') {
+      h.storage.set(key, { ...(value as any), ordinary: undefined });
+    }
+    const restarted = await harness(2, h.storage, h.threads);
+    await restarted.boardTask(task.taskId); restarted.patch(task.threadId, {}); await restarted.boardTask(task.taskId);
+    expect(restarted.bb.sdk.plugins.callRpc.mock.calls.filter(([args]) => args.method === 'track_outline')).toHaveLength(1);
+    expect(restarted.threadApi.spawn).not.toHaveBeenCalled();
+  });
+
   it('keeps a task running until its last worker finishes, then requests review', async () => {
     const h = await harness(); const task = await h.setupTask();
     const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('first'));
@@ -258,7 +328,7 @@ describe('task state and durable conversations', () => {
   });
   it('clears an explicit review request when the user resumes the leader', async () => {
     const h = await harness(); const task = await h.setupTask();
-    await h.tool('agents_update_task', task.threadId, { ...update, state: 'needs-you', ask: 'Pick direction' });
+    h.bb.sdk.plugins.callRpc.mockResolvedValueOnce({ phases: { [task.threadId]: { kind: 'needs-you', reason: 'Pick direction' } } });
     expect(await h.boardTask(task.taskId)).toMatchObject({ state: 'needs-you', ask: 'Pick direction' });
     await h.event('thread.active', task.threadId);
     expect(await h.boardTask(task.taskId)).toMatchObject({ state: 'running', ask: null });
@@ -326,14 +396,14 @@ describe('agent session configuration', () => {
     const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('first'));
     const coordinator = h.session(task.coordinatorId);
     expect(coordinator.tools).toEqual(['agents_create_task', 'agents_list_tasks', 'agents_manage_agent', 'agents_reopen_task']);
-    expect(h.session(task.threadId).tools).toContain('agents_update_task');
-    expect(h.session(worker.threadId).tools).not.toContain('agents_update_task');
+    expect(h.session(task.threadId).tools).toContain('agents_update_task_details');
+    expect(h.session(worker.threadId).tools).not.toContain('agents_update_task_details');
     for (const threadId of [task.coordinatorId, task.threadId, worker.threadId]) {
       const config = h.session(threadId);
       expect(config.instructions).toContain('global and relevant project memories');
       expect(config.instructions).toContain('Use our review checklist.');
       expect(config).not.toHaveProperty('permissionMode'); expect(config).not.toHaveProperty('model');
-      expect(h.threadApi.spawn.mock.calls.find(([options]) => options.pluginMetadata.launchId === h.threads.get(threadId)!.pluginMetadata.launchId)![0]).not.toHaveProperty('permissionMode');
+      expect(h.threadApi.spawn.mock.calls.find(([options]) => options.title === `Agents launch ${h.threads.get(threadId)!.pluginMetadata.launchId}`)![0]).not.toHaveProperty('permissionMode');
     }
   });
 });
@@ -370,12 +440,12 @@ describe('existing BB conversations', () => {
     const h = await harness();
     for (const id of ['review', 'waiting', 'running', 'done', 'idle', 'stale', 'error']) existing(h, id);
     h.patch('error', { status: 'error' });
-    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: {
-      review: { card: { state: 'review', ask: 'pick design', updatedAt: 20 }, turn: { startedAt: 10 } },
-      waiting: { card: { state: 'waiting', ask: 'add key', updatedAt: 20 }, turn: null },
-      running: { card: { state: 'running', etaAt: 999999, updatedAt: 20 }, turn: null },
-      done: { card: { state: 'done', updatedAt: 20 }, turn: null },
-      stale: { card: { state: 'review', ask: 'old ask', updatedAt: 5 }, turn: { startedAt: 10 } },
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: {
+      review: { kind: 'needs-you', reason: 'pick design' },
+      waiting: { kind: 'needs-you', reason: 'add key' },
+      running: { kind: 'running', reason: 'CI', etaAt: 999999, since: 1 },
+      done: { kind: 'done', unread: true },
+      error: { kind: 'failed', reason: 'Check failed work' },
     } });
     const byId = Object.fromEntries((await h.call('board')).tasks.map((t: any) => [t.threadId, t]));
     expect(byId.review).toMatchObject({ state: 'needs-you', ask: 'pick design' });
@@ -384,7 +454,7 @@ describe('existing BB conversations', () => {
     expect(byId.done.state).toBe('done'); expect(byId.idle.state).toBe('queued'); expect(byId.stale.state).toBe('queued');
     expect(byId.error).toMatchObject({ state: 'needs-you', ask: 'Check failed work' });
     h.bb.sdk.plugins.callRpc.mockRejectedValue(new Error('Plugin unavailable')); h.patch('review', {});
-    expect(await h.boardTask('existing:review')).toMatchObject({ state: 'queued', ask: null });
+    await expect(h.boardTask('existing:review')).rejects.toThrow('Plugin unavailable');
   });
   it('snoozes, completes, and reopens the original conversation, preserving its identity', async () => {
     const h = await harness(); existing(h, 'original'); await h.call('board');
@@ -395,15 +465,15 @@ describe('existing BB conversations', () => {
     expect(h.threadApi.archive).toHaveBeenCalledWith({ threadId: 'original' });
     expect(await h.boardTask('existing:original')).toMatchObject({ state: 'done' });
     await h.call('reopenTask', { taskId: 'existing:original' });
-    expect(await h.boardTask('existing:original')).toMatchObject({ threadId: 'original', state: 'queued' });
+    expect(await h.boardTask('existing:original')).toMatchObject({ threadId: 'original', state: 'needs-you' });
     expect(h.threadApi.spawn).not.toHaveBeenCalled(); expect(h.threadApi.delete).not.toHaveBeenCalled();
   });
   it('keeps a fresh user ask visible while descendants and background agents continue', async () => {
     const h = await harness(); existing(h, 'root', { activity: { activeBackgroundAgentCount: 2 } });
     existing(h, 'child', { parentThreadId: 'root', status: 'active' });
-    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'review', ask: 'pick direction', updatedAt: 20 }, turn: { startedAt: 10 } } } });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: { root: { kind: 'needs-you', reason: 'pick direction' } } });
     expect(await h.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'pick direction', runningAgents: 3 });
-    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'review', ask: 'stale', updatedAt: 5 }, turn: { startedAt: 10 } } } });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: { root: { kind: 'running', reason: 'Working', etaAt: 999999, since: 1 } } });
     h.patch('root', { status: 'active' });
     expect(await h.boardTask('existing:root')).toMatchObject({ state: 'running', ask: null });
   });
@@ -431,7 +501,7 @@ describe('existing BB conversations', () => {
     let entered!: () => void; let resume!: () => void;
     const started = new Promise<void>(resolve => { entered = resolve; });
     const gate = new Promise<void>(resolve => { resume = resolve; });
-    h.bb.sdk.plugins.callRpc.mockImplementationOnce(async () => { entered(); await gate; return { facts: {} }; });
+    h.bb.sdk.plugins.callRpc.mockImplementationOnce(async () => { entered(); await gate; return { phases: {} }; });
     h.patch('root', { title: 'Renamed' });
     const refresh = h.call('board'); await started;
     await h.call('completeTask', { taskId: 'existing:root' });
@@ -451,20 +521,14 @@ describe('existing BB conversations', () => {
     h.patch('root', { archivedAt: null, status: 'active' });
     expect(await h.boardTask('existing:root')).toMatchObject({ state: 'running', threadId: 'root' });
   });
-  it('keeps explicit reopen visible until a newer completion card, including after restart', async () => {
+  it('keeps an explicitly reopened completed conversation visible after restart', async () => {
     const h = await harness(); existing(h, 'root');
-    const oldFacts = { facts: { root: { card: { state: 'done', updatedAt: 100 }, turn: null } } };
-    h.bb.sdk.plugins.callRpc.mockResolvedValue(oldFacts);
-    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'done', archivedProjection: false });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: { root: { kind: 'done', unread: false } } });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'done' });
     await h.call('reopenTask', { taskId: 'existing:root' });
-    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'queued', threadId: 'root' });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'Continue task' });
     const restarted = await harness(2, h.storage, h.threads);
-    restarted.bb.sdk.plugins.callRpc.mockResolvedValue(oldFacts);
-    expect(await restarted.boardTask('existing:root')).toMatchObject({ state: 'queued' });
-    const reopenedAt = (h.storage.get('task:existing:root') as { reopenedAt: number }).reopenedAt;
-    restarted.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'done', updatedAt: reopenedAt + 1 }, turn: null } } });
-    restarted.patch('root', {});
-    expect(await restarted.boardTask('existing:root')).toMatchObject({ state: 'done' });
+    expect(await restarted.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'Continue task' });
     expect(h.threadApi.spawn).not.toHaveBeenCalled();
   });
   it('updates titles and grouping after external reparenting and removes deleted projections only', async () => {

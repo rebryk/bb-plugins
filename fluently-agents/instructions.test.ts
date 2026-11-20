@@ -37,7 +37,7 @@ describe("role instructions", () => {
   it("lets a task speak directly with its user and retains configured instructions", () => {
     const text = roleInstructions({ ...options, role: "task", instructions: "Use project conventions." });
     expect(text).toContain("Respond directly in this task's conversation");
-    expect(text).toContain("move it to needs-you with a short review request and evidence");
+    expect(text).toContain("review when the result is ready with a short review request and evidence");
     expect(text).toContain("Only the user marks a task done");
     expect(text).toContain("Additional agent instructions:\nUse project conventions.");
   });

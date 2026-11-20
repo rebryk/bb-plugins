@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.17
+
+- Create ordinary BB coordinator, task and worker threads, retaining durable
+  role links and recovering interrupted launches without duplicate work.
+- Reuse Thread Sidebar's resolved status and ETA API; connect legacy task
+  conversations to its existing outline tools and reminders.
+- Hide surrounding BB panels while the board is open alone. Restore them on
+  exit without changing saved layout, tabs or sidebar settings.
+
 ## 0.1.16 — 2026-11-20
 
 - Use the same board-grid icon as Gen-UI Gallery in navigation and plugin

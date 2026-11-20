@@ -16,6 +16,10 @@ Right-click an avatar to rename it or upload an image.
 
 ## Layout
 
+The board hides BB's surrounding panels while open alone. Back to BB restores
+the ordinary view; saved panel widths, tabs and sidebar state stay unchanged.
+Split views retain BB's navigation.
+
 Chat opens on the left. The board and task results use the remaining space
 on the right. Resize the shared column to adjust both. On narrow screens,
 content sits above the conversation instead.
@@ -38,18 +42,35 @@ its model, instructions, permissions, metadata or messages. The plugin stores
 only a board projection and your board snooze state. Renames and parent changes
 in BB appear on refresh; deleted threads lose only their board projection.
 
-Runtime work, errors and pending interactions determine the live state. When
-Thread Sidebar is installed, its public progress-card state supplies the review
-request and ETA. A stale card from an earlier turn is ignored. An idle thread
-without a known request remains queued; idleness alone does not mean review or
-completion. Mark done archives the original conversation, and reopen restores
-that same conversation. Snooze hides its card without stopping its work.
+Thread Sidebar resolves card state, reviews, CI, background work and ETA for
+both the standard BB list and this board. The board reads its public
+`resolved_phases` API and groups resolved worker phases under their task.
+Worker questions remain actionable from the task. Sidebar 0.94.0 or later is
+required; a missing API reports an error instead of inventing a status.
+
+Legacy plugin-owned task threads explicitly opt into Sidebar's outline tools,
+reminders and closing-card inference. Their ownership and history stay intact.
+New threads use the ordinary BB path automatically. No second status model or
+ETA estimator runs in this plugin. Optional result links and measured step
+counts use `agents_update_task_details`; status comes from the standard
+`progress_card_update` tool.
+
+Mark done archives the original conversation. A settled managed task stays
+available for review until you mark it done; Sidebar's done phase alone does
+not archive a thread. Reopen restores the same conversation. Snooze hides its
+card without stopping work.
 
 ## Conversations and memory
 
-A coordinator keeps its own BB thread. Every task gets a standalone thread;
-its workers are child threads. A task's normal messages go directly to its
-lead. BB renders the conversation, tool activity and plugin blocks inside the
+New coordinators and tasks are ordinary, visible BB threads, created through
+the public SDK. Each coordinator keeps its thread; each task is standalone;
+workers are ordinary child threads. The plugin stores agent profiles and
+agent/task/thread links in its persistent storage. It attaches its own metadata
+after creation without changing thread ownership. The first prompt stays held
+until those links exist, so role instructions apply from the first turn.
+Retries recover the same conversation and never recreate the initial prompt.
+A task's normal messages go directly to its lead. BB renders the conversation,
+tool activity and plugin blocks inside the
 plugin’s styled chat panel. The plugin supplies its composer and queue; BB
 owns history, permissions and execution. Drafts stay in this browser per thread.
 The text field spans the composer width. Attachments and agent selection sit
@@ -76,7 +97,8 @@ Transcript styling stays scoped to the Agents panel; embedded plugin content
 keeps its own controls and behavior.
 
 [UI reference and chat variants](https://an.dev/a/d783ae026b2314ef678e)
-keep the visual direction alongside the implementation. The design study uses sample processing text;
+keep the visual direction alongside the implementation. The design study uses
+sample processing text;
 HTML result previews remain illustrative.
 
 All threads retain global BB memory and the memory of their selected project.
@@ -107,7 +129,7 @@ Model choice happens at launch; an existing conversation keeps its model.
 ## Board controls
 
 - Running includes queued work. A card has a title, BB project tag, progress,
-  active-agent count and an ETA when reported by its lead.
+  active-agent count and the ETA resolved by Thread Sidebar.
 - Needs you shows the requested decision or review. Finishing an assistant
   turn does not mark a task done.
 - Inbox lists tasks needing attention above the conversation. Resize either

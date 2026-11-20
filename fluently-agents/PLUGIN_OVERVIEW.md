@@ -3,23 +3,28 @@ Talk to a standing agent, then review its tasks on one board.
 ## Board and Inbox
 
 Running cards show progress, active agents and an estimated finish time when
-reported. Needs you cards show the decision or review requested. Inbox keeps
-those tasks above a chat in one shared-width column. Both panels float over
-the workspace without moving it.
+available from Thread Sidebar. Needs you cards show the decision or review
+requested. Inbox keeps
+those tasks above a chat in one shared-width column. The board and task
+results use the remaining space beside the conversation.
 
 ## Persistent conversations
 
-Agent avatars open persistent coordinator conversations. A task opens its own
+Agent avatars open persistent coordinator conversations. New coordinators and
+tasks are ordinary BB threads; Thread Sidebar supplies their status and ETA.
+The board hides BB's surrounding panels while open alone, and restores them
+when you return to BB. A task opens its own
 BB conversation. Each task can delegate independent work to several workers;
 workers can delegate again within the same budget. The shared chat shows your
-messages, agent replies and tool activity, with attachments, queue and stop
-controls. BB retains the history and permission decisions.
+messages, agent replies and tool activity, with attachments and a message
+queue. BB retains the history and permission decisions.
 
 Existing open BB threads also appear as tasks, with their workers grouped under
 them. Opening a task shows its original conversation without copying history
 or changing its model and instructions.
 
-Right-click the chat button to choose text or voice. N focuses the text composer
+Right-click the microphone button to choose text or voice. N focuses the text
+composer
 or starts and stops recording. BB transcribes voice and sends it when the
 composer is empty; existing drafts keep the transcript for review.
 

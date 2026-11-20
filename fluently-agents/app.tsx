@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
-import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
+import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useBbNavigate, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
 import { CHANGED, type Agent, type Task, type rpcContract } from './shared';
 import './styles.css';
 import { Chat } from './chat';
+import { mountFocusedShell } from './focus-shell';
 
 const WIDTH_KEY = 'fluently-agents.communication-width';
 const AGENT_KEY = 'fluently-agents.selected-agent';
@@ -44,6 +45,7 @@ function TaskCard({ task, now, open }: { task: Task; now: number; open(): void }
 type Menu = { kind: 'agent'; agent: Agent; left: number; bottom: number } | { kind: 'mode'; left: number; bottom: number } | { kind: 'snooze' };
 type Board = { agents: Agent[]; tasks: Task[]; runningAgents: number };
 function AgentsPage() {
+  const navigate = useBbNavigate();
   const rpc = useRpc<typeof rpcContract>();
   const root = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -202,6 +204,7 @@ function AgentsPage() {
   return <div className="fa-app" data-sidebar-open={sidebarOpen} ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
     <header className="fa-topbar">
       <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
+        <button className="fa-icon-button" title="Back to BB" aria-label="Back to BB" onClick={() => navigate.toCompose()}><Icon name="ArrowLeft" /></button>
         <button className="fa-icon-button" title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'} aria-label="Toggle sidebar" aria-expanded={sidebarOpen} onClick={event => { event.currentTarget.focus(); setSidebarOpen(value => !value); setMenu(null); }}><Icon name="PanelLeft" /></button>
         <span className="fa-crumb-divider">/</span><button className="fa-root-crumb" onClick={returnHome}>Board</button>
         {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
@@ -266,5 +269,6 @@ function AgentsPage() {
 }
 
 export default definePluginApp(app => {
+  app.contentScripts.register({ id: 'focused-board', mount: mountFocusedShell });
   app.slots.navPanel({ id: 'board', title: 'Agents', icon: 'GridView', path: 'board', component: AgentsPage });
 });
