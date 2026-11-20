@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10 — 2026-11-20
+
+- Keep avatar selection and focus rings visible in the composer.
+
 ## 0.1.9 — 2026-11-20
 
 - Give message text the full composer width above a compact control row.
