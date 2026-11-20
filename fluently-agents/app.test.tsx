@@ -4,6 +4,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { loadPluginApp, renderSlot } from '@get-bb/plugin-sdk/testing/app';
 import { CHANGED, rpcContract, type Agent, type Task } from './shared';
 
+vi.mock('./chat', () => ({ Chat: ({ threadId, focusRequest, voiceRequest }: { threadId: string; focusRequest?: number; voiceRequest?: number }) => <div data-testid="agents-chat" data-thread-id={threadId} data-focus-request={focusRequest} data-voice-request={voiceRequest} /> }));
+
 const general: Agent = { id: 'general', name: 'General', avatar: '', instructions: '', projectId: null, threadId: 'general-thread', execution: null };
 const ads: Agent = { ...general, id: 'ads', name: 'Ads', threadId: 'ads-thread' };
 const reviewTask: Task = {
@@ -46,19 +48,18 @@ describe('Agents board interactions', () => {
     const slot = mount();
     await slot.findByRole('button', { name: 'Chat with Ads' });
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
-    await waitFor(() => expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-permission-policy')).toBe('inherit');
+    await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
     fireEvent.click(slot.getByRole('button', { name: /Review campaign.*Marketing/ }));
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('task-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     expect(slot.queryByRole('button', { name: 'Chat with Ads' })).toBeNull();
     fireEvent.click(slot.getByRole('button', { name: 'Permission needed' }));
     const approval = slot.getByRole('dialog', { name: 'Worker approval' });
     expect(within(approval).getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('worker-thread');
-    expect(slot.getAllByTestId('bb-thread-chat').map(chat => chat.getAttribute('data-thread-id'))).toEqual(['task-thread', 'worker-thread']);
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     fireEvent.click(slot.getByRole('button', { name: 'Back to task' }));
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('task-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     fireEvent.click(slot.getByRole('button', { name: 'Board' }));
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('ads-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
 
@@ -66,7 +67,7 @@ describe('Agents board interactions', () => {
     const slot = mount();
     await slot.findByRole('button', { name: 'Chat with General' });
     fireEvent.click(slot.getByRole('button', { name: 'Open chat' }));
-    await slot.findByTestId('bb-thread-chat');
+    await slot.findByTestId('agents-chat');
     const rootControl = slot.getByRole('button', { name: 'Board' });
     const canvas = slot.container.querySelector('.fa-canvas');
     const footer = slot.container.querySelector('.fa-footer');
@@ -84,7 +85,7 @@ describe('Agents board interactions', () => {
     expect(slot.getByRole('button', { name: 'Inbox' })).toBe(rootControl);
     expect(slot.container.querySelector('.fa-canvas')).toBe(canvas);
     expect(slot.container.querySelector('.fa-footer')).toBe(footer);
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('task-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
   });
 
   it('ignores an earlier openAgent response after another agent was selected', async () => {
@@ -94,9 +95,9 @@ describe('Agents board interactions', () => {
     await slot.findByRole('button', { name: 'Chat with General' });
     fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
-    await waitFor(() => expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
+    await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
     await act(async () => { finishGeneral({ threadId: 'general-thread' }); await deferred; });
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('ads-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
     expect(slot.getByRole('button', { name: 'Chat with Ads' }).getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -125,7 +126,7 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     expect((await slot.findByRole('alert')).textContent).toContain('Could not archive this thread');
     expect(slot.getByRole('button', { name: 'Mark task done' })).not.toBeNull();
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('task-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
   });
 
   it('reconciles realtime board changes and focuses N only outside text inputs', async () => {
@@ -133,7 +134,7 @@ describe('Agents board interactions', () => {
     const slot = mount({ board: () => current });
     await slot.findByRole('button', { name: 'Chat with General' });
     fireEvent.keyDown(window, { key: 'n' });
-    const chat = await slot.findByTestId('bb-thread-chat');
+    const chat = await slot.findByTestId('agents-chat');
     const initialFocus = Number(chat.getAttribute('data-focus-request'));
     fireEvent.keyDown(window, { key: 'n' });
     expect(Number(chat.getAttribute('data-focus-request'))).toBe(initialFocus + 1);
@@ -157,7 +158,7 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: 'Show inbox' }));
     fireEvent.click(within(slot.getByRole('region', { name: 'Needs you' })).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
-    await waitFor(() => expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('next-thread'));
+    await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
     expect(slot.getByRole('button', { name: 'Inbox' })).not.toBeNull();
   });
 
@@ -170,7 +171,7 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: 'Board' }));
     fireEvent.click(slot.getByRole('button', { name: /Prepare creatives/ }));
     await act(async () => { finish(); await completed; });
-    expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('running-thread');
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('running-thread');
   });
 
 });

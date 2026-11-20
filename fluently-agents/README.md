@@ -1,6 +1,6 @@
 # Fluently Agents
 
-A task board with persistent coordinator agents and native BB conversations.
+A task board with persistent coordinator agents and a shared conversation panel.
 
 ## Install
 
@@ -13,11 +13,33 @@ Ask it to execute work; it creates a task with its own conversation. Ask it to
 create another agent, set its default BB project or change its instructions.
 Right-click an avatar to rename it or upload an image.
 
+## Existing BB threads
+
+The board also shows existing open BB conversations. Each visible root becomes
+one task card. Its descendants stay grouped under that card, including hidden
+workers. A visible thread whose parent is missing or hidden remains reachable.
+Standing coordinators and their managed workers are not imported again.
+
+Opening a card opens the original thread and history. Importing does not change
+its model, instructions, permissions, metadata or messages. The plugin stores
+only a board projection and your board snooze state. Renames and parent changes
+in BB appear on refresh; deleted threads lose only their board projection.
+
+Runtime work, errors and pending interactions determine the live state. When
+Thread Sidebar is installed, its public progress-card state supplies the review
+request and ETA. A stale card from an earlier turn is ignored. An idle thread
+without a known request remains queued; idleness alone does not mean review or
+completion. Mark done archives the original conversation, and reopen restores
+that same conversation. Snooze hides its card without stopping its work.
+
 ## Conversations and memory
 
 A coordinator keeps its own BB thread. Every task gets a standalone thread;
 its workers are child threads. A task's normal messages go directly to its
-lead. BB owns their history, streaming, permissions, drafts and execution.
+lead. The plugin draws the messages, tool activity and composer; BB owns the
+history, permissions and execution. Drafts stay in this browser per thread.
+Queued messages, file uploads and stop controls use BB APIs. Complex permission
+and question requests open BB's own controls from the conversation.
 
 All threads retain global BB memory and the memory of their selected project.
 Memory does not copy another thread's live context: agents must pass a brief
@@ -52,13 +74,17 @@ Model choice happens at launch; an existing conversation keeps its model.
   turn does not mark a task done.
 - Inbox lists tasks needing attention above the conversation. Resize either
   panel to change their shared width; this browser remembers it.
-- Mark done archives settled work. Stop running or queued work in its native
-  chat before closing the task.
+- Mark done archives settled work. Stop running or queued work in its
+  conversation before closing the task.
 - Snooze hides a card for three hours, until tomorrow at 09:00, or indefinitely.
   It does not stop work. Time-based snoozes expire on the next refresh.
-- N opens and focuses the conversation. Right-click the chat button for text
-  focus or instructions for BB's microphone. BB transcribes voice into the
-  native composer for review before sending.
+- Right-click the chat button to choose text or voice mode. N focuses the
+  composer in text mode. In voice mode, N starts recording; press it again to
+  finish. The microphone button also records in either mode.
+- Voice uses BB's configured transcription service. An empty composer sends the
+  transcript automatically; an existing draft keeps it for review. Failed
+  transcription keeps the recording for retry. Leaving the conversation
+  cancels its recording and prevents delivery into another thread.
 
 ## Commands and automation
 

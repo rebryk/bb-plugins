@@ -8,7 +8,8 @@ import { roleInstructions } from './instructions';
 type Thread = Awaited<ReturnType<BbPluginApi['sdk']['threads']['get']>>;
 type ListedThread = Awaited<ReturnType<BbPluginApi['sdk']['threads']['list']>>[number];
 type Launch = { id: string; role: AgentRole; agentId: string; taskId?: string; threadId: string | null; requestKey: string; callerId: string };
-type StoredTask = Task & { declaredAsk: string | null };
+type StoredTask = Task & { declaredAsk: string | null; archivedProjection?: boolean; reopenedAt?: number };
+const phaseSchema = z.object({ facts: z.record(z.string(), z.object({ card: z.object({ state: z.string().optional(), ask: z.string().optional(), etaAt: z.number().optional(), updatedAt: z.number(), running: z.boolean().optional() }).nullable(), turn: z.object({ startedAt: z.number() }).nullable().optional() })) });
 const working = (t: Pick<Thread, 'status'>) => ['active', 'starting', 'pending', 'stopping'].includes(t.status);
 const active = (t: Pick<Thread, 'status'>) => t.status === 'active' || t.status === 'starting';
 const result = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
@@ -29,6 +30,12 @@ export default async function plugin(bb: BbPluginApi) {
   let disposed = false;
   let reconciliation: Promise<void> | undefined;
   let recoverArchived = true;
+  let dirty = true;
+  let lastReconciled = 0;
+  let pendingPublish = false;
+  const invalidatedThreads = new Set<string>();
+  const transitions = new Map<string, number>();
+  let phases: z.infer<typeof phaseSchema>['facts'] = {};
   async function load<T extends { id: string }>(prefix: string, map: Map<string, T>) {
     for (const key of await bb.storage.kv.list(prefix)) {
       const item = await bb.storage.kv.get<T>(key);
@@ -40,11 +47,17 @@ export default async function plugin(bb: BbPluginApi) {
     const general: Agent = { id: 'general', name: 'General', avatar: '', instructions: '', projectId: null, threadId: null, execution: null };
     await bb.storage.kv.set('agent:general', general); agents.set(general.id, general);
   }
-  const changed = () => { if (!disposed) bb.realtime.publish(CHANGED, null); };
+  const changed = () => {
+    if (disposed) return;
+    if (reconciliation) pendingPublish = true;
+    else bb.realtime.publish(CHANGED, null);
+  };
+  const invalidate = (threadId?: string) => { dirty = true; if (threadId && tasks.get(`existing:${threadId}`)?.archivedProjection) invalidatedThreads.add(threadId); };
   async function saveAgent(agent: Agent) {
     await bb.storage.kv.set(`agent:${agent.id}`, agent); agents.set(agent.id, agent); changed(); return agent;
   }
   async function saveTask(task: StoredTask) {
+    if (!reconciliation) invalidate();
     await bb.storage.kv.set(`task:${task.id}`, task); tasks.set(task.id, task); changed(); return task;
   }
   async function saveLaunch(launch: Launch) {
@@ -115,7 +128,7 @@ export default async function plugin(bb: BbPluginApi) {
     await saveLaunch(launch);
     try {
       const thread = await bb.sdk.threads.spawn({ ...options, visibility: 'hidden', pluginMetadata: { launchId: launch.id } });
-      await remember(thread, launch); return thread;
+      await remember(thread, launch); invalidate(thread.id); return thread;
     } catch (error) {
       if (launch.taskId && launch.role === 'task') await saveTask({ ...taskById(launch.taskId), state: 'needs-you', ask: 'Check failed launch', declaredAsk: 'Check failed launch', needsSince: Date.now() });
       throw new Error(`${error instanceof Error ? error.message : String(error)} Unresolved launch ${launch.id}: run bb agents abandon-launch ${launch.id} to check and abandon it explicitly if a retry is needed.`, { cause: error });
@@ -206,11 +219,69 @@ export default async function plugin(bb: BbPluginApi) {
     }
     return rows.filter(row => !row.deletedAt);
   }
-  async function reconcileTask(id: string) {
+  // Existing conversations stay ordinary BB threads. Only the board projection
+  // is stored here: no launch metadata, prompts, model or history is changed.
+  async function discoverExisting() {
+    const rows: ListedThread[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const page = await bb.sdk.threads.list({ archived: false, includeHidden: true, limit: 100, offset });
+      rows.push(...page.filter(row => !row.deletedAt));
+      if (page.length < 100) break;
+    }
+    const byId = new Map(rows.map(row => [row.id, row]));
+    const managed = new Set([...launches.values()].flatMap(launch => launch.threadId ? [launch.threadId] : []));
+    const rootFor = (row: ListedThread): string | null => {
+      let root = row.visibility !== 'hidden' ? row.id : null;
+      let current: ListedThread | undefined = row;
+      const visited = new Set<string>();
+      while (current && !visited.has(current.id)) {
+        if (managed.has(current.id)) return null;
+        visited.add(current.id);
+        if (current.visibility !== 'hidden') root = current.id;
+        current = current.parentThreadId ? byId.get(current.parentThreadId) : undefined;
+      }
+      return root;
+    };
+    const groups = new Map<string, ListedThread[]>();
+    for (const row of rows) {
+      const root = rootFor(row); if (!root) continue;
+      const group = groups.get(root) ?? []; group.push(row); groups.set(root, group);
+    }
+    const projects = new Map((await bb.sdk.projects.list({ includePersonal: true })).map(project => [project.id, project.name]));
+    for (const [threadId] of groups) {
+      const row = byId.get(threadId)!; const id = `existing:${threadId}`;
+      await locked(`task:${id}`, async () => {
+      const previous = tasks.get(id);
+      const task: StoredTask = previous ? { ...previous, title: row.title ?? row.titleFallback ?? 'Untitled task', projectId: row.projectId, projectName: projects.get(row.projectId) ?? row.projectId, updatedAt: row.updatedAt ?? previous.updatedAt }
+        : { id, source: 'existing', agentId: 'general', threadId, title: row.title ?? row.titleFallback ?? 'Untitled task', projectId: row.projectId, projectName: projects.get(row.projectId) ?? row.projectId, state: 'queued', ask: null, declaredAsk: null, needsSince: null, etaAt: null, completed: 0, total: 0, runningAgents: 0, snoozeUntil: null, updatedAt: row.updatedAt ?? Date.now(), pendingWorkers: [], artifacts: [], execution: null, routingReason: null };
+      if (JSON.stringify(task) !== JSON.stringify(previous)) await saveTask(task);
+      });
+    }
+    const missing = [...tasks.values()].filter(task => task.source === 'existing' && task.threadId && !groups.has(task.threadId));
+    for (const task of missing) {
+      if (byId.has(task.threadId!)) {
+        // Reparented conversations now belong to their visible root card.
+        await locked(`task:${task.id}`, async () => { await bb.storage.kv.delete(`task:${task.id}`); tasks.delete(task.id); changed(); });
+      }
+    }
+    const closed = missing.filter(task => !byId.has(task.threadId!) && (!task.archivedProjection || invalidatedThreads.has(task.threadId!)));
+    for (const task of closed) invalidatedThreads.delete(task.threadId!);
+    for (let start = 0; start < closed.length; start += 100) {
+      const batch = closed.slice(start, start + 100);
+      const archived = await bb.sdk.threads.list({ threadIds: batch.map(task => task.threadId!), archived: true, includeHidden: true, limit: 100 });
+      for (const task of batch) groups.set(task.threadId!, archived.filter(row => row.id === task.threadId));
+    }
+    return groups;
+  }
+  async function reconcileTask(id: string, snapshot?: ListedThread[], transition?: number) {
     return locked(`task:${id}`, async () => {
+      if (transition !== undefined && transition !== (transitions.get(id) ?? 0)) { dirty = true; return; }
       const old = taskById(id); if (!old.threadId) return;
-      const rows = await relatedThreads(old);
+      const rows = snapshot ?? await relatedThreads(old);
       const lead = rows.find(row => row.id === old.threadId);
+      if (!lead && old.source === 'existing') {
+        await bb.storage.kv.delete(`task:${old.id}`); tasks.delete(old.id); changed(); return;
+      }
       if (!lead) {
         if (old.state !== 'done') {
           const next = { ...old, state: 'needs-you' as const, ask: 'Task conversation was deleted', needsSince: old.needsSince ?? Date.now(), runningAgents: 0, pendingWorkers: [] };
@@ -225,27 +296,46 @@ export default async function plugin(bb: BbPluginApi) {
       }
       const count = live.reduce((sum, row) => sum + (active(row) ? 1 : 0) + row.activity.activeBackgroundAgentCount, 0);
       let state = old.state; let ask = old.ask; const now = Date.now();
+      const facts = phases[lead.id];
+      const card = facts?.card && (!facts.turn || facts.card.updatedAt >= facts.turn.startedAt)
+        && !(facts.card.state === 'done' && facts.card.updatedAt <= (old.reopenedAt ?? -1)) ? facts.card : null;
       if (state === 'snoozed' && old.snoozeUntil !== null && old.snoozeUntil <= now) state = 'queued';
+      if (old.source === 'existing' && lead.archivedAt) { state = 'done'; ask = null; }
       if (state === 'done' && !lead.archivedAt) state = 'queued';
       if (state !== 'done' && state !== 'snoozed') {
         if (lead.archivedAt) { state = 'done'; ask = null; }
         else if (pendingWorkers.length) { state = 'needs-you'; ask = 'Answer a question'; }
+        else if (old.source === 'existing' && live.some(row => row.status === 'error' || row.queuedWork === 'failed')) { state = 'needs-you'; ask = 'Check failed work'; }
+        else if (old.source === 'existing' && (card?.state === 'waiting' || card?.state === 'review')) { state = 'needs-you'; ask = card.ask || (card.state === 'review' ? 'Review result' : 'Respond'); }
         else if (old.declaredAsk) { state = 'needs-you'; ask = old.declaredAsk; }
         else if (count > 0) { state = 'running'; ask = null; }
         else if (live.some(row => working(row) || row.queuedWork !== 'none')) { state = 'queued'; ask = null; }
+        else if (old.source === 'existing') {
+          ask = null;
+          if (card?.state === 'waiting' || card?.state === 'review') { state = 'needs-you'; ask = card.ask || (card.state === 'review' ? 'Review result' : 'Respond'); }
+          else if (card?.state === 'running' || card?.running) state = 'running';
+          else if (card?.state === 'done') state = 'done';
+          else state = 'queued';
+        }
         else { state = 'needs-you'; ask = live.some(row => row.status === 'error') ? 'Check failed work' : 'Review result'; }
       }
-      const next = { ...old, state, ask, snoozeUntil: state === 'snoozed' ? old.snoozeUntil : null, runningAgents: count, pendingWorkers, needsSince: state === 'needs-you' ? old.needsSince ?? now : null };
+      const next = { ...old, state, ask, ...(old.source === 'existing' ? { archivedProjection: Boolean(lead.archivedAt), etaAt: state === 'running' ? card?.etaAt ?? null : null } : {}), snoozeUntil: state === 'snoozed' ? old.snoozeUntil : null, runningAgents: count, pendingWorkers, needsSince: state === 'needs-you' ? old.needsSince ?? now : null };
       if (JSON.stringify(next) !== JSON.stringify(old)) await saveTask(next);
     });
   }
   async function reconcile() {
     if (reconciliation) return reconciliation;
+    if (!dirty && Date.now() - lastReconciled < 1000) return;
+    dirty = false;
     reconciliation = (async () => {
+      const before = new Map(transitions);
+      const [existing, facts] = await Promise.all([discoverExisting(), bb.sdk.plugins.callRpc({ pluginId: 'thread-sidebar', method: 'phases', input: {}, outputSchema: phaseSchema }).catch(() => null)]);
+      phases = facts?.facts ?? {};
+      for (const task of [...tasks.values()]) if (task.source === 'existing' && existing.has(task.threadId!)) await reconcileTask(task.id, existing.get(task.threadId!)!, before.get(task.id) ?? 0);
       // Recover automation wakes missed while the plugin was stopped. Later
       // wakes arrive through thread events, without rescanning the archive.
       if (recoverArchived) {
-        const archived = [...tasks.values()].filter(task => task.state === 'done' && task.threadId);
+        const archived = [...tasks.values()].filter(task => task.source !== 'existing' && task.state === 'done' && task.threadId);
         for (let start = 0; start < archived.length; start += 100) {
           const batch = archived.slice(start, start + 100);
           const live = await bb.sdk.threads.list({ threadIds: batch.map(task => task.threadId!), archived: false, includeHidden: true, limit: 100 });
@@ -253,8 +343,12 @@ export default async function plugin(bb: BbPluginApi) {
         }
         recoverArchived = false;
       }
-      for (const task of tasks.values()) if (task.state !== 'done') await reconcileTask(task.id);
-    })().finally(() => { reconciliation = undefined; });
+      for (const task of tasks.values()) if (task.source !== 'existing' && task.state !== 'done') await reconcileTask(task.id);
+      lastReconciled = Date.now();
+    })().catch(error => { dirty = true; throw error; }).finally(() => {
+      reconciliation = undefined;
+      if (pendingPublish) { pendingPublish = false; changed(); }
+    });
     return reconciliation;
   }
   async function completeTask(id: string) {
@@ -263,6 +357,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (rows.some(row => !row.archivedAt && (working(row) || row.queuedWork !== 'none' || row.activity.activeBackgroundAgentCount > 0 || row.hasPendingInteraction))) throw new Error('Work is still running, queued, or awaiting a response. Resolve it in the chat before marking the task done.');
       for (const row of rows.filter(row => row.id !== task.threadId)) if (!row.archivedAt) await bb.sdk.threads.archive({ threadId: row.id });
       if (task.threadId) await bb.sdk.threads.archive({ threadId: task.threadId });
+      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true;
       await saveTask({ ...task, state: 'done', ask: null, declaredAsk: null, needsSince: null, snoozeUntil: null, runningAgents: 0, pendingWorkers: [], updatedAt: Date.now() }); return null;
     });
   }
@@ -271,7 +366,8 @@ export default async function plugin(bb: BbPluginApi) {
       const task = taskById(id); if (!task.threadId) throw new Error('This task has no confirmed conversation to reopen.');
       const lead = await bb.sdk.threads.get({ threadId: task.threadId });
       if (lead.archivedAt) await bb.sdk.threads.unarchive({ threadId: lead.id });
-      await saveTask({ ...task, state: 'needs-you', ask: 'Continue task', declaredAsk: null, needsSince: Date.now(), snoozeUntil: null, updatedAt: Date.now() });
+      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true;
+      await saveTask({ ...task, ...(task.source === 'existing' ? { reopenedAt: Date.now() } : {}), state: 'needs-you', ask: 'Continue task', declaredAsk: null, needsSince: Date.now(), snoozeUntil: null, updatedAt: Date.now() });
       if (prompt) await bb.sdk.threads.send({ threadId: lead.id, mode: 'auto', input: [{ type: 'text', text: prompt, mentions: [] }], ...(senderThreadId ? { senderThreadId } : {}) }); return null;
     });
   }
@@ -297,6 +393,7 @@ export default async function plugin(bb: BbPluginApi) {
     snoozeTask: ({ taskId, until }) => locked(`task:${taskId}`, async () => {
       if (until !== null && until <= Date.now()) throw new Error('Choose a future snooze time.');
       const task = taskById(taskId); if (task.state === 'done') throw new Error('Reopen this task before snoozing it.');
+      transitions.set(taskId, (transitions.get(taskId) ?? 0) + 1); dirty = true;
       await saveTask({ ...task, state: 'snoozed', snoozeUntil: until, updatedAt: Date.now() }); return null;
     }),
   });
@@ -342,7 +439,8 @@ export default async function plugin(bb: BbPluginApi) {
     return { tools, skills: [], instructions: roleInstructions({ role: launch.role, agentName: agent.name, agentId: agent.id, taskId: launch.taskId, instructions: agent.instructions, maxWorkers }) };
   });
   async function onChange(thread: Thread, clearAsk = false) {
-    const launch = [...launches.values()].find(row => row.threadId === thread.id); if (!launch) return;
+    invalidate(thread.id);
+    const launch = [...launches.values()].find(row => row.threadId === thread.id); if (!launch) { changed(); return; }
     if (launch.taskId) {
       if (clearAsk && launch.role === 'task') await locked(`task:${launch.taskId}`, async () => {
         await saveTask({ ...taskById(launch.taskId!), declaredAsk: null, ask: null, needsSince: null, updatedAt: Date.now() });
@@ -350,6 +448,7 @@ export default async function plugin(bb: BbPluginApi) {
       await reconcileTask(launch.taskId);
     } else changed();
   }
+  bb.events.on('thread.created', ({ thread }) => { invalidate(thread.id); changed(); });
   bb.events.on('thread.active', ({ thread }) => onChange(thread, true));
   bb.events.on('thread.idle', ({ thread }) => onChange(thread));
   bb.events.on('thread.failed', ({ thread }) => onChange(thread));

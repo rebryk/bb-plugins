@@ -9,6 +9,7 @@ export const agentSchema = z.object({
 });
 export type Agent = z.infer<typeof agentSchema>;
 export const taskSchema = z.object({
+  source: z.enum(['managed', 'existing']).optional(),
   id: z.string(), agentId: z.string(), threadId: z.string().nullable(), title: z.string(),
   projectId: z.string(), projectName: z.string(),
   state: z.enum(['queued', 'running', 'needs-you', 'done', 'snoozed']),

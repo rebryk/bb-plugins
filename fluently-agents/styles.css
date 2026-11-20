@@ -117,3 +117,5 @@
 .fa-app .fa-worker-dialog > header strong { font-size: 13px; font-weight: 500; display: block; }
 .fa-app .fa-worker-dialog > header small { font-size: 11px; color: var(--fa-muted); }
 .fa-app .fa-worker-dialog > p { font-size: 11px; color: var(--fa-muted); padding: 8px; margin: 0; }
+.fa-app .fa-chat-toggle.fa-recording { background: #416bc4; color: white; border-color: #8ab2ff; box-shadow: 0 0 0 calc(3px + var(--voice-level, 0) * 12px) rgba(91,141,239,.22); transition: box-shadow 80ms linear; }
+.fa-app .fa-chat-toggle:disabled { opacity: .65; }

@@ -11,9 +11,17 @@ the workspace without moving it.
 
 Agent avatars open persistent coordinator conversations. A task opens its own
 BB conversation. Each task can delegate independent work to several workers;
-workers can delegate again within the same budget. Native BB chat retains
-streaming, queued messages, attachments, permissions and voice transcription.
-Press N to focus the conversation. Voice uses BB's microphone control.
+workers can delegate again within the same budget. The shared chat shows your
+messages, agent replies and tool activity, with attachments, queue and stop
+controls. BB retains the history and permission decisions.
+
+Existing open BB threads also appear as tasks, with their workers grouped under
+them. Opening a task shows its original conversation without copying history
+or changing its model and instructions.
+
+Right-click the chat button to choose text or voice. N focuses the text composer
+or starts and stops recording. BB transcribes voice and sends it when the
+composer is empty; existing drafts keep the transcript for review.
 
 ## Shared memory and execution
 

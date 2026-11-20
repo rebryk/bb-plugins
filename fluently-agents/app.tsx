@@ -3,6 +3,8 @@ import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
 import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
 import { CHANGED, type Agent, type Task, type rpcContract } from './shared';
 import './styles.css';
+import { Chat } from './chat';
+import type { VoiceState } from './voice';
 
 const WIDTH_KEY = 'fluently-agents.communication-width';
 const AGENT_KEY = 'fluently-agents.selected-agent';
@@ -60,7 +62,11 @@ function AgentsPage() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState(false);
-  const [voiceHint, setVoiceHint] = useState(false);
+  const [mode, setMode] = useState<'text' | 'voice'>(() => readPreference('fluently-agents.input-mode', 'text') === 'voice' ? 'voice' : 'text');
+  const [voiceRequest, setVoiceRequest] = useState({ threadId: '', nonce: 0 });
+  const [voice, setVoice] = useState<{ state: VoiceState; level: number }>({ state: 'idle', level: 0 });
+  const onVoiceRequestHandled = useCallback((nonce: number) => setVoiceRequest(previous => previous.nonce === nonce ? { ...previous, threadId: '' } : previous), []);
+  const onVoiceState = useCallback((next: { state: VoiceState; level: number }) => setVoice(next), []);
   const [now, setNow] = useState(Date.now());
   const upload = useRef<HTMLInputElement>(null);
   const uploadAgent = useRef<Agent | null>(null);
@@ -96,6 +102,7 @@ function AgentsPage() {
       if (sequence === openingSequence.current) {
         setAgentThread({ agentId: next.id, threadId: result.threadId });
         if (focusComposer) setFocus(value => value + 1);
+        return result.threadId;
       }
     } catch (cause) { report(cause); }
     finally { if (sequence === openingSequence.current) setOpening(false); }
@@ -105,6 +112,11 @@ function AgentsPage() {
     if (task || threadId) setFocus(value => value + 1);
     else if (agent) void openAgent(agent, true);
   }, [task, threadId, agent, openAgent]);
+  const activateVoice = useCallback(async () => {
+    setChatOpen(true);
+    const target = threadId ?? (agent ? await openAgent(agent) : undefined);
+    if (target) setVoiceRequest(previous => ({ threadId: target, nonce: previous.nonce + 1 }));
+  }, [threadId, agent, openAgent]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { setMenu(null); setRenaming(null); setWorkerThread(null); }
@@ -112,12 +124,12 @@ function AgentsPage() {
       const target = event.target;
       const editing = target instanceof HTMLElement && (target.isContentEditable || !!target.closest('input,textarea,select,[role="textbox"],[role="dialog"]'));
       if (event.key.toLowerCase() === 'n' && !event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !editing) {
-        event.preventDefault(); focusChat();
+        event.preventDefault(); if (mode === 'voice') void activateVoice(); else focusChat();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusChat, workerThread, renaming]);
+  }, [focusChat, activateVoice, mode, workerThread, renaming]);
   useEffect(() => {
     if (!menu) return;
     const dismiss = (event: globalThis.PointerEvent) => {
@@ -135,8 +147,8 @@ function AgentsPage() {
     setMenu(kind === 'agent' && next ? { kind, agent: next, ...position } : { kind: 'mode', ...position });
   };
   const openTask = (next: Task) => {
-    openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null); setVoiceHint(false);
-    if (view === 'inbox' || next.state === 'needs-you') setChatOpen(true);
+    openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null); setVoice({ state: 'idle', level: 0 });
+    setChatOpen(true);
   };
   const returnHome = () => { setTaskId(null); setWorkerThread(null); setMenu(null); };
   const act = async (operation: () => Promise<unknown>, closeTask = false) => {
@@ -213,14 +225,13 @@ function AgentsPage() {
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}
         </div>}
-        {voiceHint && <div className="fa-voice-hint">Use the microphone in the message field to dictate. Review the transcript before sending.<button aria-label="Dismiss voice hint" onClick={() => setVoiceHint(false)}><Icon name="X" /></button></div>}
-        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…</div> : threadId ? <ThreadChat key={threadId} threadId={threadId} variant="compact" layout="contained" focusRequest={focus} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}</div>}
+        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} onVoiceState={onVoiceState} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}</div>}
         {resizeHandle}
       </section>}
     </aside>}
 
     <footer className="fa-footer">
-      <button className={`fa-chat-toggle${chatOpen ? ' fa-selected' : ''}`} title="Chat · N" aria-label={chatOpen ? 'Close chat' : 'Open chat'} aria-expanded={chatOpen} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (chatOpen) setChatOpen(false); else focusChat(); }}><Icon name="MessageSquare" /></button>
+      <button className={`fa-chat-toggle${chatOpen ? ' fa-selected' : ''}${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} title={mode === 'voice' ? 'Voice · N' : 'Chat · N'} aria-label={voice.state === 'recording' ? 'Stop and send voice message' : mode === 'voice' ? 'Record voice message' : chatOpen ? 'Close chat' : 'Open chat'} disabled={voice.state === 'starting' || voice.state === 'transcribing'} aria-expanded={chatOpen} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (mode === 'voice') void activateVoice(); else if (chatOpen) setChatOpen(false); else focusChat(); }}><Icon name={voice.state === 'recording' ? 'Square' : mode === 'voice' ? 'Mic' : 'MessageSquare'} /></button>
       {!task && board && board.agents.length > 0 && <div className="fa-pill fa-avatars" aria-label="Agents">{board.agents.map(item => <button className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => { if (agent?.id === item.id && chatOpen) setChatOpen(false); else void openAgent(item, true); }}><Avatar agent={item} /></button>)}</div>}
     </footer>
 
@@ -229,7 +240,7 @@ function AgentsPage() {
         { label: 'Later today', until: now + 3 * 60 * 60 * 1000 },
         { label: 'Tomorrow', until: new Date(new Date(now).getFullYear(), new Date(now).getMonth(), new Date(now).getDate() + 1, 9).getTime() },
         { label: 'Forever', until: null },
-      ].map(option => <button role="menuitem" key={option.label} disabled={busy} onClick={() => void act(() => rpc.call('snoozeTask', { taskId: task.id, until: option.until }), true)}>{option.label}</button>)}</> : menu.kind === 'agent' ? <><button role="menuitem" onClick={() => { uploadAgent.current = menu.agent; upload.current?.click(); setMenu(null); }}><Icon name="FileAttachment" />Change avatar</button><button role="menuitem" onClick={() => { setRenaming(menu.agent); setName(menu.agent.name); setMenu(null); }}><Icon name="Edit" />Rename</button></> : <><button role="menuitem" onClick={() => { setMenu(null); setVoiceHint(false); focusChat(); }}><Icon name="AlignLeft" />Write a message</button><button role="menuitem" onClick={() => { setMenu(null); setVoiceHint(true); focusChat(); }}><Icon name="Mic" />Voice input</button></>}
+      ].map(option => <button role="menuitem" key={option.label} disabled={busy} onClick={() => void act(() => rpc.call('snoozeTask', { taskId: task.id, until: option.until }), true)}>{option.label}</button>)}</> : menu.kind === 'agent' ? <><button role="menuitem" onClick={() => { uploadAgent.current = menu.agent; upload.current?.click(); setMenu(null); }}><Icon name="FileAttachment" />Change avatar</button><button role="menuitem" onClick={() => { setRenaming(menu.agent); setName(menu.agent.name); setMenu(null); }}><Icon name="Edit" />Rename</button></> : <><button role="menuitem" onClick={() => { setMenu(null); setMode('text'); writePreference('fluently-agents.input-mode', 'text'); focusChat(); }}><Icon name="AlignLeft" />Write a message</button><button role="menuitem" onClick={() => { setMenu(null); setMode('voice'); writePreference('fluently-agents.input-mode', 'voice'); }}><Icon name="Mic" />Voice input</button></>}
     </div>}
     <input ref={upload} className="fa-file-input" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Agent avatar" onChange={event => {
       const file = event.currentTarget.files?.[0]; const next = uploadAgent.current; event.currentTarget.value = '';

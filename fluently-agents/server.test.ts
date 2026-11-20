@@ -13,7 +13,7 @@ type FakeThread = {
   status: string; archivedAt: number | null; deletedAt: number | null;
   hasPendingInteraction: boolean; queuedWork: string;
   activity: { activeBackgroundAgentCount: number };
-  parentThreadId?: string; pluginMetadata: Record<string, string>;
+  visibility?: string; updatedAt?: number; parentThreadId?: string; pluginMetadata: Record<string, string>;
 };
 const cleanups: (() => void)[] = [];
 beforeEach(() => { vi.clearAllMocks(); });
@@ -72,6 +72,7 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
     } },
     realtime: { publish: vi.fn() }, log: { warn: vi.fn() },
     sdk: {
+      plugins: { callRpc: vi.fn().mockResolvedValue({ facts: {} }) },
       threads: threadApi,
       projects: { get: vi.fn(async ({ projectId }: { projectId: string }) => ({ ...project, id: projectId })), list: vi.fn(async () => [project]) },
       environments: { get: vi.fn(async ({ environmentId }: { environmentId: string }) => ({ id: environmentId, projectId: environmentId === 'wrong-project' ? 'other' : 'project' })) },
@@ -89,7 +90,7 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
     return JSON.parse(output.content[0].text);
   }
   async function event(name: string, threadId: string) { await events.get(name)!({ thread: threads.get(threadId)! }); }
-  function patch(threadId: string, input: Partial<FakeThread>) { Object.assign(threads.get(threadId)!, input); }
+  function patch(threadId: string, input: Partial<FakeThread>) { Object.assign(threads.get(threadId)!, input); events.get('thread.created')?.({ thread: threads.get(threadId)! }); }
   function session(threadId: string) { const thread = threads.get(threadId)!; return configure({ thread, pluginMetadata: thread.pluginMetadata }); }
   async function setupTask(key = 'task-key') {
     const coordinator = await call('openAgent', { agentId: 'general' });
@@ -271,7 +272,7 @@ describe('task state and durable conversations', () => {
     expect(await h.boardTask(task.taskId)).toMatchObject({ state: 'running', threadId: task.threadId });
     const now = Date.now(); const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
     try {
-      await h.call('snoozeTask', { taskId: task.taskId, until: now + 1000 }); clock.mockReturnValue(now + 1001);
+      await h.call('snoozeTask', { taskId: task.taskId, until: now + 1000 }); clock.mockReturnValue(now + 1001); h.patch(task.threadId, {});
       expect(await h.boardTask(task.taskId)).toMatchObject({ state: 'running', snoozeUntil: null });
     } finally { clock.mockRestore(); }
     expect(h.threadApi.spawn).toHaveBeenCalledTimes(2);
@@ -334,5 +335,144 @@ describe('agent session configuration', () => {
       expect(config).not.toHaveProperty('permissionMode'); expect(config).not.toHaveProperty('model');
       expect(h.threadApi.spawn.mock.calls.find(([options]) => options.pluginMetadata.launchId === h.threads.get(threadId)!.pluginMetadata.launchId)![0]).not.toHaveProperty('permissionMode');
     }
+  });
+});
+
+describe('existing BB conversations', () => {
+  function existing(h: Awaited<ReturnType<typeof harness>>, id: string, patch: Partial<FakeThread> = {}) {
+    h.threads.set(id, { id, title: `Existing ${id}`, projectId: 'project', environmentId: 'environment', status: 'idle', archivedAt: null, deletedAt: null, hasPendingInteraction: false, queuedWork: 'none', activity: { activeBackgroundAgentCount: 0 }, pluginMetadata: {}, visibility: 'visible', updatedAt: 100, ...patch });
+    h.patch(id, {});
+  }
+  it('shows every open root across pages without changing its thread or injecting instructions', async () => {
+    const h = await harness();
+    for (let i = 0; i < 103; i++) existing(h, `existing-${i}`);
+    existing(h, 'archived', { archivedAt: 1 }); existing(h, 'hidden', { visibility: 'hidden' });
+    const board = await h.call('board');
+    expect(board.tasks).toHaveLength(103);
+    expect(board.tasks[0]).toMatchObject({ source: 'existing', execution: null, state: 'queued' });
+    expect(h.session('existing-0')).toEqual({ tools: [], skills: [] });
+    expect(h.threadApi.spawn).not.toHaveBeenCalled(); expect(h.threadApi.send).not.toHaveBeenCalled(); expect(h.threadApi.archive).not.toHaveBeenCalled();
+    const publishes = h.bb.realtime.publish.mock.calls.length;
+    await h.call('board'); expect(h.bb.realtime.publish).toHaveBeenCalledTimes(publishes);
+  });
+  it('groups descendants, excludes standing coordinators, and promotes visible orphan roots', async () => {
+    const h = await harness(); const managed = await h.setupTask();
+    existing(h, 'root', { status: 'active' });
+    existing(h, 'child', { parentThreadId: 'root', status: 'active', visibility: 'hidden' });
+    existing(h, 'grandchild', { parentThreadId: 'child', hasPendingInteraction: true });
+    existing(h, 'orphan', { parentThreadId: 'missing' });
+    existing(h, 'hidden-parent', { visibility: 'hidden' }); existing(h, 'visible-child', { parentThreadId: 'hidden-parent' });
+    const board = await h.call('board');
+    expect(board.tasks.map((t: any) => t.threadId).sort()).toEqual([managed.threadId, 'root', 'orphan', 'visible-child'].sort());
+    expect(board.tasks.find((t: any) => t.threadId === 'root')).toMatchObject({ runningAgents: 2, state: 'needs-you', pendingWorkers: [{ threadId: 'grandchild', title: 'Existing grandchild' }] });
+  });
+  it('uses fresh public progress cards and real errors, never guessing attention from idle', async () => {
+    const h = await harness();
+    for (const id of ['review', 'waiting', 'running', 'done', 'idle', 'stale', 'error']) existing(h, id);
+    h.patch('error', { status: 'error' });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: {
+      review: { card: { state: 'review', ask: 'pick design', updatedAt: 20 }, turn: { startedAt: 10 } },
+      waiting: { card: { state: 'waiting', ask: 'add key', updatedAt: 20 }, turn: null },
+      running: { card: { state: 'running', etaAt: 999999, updatedAt: 20 }, turn: null },
+      done: { card: { state: 'done', updatedAt: 20 }, turn: null },
+      stale: { card: { state: 'review', ask: 'old ask', updatedAt: 5 }, turn: { startedAt: 10 } },
+    } });
+    const byId = Object.fromEntries((await h.call('board')).tasks.map((t: any) => [t.threadId, t]));
+    expect(byId.review).toMatchObject({ state: 'needs-you', ask: 'pick design' });
+    expect(byId.waiting).toMatchObject({ state: 'needs-you', ask: 'add key' });
+    expect(byId.running).toMatchObject({ state: 'running', etaAt: 999999 });
+    expect(byId.done.state).toBe('done'); expect(byId.idle.state).toBe('queued'); expect(byId.stale.state).toBe('queued');
+    expect(byId.error).toMatchObject({ state: 'needs-you', ask: 'Check failed work' });
+    h.bb.sdk.plugins.callRpc.mockRejectedValue(new Error('Plugin unavailable')); h.patch('review', {});
+    expect(await h.boardTask('existing:review')).toMatchObject({ state: 'queued', ask: null });
+  });
+  it('snoozes, completes, and reopens the original conversation, preserving its identity', async () => {
+    const h = await harness(); existing(h, 'original'); await h.call('board');
+    await h.call('snoozeTask', { taskId: 'existing:original', until: null });
+    expect(await h.boardTask('existing:original')).toMatchObject({ state: 'snoozed' });
+    await h.call('reopenTask', { taskId: 'existing:original' });
+    await h.call('completeTask', { taskId: 'existing:original' });
+    expect(h.threadApi.archive).toHaveBeenCalledWith({ threadId: 'original' });
+    expect(await h.boardTask('existing:original')).toMatchObject({ state: 'done' });
+    await h.call('reopenTask', { taskId: 'existing:original' });
+    expect(await h.boardTask('existing:original')).toMatchObject({ threadId: 'original', state: 'queued' });
+    expect(h.threadApi.spawn).not.toHaveBeenCalled(); expect(h.threadApi.delete).not.toHaveBeenCalled();
+  });
+  it('keeps a fresh user ask visible while descendants and background agents continue', async () => {
+    const h = await harness(); existing(h, 'root', { activity: { activeBackgroundAgentCount: 2 } });
+    existing(h, 'child', { parentThreadId: 'root', status: 'active' });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'review', ask: 'pick direction', updatedAt: 20 }, turn: { startedAt: 10 } } } });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'pick direction', runningAgents: 3 });
+    h.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'review', ask: 'stale', updatedAt: 5 }, turn: { startedAt: 10 } } } });
+    h.patch('root', { status: 'active' });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'running', ask: null });
+  });
+  it('serializes a projection rename against a concurrent user snooze', async () => {
+    const h = await harness(); existing(h, 'root'); await h.call('board');
+    const save = h.bb.storage.kv.set;
+    let started!: () => void; let resume!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    let once = true;
+    h.bb.storage.kv.set = async (key, value: any) => {
+      if (key === 'task:existing:root' && value.title === 'Renamed' && once) { once = false; started(); await gate; }
+      await save(key, value);
+    };
+    h.patch('root', { title: 'Renamed' });
+    const refresh = h.call('board'); await entered;
+    const snooze = h.call('snoozeTask', { taskId: 'existing:root', until: null });
+    resume(); await Promise.all([refresh, snooze]);
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'snoozed', title: 'Renamed' });
+  });
+  it('does not resurrect a task from a snapshot taken before user completion', async () => {
+    const h = await harness(); existing(h, 'root'); await h.call('board');
+    const list = h.threadApi.list.getMockImplementation()!;
+    h.threadApi.list.mockImplementation(async args => structuredClone(await list(args)));
+    let entered!: () => void; let resume!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    h.bb.sdk.plugins.callRpc.mockImplementationOnce(async () => { entered(); await gate; return { facts: {} }; });
+    h.patch('root', { title: 'Renamed' });
+    const refresh = h.call('board'); await started;
+    await h.call('completeTask', { taskId: 'existing:root' });
+    resume(); const board = await refresh;
+    expect(board.tasks.find((t: any) => t.threadId === 'root').state).toBe('done');
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'done' });
+  });
+  it('coalesces refreshes and does not rescan known archived projections', async () => {
+    const h = await harness(); existing(h, 'root'); existing(h, 'open');
+    const before = h.bb.realtime.publish.mock.calls.length;
+    await h.call('board'); expect(h.bb.realtime.publish.mock.calls.length - before).toBe(1);
+    const scans = () => h.threadApi.list.mock.calls.filter(([args]) => !args.threadIds && !args.archived).length;
+    const first = scans(); await h.call('board'); await h.call('board'); expect(scans()).toBe(first);
+    await h.call('completeTask', { taskId: 'existing:root' }); await h.call('board');
+    h.threadApi.list.mockClear(); h.patch('open', {}); await h.call('board');
+    expect(h.threadApi.list.mock.calls.some(([args]) => args.archived && args.threadIds?.includes('root'))).toBe(false);
+    h.patch('root', { archivedAt: null, status: 'active' });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'running', threadId: 'root' });
+  });
+  it('keeps explicit reopen visible until a newer completion card, including after restart', async () => {
+    const h = await harness(); existing(h, 'root');
+    const oldFacts = { facts: { root: { card: { state: 'done', updatedAt: 100 }, turn: null } } };
+    h.bb.sdk.plugins.callRpc.mockResolvedValue(oldFacts);
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'done', archivedProjection: false });
+    await h.call('reopenTask', { taskId: 'existing:root' });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'queued', threadId: 'root' });
+    const restarted = await harness(2, h.storage, h.threads);
+    restarted.bb.sdk.plugins.callRpc.mockResolvedValue(oldFacts);
+    expect(await restarted.boardTask('existing:root')).toMatchObject({ state: 'queued' });
+    const reopenedAt = (h.storage.get('task:existing:root') as { reopenedAt: number }).reopenedAt;
+    restarted.bb.sdk.plugins.callRpc.mockResolvedValue({ facts: { root: { card: { state: 'done', updatedAt: reopenedAt + 1 }, turn: null } } });
+    restarted.patch('root', {});
+    expect(await restarted.boardTask('existing:root')).toMatchObject({ state: 'done' });
+    expect(h.threadApi.spawn).not.toHaveBeenCalled();
+  });
+  it('updates titles and grouping after external reparenting and removes deleted projections only', async () => {
+    const h = await harness(); existing(h, 'a'); existing(h, 'b'); await h.call('board');
+    h.patch('b', { parentThreadId: 'a' }); h.patch('a', { title: 'Renamed', updatedAt: 200 });
+    let board = await h.call('board'); expect(board.tasks).toHaveLength(1); expect(board.tasks[0].title).toBe('Renamed');
+    h.patch('a', { deletedAt: 200 });
+    board = await h.call('board'); expect(board.tasks.map((t: any) => t.threadId)).toEqual(['b']);
+    expect(h.threadApi.delete).not.toHaveBeenCalled();
   });
 });
