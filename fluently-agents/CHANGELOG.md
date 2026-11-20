@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.15 — 2026-11-20
+
+- Use BB's native transcript for streaming, history and plugin embeds inside
+  the styled conversation panel.
+- Keep the existing composer, voice controls, attachments and anchored queue.
+
 ## 0.1.14 — 2026-11-20
 
 - Align the first draft attachment with chat text while keeping the strip scrollable.

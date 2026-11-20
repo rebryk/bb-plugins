@@ -49,8 +49,9 @@ that same conversation. Snooze hides its card without stopping its work.
 
 A coordinator keeps its own BB thread. Every task gets a standalone thread;
 its workers are child threads. A task's normal messages go directly to its
-lead. The plugin draws the messages, tool activity and composer; BB owns the
-history, permissions and execution. Drafts stay in this browser per thread.
+lead. BB renders the conversation, tool activity and plugin blocks inside the
+plugin’s styled chat panel. The plugin supplies its composer and queue; BB
+owns history, permissions and execution. Drafts stay in this browser per thread.
 The text field spans the composer width. Attachments and agent selection sit
 below it, with voice and send controls on the right. Task conversations omit
 the agent selector. Recording animates the microphone button; press it again
@@ -69,8 +70,10 @@ Other files
 keep their download link. Uploads finish before
 sending. Internal activity stays collapsed until you expand it.
 
-The custom chat uses BB Markdown. Message-specific plugin embeds require
-BB's native chat renderer and are not rendered inline here.
+The native BB transcript renders installed message directives, Generative UI
+and code-fence renderers with the original message and thread context.
+Transcript styling stays scoped to the Agents panel; embedded plugin content
+keeps its own controls and behavior.
 
 [UI reference and chat variants](https://an.dev/a/d783ae026b2314ef678e)
 keep the visual direction alongside the implementation. The design study uses sample processing text;

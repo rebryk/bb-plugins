@@ -1,19 +1,16 @@
 .fa-app .fa-custom-chat { --fa-chat-inset: 12px; position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
-.fa-app .fa-chat-transcript { flex: 1; min-height: 0; overflow: auto; padding: 12px var(--fa-chat-inset) 18px; scrollbar-width: thin; }
-.fa-app .fa-message { margin: 12px 0 20px; line-height: 1.6; overflow-wrap: anywhere; font-size: 13px; }
-.fa-app .fa-message-user { width: fit-content; max-width: 88%; margin-left: auto; padding: 9px 13px; border-radius: 18px 18px 5px 18px; background: var(--fa-control); }
-.fa-app .fa-message-assistant { width: 100%; padding: 0; background: none; }
-.fa-app .fa-message p:first-child { margin-top: 0; }
-.fa-app .fa-message p:last-child { margin-bottom: 0; }
-.fa-app .fa-chat-note { font-size: 11px; color: var(--fa-muted); padding: 8px 0; }
-.fa-app .fa-tool-event { color: var(--fa-muted); margin: 5px 0; border-radius: 10px; font-size: 11px; }
-.fa-app .fa-tool-event summary { display: flex; gap: 6px; align-items: center; cursor: pointer; padding: 5px 0; }
-.fa-app .fa-tool-event summary span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.fa-app .fa-tool-event small { margin-left: auto; opacity: .7; }
-.fa-app .fa-tool-event pre, .fa-app .fa-interaction pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; padding: 9px; background: var(--fa-card); border-radius: 8px; font-size: 10px; }
-.fa-app .fa-chat-activity { display: flex; flex-shrink: 0; gap: 6px; align-items: center; color: var(--fa-muted); font-size: 11px; line-height: 18px; padding: 4px 8px; }
-.fa-app .fa-chat-activity i { width: 5px; height: 5px; flex: none; border-radius: 50%; background: var(--fa-blue); animation: fa-chat-breathe 1.5s ease-in-out infinite; }
-@keyframes fa-chat-breathe { 50% { opacity: .3; transform: scale(.8); } }
+/* BB owns transcript behavior and plugin renderers. Keep host DOM overrides
+   scoped to its message shells; never restyle nested plugin content. */
+.fa-app .fa-chat-transcript { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: 12px var(--fa-chat-inset) 18px; scrollbar-width: thin; }
+.fa-app .fa-native-transcript { min-width: 0; }
+.fa-app .fa-native-transcript > div { background: transparent; padding: 0; }
+.fa-app .fa-native-transcript [data-message-column][class~="group/message"] { padding-inline: 0; font-size: 13px; line-height: 1.6; }
+.fa-app .fa-native-transcript [data-message-column] > .ml-auto { max-width: 88%; }
+.fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .bg-surface-recessed { padding: 9px 13px; border: 0; border-radius: 18px 18px 5px 18px; background: var(--fa-control); font-size: 13px; line-height: 1.6; }
+.fa-app .fa-native-transcript [data-message-column][class~="group/message"] > [data-sidebar-swipe-selectable] > [data-markdown-preview],
+.fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .bg-surface-recessed > [data-image-gallery-clipped] > [data-markdown-preview] { font-size: 13px; line-height: 1.6; }
+.fa-app .fa-native-transcript [data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id] > .rounded-md > [class~="group/timeline-row"] > button[aria-expanded] { padding: 0; font-size: 11px; line-height: 18px; }
+.fa-app .fa-native-transcript [data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id] > .rounded-md > [class~="group/timeline-row"] > button[aria-expanded] .text-sm { font-size: inherit; line-height: inherit; }
 .fa-app .fa-message-composer { display: flex; flex-direction: column; align-items: stretch; gap: 4px; flex-shrink: 0; margin: 0 6px 3px; padding: 6px; border: 1px solid var(--fa-line); background: transparent; border-radius: 21px; }
 .fa-app .fa-message-composer textarea { display: block; flex: none; min-width: 0; resize: none; height: 28px; min-height: 28px; max-height: 92px; width: 100%; padding: 4px 6px; font: inherit; line-height: 20px; border: 0; outline: none; color: inherit; background: transparent; }
 .fa-app .fa-message-composer textarea::placeholder { color: var(--fa-faint); }
@@ -23,9 +20,9 @@
 .fa-app .fa-compose-actions .fa-composer-tool { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; min-width: 28px; height: 28px; padding: 4px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
 .fa-app .fa-compose-actions .fa-send-message { background: var(--fa-control); color: var(--fa-text); }
 .fa-app .fa-chat-error { display: flex; gap: 8px; align-items: center; padding: 10px; color: var(--fa-amber); font-size: 11px; }
-.fa-app .fa-chat-error button, .fa-app .fa-load-history, .fa-app .fa-interaction button { border: 0; background: var(--fa-control); color: inherit; border-radius: 10px; padding: 6px 9px; font-size: 11px; }
-.fa-app .fa-draft-files, .fa-app .fa-message-files { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; font-size: 10px; }
-.fa-app .fa-draft-files > span, .fa-app .fa-message-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--fa-control); border-radius: 8px; }
+.fa-app .fa-chat-error button, .fa-app .fa-interaction button { border: 0; background: var(--fa-control); color: inherit; border-radius: 10px; padding: 6px 9px; font-size: 11px; }
+.fa-app .fa-draft-files { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; font-size: 10px; }
+.fa-app .fa-draft-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--fa-control); border-radius: 8px; }
 .fa-app .fa-draft-files button, .fa-app .fa-queued-message button { padding: 0; border: 0; background: none; }
 .fa-app .fa-interaction { margin: 10px 0; padding: 10px; border: 1px solid color-mix(in srgb, var(--fa-amber) 40%, var(--fa-line)); border-radius: 14px; font-size: 12px; }
 .fa-app .fa-message-queue { flex: 0 1 auto; min-height: 0; max-height: min(144px, 25%); overflow-y: auto; scrollbar-width: thin; margin: 0 6px 6px; }
@@ -44,19 +41,6 @@
 
 @media (max-width: 700px) { .fa-app .fa-message-composer textarea { font-size: 16px; } }
 
-.fa-app .fa-message-files button { border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; }
-
-.fa-app .fa-activity-group { margin: 0; color: var(--fa-muted); font-size: 11px; line-height: 18px; }
-.fa-app .fa-activity-group > summary { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; cursor: pointer; list-style: none; padding: 0; }
-@media (hover: hover) { .fa-app .fa-activity-group > summary:hover { color: var(--fa-text); } }
-.fa-app .fa-activity-group > summary::-webkit-details-marker { display: none; }
-.fa-app .fa-activity-group > summary svg { width: 12px; height: 12px; flex: none; transition: transform .15s; }
-.fa-app .fa-activity-group[open] > summary svg { transform: rotate(90deg); }
-.fa-app .fa-activity-group > summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .fa-app .fa-chat-activity i { animation: none; } .fa-app .fa-activity-group > summary svg { transition: none; } }
-
-.fa-app .fa-message:has(+ .fa-activity-group) { margin-bottom: 4px; }
-.fa-app .fa-activity-group + .fa-message { margin-top: 4px; }
 .fa-app .fa-draft-files { flex-wrap: nowrap; overflow-x: auto; padding: 6px var(--fa-chat-inset); flex-shrink: 0; scrollbar-width: thin; }
 .fa-app .fa-draft-files > span { flex: none; align-self: center; }
 .fa-app .fa-image-attachment { position: relative; width: 88px; height: 72px; flex: none; }
@@ -82,3 +66,6 @@
 .fa-app .fa-voice-spinner { width: 16px; height: 16px; border: 2px solid var(--fa-line); border-top-color: var(--fa-blue); border-radius: 50%; animation: fa-voice-spin .8s linear infinite; }
 @keyframes fa-voice-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .fa-app .fa-voice-orb, .fa-app .fa-voice-spinner { animation: none; transition: none; scale: 1; } }
+
+/* Native processing indicator, outside message/plugin content. */
+.fa-app .fa-native-transcript > div > div > div > div > .min-h-7 { padding: 4px 0; margin-top: 4px; min-height: 18px; font-size: 11px; line-height: 18px; }

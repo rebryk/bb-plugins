@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderSlot } from '@get-bb/plugin-sdk/testing/app';
 import type { PluginBrowserBbSdk } from '@get-bb/plugin-sdk/app';
-import { Chat, mergeRows, reconcileRows, removeSubmittedDraft, type ChatProps, type ChatRow } from './chat';
+import { Chat, removeSubmittedDraft, type ChatProps } from './chat';
 const voice = vi.hoisted(() => ({ state: 'idle' as import('./voice').VoiceState, level: 0, failedRecording: null as Blob | null, toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), onTranscript: null as ((value: string) => void) | null, onError: null as ((value: string) => void) | null }));
 vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: string): void; onError(value: string): void }) => { voice.onTranscript = options.onTranscript; voice.onError = options.onError; return voice; } }));
 beforeEach(() => { const values = new Map<string, string>(); vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) }); });
@@ -17,13 +17,10 @@ beforeEach(() => {
   });
 });
 afterEach(() => { cleanup(); voice.state = 'idle'; voice.failedRecording = null; voice.level = 0; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-const row = (id: string, seq: number, text: string, role: 'assistant' | 'user' = 'assistant') => ({ kind: 'conversation', role, id, sourceSeqStart: seq, sourceSeqEnd: seq, text, attachments: null }) as ChatRow;
 type Upload = PluginBrowserBbSdk['projects']['attachments']['upload'];
 type ReadAttachment = PluginBrowserBbSdk['projects']['attachments']['read'];
-function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; queued?: unknown[]; sendQueued?: () => Promise<unknown>; rows?: ChatRow[]; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
+function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send?: () => Promise<unknown>; interactions?: unknown[]; status?: string; queued?: unknown[]; sendQueued?: () => Promise<unknown>; subscribe?: PluginBrowserBbSdk['subscribe'] } = {}, props: Partial<ChatProps> = {}) {
   return renderSlot({ component: Chat }, { threadId: 'thread-a', ...props }, { sdk: { projects: { attachments: { upload: options.upload ?? (async () => { throw new Error('Unexpected upload'); }), read: options.readAttachment ?? (async () => { throw new Error('Preview unavailable'); }) } } as PluginBrowserBbSdk['projects'], subscribe: options.subscribe ?? (() => () => {}), threads: {
-    storageLocation: async () => ({ hostId: 'host-a', storageRootPath: '/storage/thread-a' }),
-    timeline: async () => ({ rows: options.rows ?? [row('a', 1, 'Hello'), row('b', 2, 'My reply', 'user')], timelinePage: { olderCursor: null }, maxSeq: 2 }),
     get: async () => ({ id: 'thread-a', projectId: 'project-a', status: options.status || 'idle' }),
     interactions: { list: async () => options.interactions ?? [], resolve: async () => ({}) },
     queuedMessages: { list: async () => options.queued ?? [], send: options.sendQueued ?? (async () => ({})), delete: async () => ({}) },
@@ -31,9 +28,45 @@ function mount(options: { upload?: Upload; readAttachment?: ReadAttachment; send
     stop: async () => ({}),
   } as unknown as PluginBrowserBbSdk['threads'] } });
 }
+async function ready(slot: ReturnType<typeof mount>) { await waitFor(() => expect(slot.inspection.sdkCalls.some(call => call.method === 'threads.get')).toBe(true)); await act(async () => {}); }
 describe('Custom conversation', () => {
+  it('follows native content and viewport changes until reading older messages, then resumes after send', async () => {
+    let resize!: () => void;
+    const observe = vi.fn(), disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe = observe; disconnect = disconnect; });
+    let contentHeight = 900, viewportHeight = 300;
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function(this: HTMLElement) { return this.classList.contains('fa-chat-transcript') ? contentHeight : 28; });
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function(this: HTMLElement) { return this.classList.contains('fa-chat-transcript') ? viewportHeight : 28; });
+    const slot = mount(); await ready(slot);
+    const viewport = slot.container.querySelector('.fa-chat-transcript') as HTMLDivElement;
+    expect(viewport.scrollTop).toBe(900);
+
+    expect(observe.mock.calls.map(([node]) => node)).toEqual([viewport, viewport.firstElementChild]);
+    // Content grows before the browser delivers our previous scroll event.
+    contentHeight = 1100; fireEvent.scroll(viewport); expect(viewport.scrollTop).toBe(1100);
+    contentHeight = 1250; act(() => resize()); expect(viewport.scrollTop).toBe(1250);
+    viewport.scrollTop = 100; fireEvent.scroll(viewport);
+    contentHeight = 1400; act(() => resize()); expect(viewport.scrollTop).toBe(100);
+    viewportHeight = 0; act(() => resize()); fireEvent.scroll(viewport);
+    viewportHeight = 200; act(() => resize()); expect(viewport.scrollTop).toBe(100);
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Return to latest' } });
+    fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(viewport.scrollTop).toBe(1400));
+    contentHeight = 1700; act(() => resize()); expect(viewport.scrollTop).toBe(1700);
+    slot.unmount(); expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+  it('does not resume transcript follow when sending fails', async () => {
+    const slot = mount({ send: async () => { throw new Error('Send rejected'); } }); await ready(slot);
+    const viewport = slot.container.querySelector('.fa-chat-transcript') as HTMLDivElement;
+    Object.defineProperty(viewport, 'scrollHeight', { value: 1000 });
+    Object.defineProperty(viewport, 'clientHeight', { value: 200 });
+    viewport.scrollTop = 80; fireEvent.scroll(viewport);
+    fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Retry later' } });
+    fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
+    await slot.findByRole('alert'); expect(viewport.scrollTop).toBe(80);
+  });
   it('shows an empty-recording error on the mic even when capture returns idle', async () => {
-    const slot = mount(); await slot.findByText('Hello');
+    const slot = mount(); await ready(slot);
     await act(async () => { voice.onError?.('No audio was recorded'); });
     const retry = slot.getByRole('button', { name: 'Retry voice message: No audio was recorded' });
     expect(retry.querySelector('svg')).toBeTruthy(); expect(slot.queryByRole('alert')).toBeNull();
@@ -42,24 +75,24 @@ describe('Custom conversation', () => {
   });
   it('keeps voice recording, processing and retry inside the microphone button', async () => {
     voice.state = 'recording'; voice.level = .7;
-    const recording = mount(); await recording.findByText('Hello');
+    const recording = mount(); await ready(recording);
     expect(recording.queryByText('Cancel')).toBeNull();
     const finish = recording.getByRole('button', { name: 'Finish recording' });
     expect(finish.querySelector('.fa-voice-orb')).toBeTruthy();
     expect(finish.style.getPropertyValue('--voice-level')).toBe('0.7');
     voice.toggle.mockClear(); fireEvent.click(finish); expect(voice.toggle).toHaveBeenCalledTimes(1); recording.unmount();
     voice.state = 'transcribing';
-    const processing = mount(); await processing.findByText('Hello');
+    const processing = mount(); await ready(processing);
     const spinner = processing.getByRole('button', { name: 'Transcribing voice message' });
     expect((spinner as HTMLButtonElement).disabled).toBe(true);
     expect(spinner.querySelector('.fa-voice-spinner')).toBeTruthy();
     expect(processing.queryByText('Transcribing…')).toBeNull(); processing.unmount();
     voice.state = 'error'; voice.failedRecording = new Blob(['audio']); voice.retry.mockClear();
-    const failed = mount(); await failed.findByText('Hello');
+    const failed = mount(); await ready(failed);
     fireEvent.click(failed.getByRole('button', { name: 'Retry voice message' }));
     expect(voice.retry).toHaveBeenCalledTimes(1); expect(failed.queryByText('Retry voice')).toBeNull(); failed.unmount();
     voice.failedRecording = null; voice.toggle.mockClear();
-    const unavailable = mount(); await unavailable.findByText('Hello');
+    const unavailable = mount(); await ready(unavailable);
     fireEvent.click(unavailable.getByRole('button', { name: 'Retry voice message' }));
     expect(voice.toggle).toHaveBeenCalledTimes(1);
   });
@@ -67,7 +100,7 @@ describe('Custom conversation', () => {
   it('attaches pasted screenshots once and keeps ordinary text paste untouched', async () => {
     const image = new File(['png'], 'Screenshot.png', { type: 'image/png' });
     const upload = vi.fn(async () => ({ type: 'localImage' as const, path: 'attachments/shot.png', name: image.name, sizeBytes: image.size }));
-    const slot = mount({ upload }); await slot.findByText('Hello');
+    const slot = mount({ upload }); await ready(slot);
     const textbox = slot.getByRole('textbox');
     expect(fireEvent.paste(textbox, { clipboardData: { files: [], items: [{ kind: 'string' }], getData: () => 'plain text' } })).toBe(true);
     expect(upload).not.toHaveBeenCalled();
@@ -80,7 +113,7 @@ describe('Custom conversation', () => {
 
 
   it('does not upload a paste already handled by a nested BB control', async () => {
-    const upload = vi.fn<Upload>(); const slot = mount({ upload }); await slot.findByText('Hello');
+    const upload = vi.fn<Upload>(); const slot = mount({ upload }); await ready(slot);
     const event = new Event('paste', { bubbles: true, cancelable: true });
     Object.defineProperty(event, 'clipboardData', { value: { files: [new File(['x'], 'nested.txt')] } });
     event.preventDefault(); fireEvent(slot.getByRole('textbox'), event);
@@ -89,9 +122,9 @@ describe('Custom conversation', () => {
   it('waits for every concurrent drop and paste upload before sending', async () => {
     const finish = new Map<string, (attachment: Awaited<ReturnType<Upload>>) => void>();
     const upload = vi.fn<Upload>(({ clientFile }) => new Promise(resolve => { finish.set((clientFile as File).name, resolve); }));
-    const slot = mount({ upload }); await slot.findByText('Hello');
+    const slot = mount({ upload }); await ready(slot);
     const first = new File(['a'], 'a.txt'), second = new File(['b'], 'b.txt');
-    fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [first], types: ['Files'] } });
+    fireEvent.drop(slot.getByTestId('bb-thread-chat'), { dataTransfer: { files: [first], types: ['Files'] } });
     fireEvent.paste(slot.getByRole('textbox'), { clipboardData: { files: [], items: [{ kind: 'file', getAsFile: () => second }] } });
     expect(upload).toHaveBeenCalledTimes(2);
     await act(async () => finish.get('a.txt')!({ type: 'localFile', path: 'a.txt', name: 'a.txt', sizeBytes: 1 }));
@@ -105,9 +138,9 @@ describe('Custom conversation', () => {
 
   it('retains failed files for retry alongside successful attachments', async () => {
     const upload = vi.fn<Upload>().mockRejectedValueOnce(new Error('Upload failed')).mockResolvedValueOnce({ type: 'localFile', path: 'good.txt', name: 'good.txt', sizeBytes: 1 }).mockResolvedValueOnce({ type: 'localFile', path: 'retry.txt', name: 'retry.txt', sizeBytes: 1 });
-    const slot = mount({ upload }); await slot.findByText('Hello');
+    const slot = mount({ upload }); await ready(slot);
     const failed = new File(['retry'], 'retry.txt');
-    fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [failed, new File(['good'], 'good.txt')], types: ['Files'] } });
+    fireEvent.drop(slot.getByTestId('bb-thread-chat'), { dataTransfer: { files: [failed, new File(['good'], 'good.txt')], types: ['Files'] } });
     await slot.findByText('good.txt'); await slot.findByText('retry.txt: Upload failed');
     expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(slot.getByRole('button', { name: 'Retry upload' }));
@@ -120,9 +153,9 @@ describe('Custom conversation', () => {
   it('preserves a pending upload and failure across chat navigation', async () => {
     let fail!: (error: Error) => void;
     const upload = vi.fn<Upload>(() => new Promise((_resolve, reject) => { fail = reject; }));
-    const first = mount({ upload }); await first.findByText('Hello');
+    const first = mount({ upload }); await ready(first);
     fireEvent.paste(first.getByRole('textbox'), { clipboardData: { files: [new File(['file'], 'pending.txt')] } });
-    first.unmount(); const second = mount(); await second.findByText('Hello');
+    first.unmount(); const second = mount(); await ready(second);
     expect(second.getByRole('status').textContent).toBe('Attaching files…');
     await act(async () => fail(new Error('Connection lost')));
     await second.findByText('pending.txt: Connection lost');
@@ -137,8 +170,8 @@ describe('Custom conversation', () => {
     try {
       const upload = vi.fn<Upload>(async ({ clientFile }) => ({ type: 'localImage', path: (clientFile as File).name, name: (clientFile as File).name, sizeBytes: 1 }));
       const readAttachment = vi.fn<ReadAttachment>(async ({ path }) => ({ bytes: new Uint8Array([1]), mimeType: path.endsWith('.svg') ? 'image/svg+xml' : 'image/png', sizeBytes: 1 }));
-      const slot = mount({ upload, readAttachment }); await slot.findByText('Hello');
-      fireEvent.drop(slot.getByRole('log'), { dataTransfer: { files: [new File(['png'], 'preview.png'), new File(['svg'], 'unsafe.svg')], types: ['Files'] } });
+      const slot = mount({ upload, readAttachment }); await ready(slot);
+      fireEvent.drop(slot.getByTestId('bb-thread-chat'), { dataTransfer: { files: [new File(['png'], 'preview.png'), new File(['svg'], 'unsafe.svg')], types: ['Files'] } });
       await slot.findByRole('button', { name: 'Preview preview.png' });
       expect(slot.queryByRole('button', { name: 'Preview unsafe.svg' })).toBeNull();
       expect(create).toHaveBeenCalledTimes(1);
@@ -177,7 +210,7 @@ describe('Custom conversation', () => {
     let finish!: (value: Awaited<ReturnType<ReadAttachment>>) => void;
     const upload = vi.fn<Upload>(async () => ({ type: 'localImage', path: 'loading.png', name: 'loading.png', sizeBytes: 1 }));
     const readAttachment = vi.fn<ReadAttachment>(() => new Promise(resolve => { finish = resolve; }));
-    const slot = mount({ upload, readAttachment }); await slot.findByText('Hello');
+    const slot = mount({ upload, readAttachment }); await ready(slot);
     fireEvent.paste(slot.getByRole('textbox'), { clipboardData: { files: [new File(['png'], 'loading.png')] } });
     await slot.findByRole('img', { name: 'Loading preview: loading.png' });
     expect(slot.queryByText('loading.png')).toBeNull();
@@ -186,86 +219,43 @@ describe('Custom conversation', () => {
     expect(slot.queryByRole('button', { name: 'Preview loading.png' })).toBeNull();
     expect(slot.queryByRole('img', { name: 'Loading preview: loading.png' })).toBeNull();
   });
-  it('renders sent local images through BB attachment reads with a link fallback', async () => {
-    const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
-    URL.createObjectURL = vi.fn(() => 'blob:sent'); URL.revokeObjectURL = vi.fn();
-    try {
-      const sent = { ...row('image', 1, 'Attached screenshot', 'user'), attachments: { imageUrls: [], localFileDetails: [], localImagePaths: ['attachments/sent.png', 'attachments/missing.png'], localFilePaths: [], localFiles: 0, localImages: 2, webImages: 0 } } as ChatRow;
-      const readAttachment = vi.fn<ReadAttachment>(async ({ path }) => { if (path.includes('missing')) throw new Error('Unavailable'); return { bytes: new Uint8Array([1]), mimeType: 'image/png', sizeBytes: 1 }; });
-      const slot = mount({ rows: [sent], readAttachment });
-      await slot.findByRole('button', { name: 'Preview sent.png' });
-      expect(slot.queryByRole('button', { name: 'Preview missing.png' })).toBeNull();
-      expect(slot.getByRole('button', { name: 'missing.png' })).toBeTruthy();
-      expect(slot.queryByText('sent.png')).toBeNull();
-      expect(slot.queryByRole('button', { name: 'Remove sent.png' })).toBeNull();
-      expect(readAttachment).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'project-a', path: 'attachments/sent.png' }));
-      slot.unmount();
-    } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; }
-  });
-  it('renders custom messages and sends through the original thread without permission overrides', async () => {
-    const slot = mount(); await slot.findByText('Hello');
-    expect(slot.container.querySelector('.fa-message-user')?.textContent).toBe('My reply');
-    expect(slot.queryByTestId('bb-thread-chat')).toBeNull();
+  it('uses the native timeline and sends through the original thread without permission overrides', async () => {
+    const slot = mount(); await ready(slot);
+    const transcript = slot.getByTestId('bb-thread-chat');
+    expect(transcript.getAttribute('data-thread-id')).toBe('thread-a');
+    expect(transcript.getAttribute('data-variant')).toBe('timeline');
+    expect(transcript.getAttribute('data-layout')).toBe('document');
+    expect(slot.inspection.sdkCalls.some(call => call.method === 'threads.timeline')).toBe(false);
+    expect(slot.getAllByRole('textbox')).toHaveLength(1);
     fireEvent.change(slot.getByRole('textbox', { name: 'Message' }), { target: { value: 'New task' } });
     fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await waitFor(() => expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe(''));
     expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ threadId: 'thread-a', mode: 'queue-if-active', input: [{ type: 'text', text: 'New task', mentions: [] }] }] });
   });
-  it('collapses internal activity while keeping conversation messages visible', async () => {
-    const events = [1, 2].map(seq => ({ kind: 'system', id: `event-${seq}`, sourceSeqStart: seq, sourceSeqEnd: seq, title: `Internal event ${seq}`, status: 'completed', detail: 'Diagnostic output' }) as ChatRow);
-    const slot = mount({ rows: [...events, row('answer', 3, 'Result')] });
-    await slot.findByText('Result');
-    expect(slot.queryByText('Internal event 1')).toBeNull();
-    const group = slot.getByText('Activity').closest('details')!;
-    group.open = true; fireEvent(group, new Event('toggle'));
-    await slot.findByText('Internal event 1');
-    expect(slot.getByText('Result')).toBeTruthy();
-    group.open = false; fireEvent(group, new Event('toggle'));
-    await waitFor(() => expect(slot.queryByText('Internal event 1')).toBeNull());
-  });
-
-  it('uses actual pending activity presentation and renders one quiet runtime indicator', async () => {
-    const pending = { kind: 'tool', id: 'pending', sourceSeqStart: 1, sourceSeqEnd: 1, status: 'pending', presentation: { title: 'Inspecting screenshots', label: { pending: 'Inspecting', completed: 'Inspected' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
-    const completed = { ...pending, id: 'completed', sourceSeqStart: 2, sourceSeqEnd: 2, status: 'completed', presentation: { title: 'Later completed step', label: { pending: 'Working', completed: 'Completed' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
-    const slot = mount({ status: 'active', rows: [pending, completed] });
-    await slot.findByText('Inspecting screenshots');
-    expect(slot.queryByText('Later completed step')).toBeNull();
-    expect(slot.getAllByRole('status')).toHaveLength(1);
-    expect(slot.getByRole('status').textContent).toBe('Working…');
-    expect(slot.getByRole('status').closest('[role="log"]')).toBeTruthy();
-  });
-
-  it('does not label failed activity as completed or show processing behind an interaction', async () => {
-    const failed = { kind: 'tool', id: 'failed', sourceSeqStart: 1, sourceSeqEnd: 1, status: 'error', presentation: { label: { pending: 'Checking', completed: 'Checks passed' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
-    const slot = mount({ status: 'active', rows: [failed], interactions: [{ id: 'i', payload: { kind: 'form', title: 'Question' } }] });
-    await slot.findByText('Activity');
-    expect(slot.queryByText('Checks passed')).toBeNull();
-    expect(slot.queryByRole('status')).toBeNull();
-  });
   it('keeps the draft on ambiguous send failure and never retries automatically', async () => {
-    const send = vi.fn(async () => { throw new Error('Connection lost'); }); const slot = mount({ send }); await slot.findByText('Hello');
+    const send = vi.fn(async () => { throw new Error('Connection lost'); }); const slot = mount({ send }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Keep this draft' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await slot.findByRole('alert'); expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep this draft'); expect(send).toHaveBeenCalledTimes(1);
   });
   it('blocks normal sends behind an interaction and keeps advanced controls explicit', async () => {
     const slot = mount({ interactions: [{ id: 'i', payload: { kind: 'form', title: 'Question' } }] }); await slot.findByText('Your input is needed');
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Not an approval' } }); expect((slot.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(slot.getByRole('button', { name: 'Review request' })); expect(slot.getByRole('dialog').getAttribute('aria-label')).toBe('Review agent request'); expect(slot.getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('thread-a');
+    fireEvent.click(slot.getByRole('button', { name: 'Review request' })); expect(slot.getByRole('dialog').getAttribute('aria-label')).toBe('Review agent request'); expect(slot.getAllByTestId('bb-thread-chat').map(node => [node.getAttribute('data-thread-id'), node.getAttribute('data-variant')])).toEqual([['thread-a', 'timeline'], ['thread-a', 'compact']]);
   });
   it('steers normal sends without Stop or queue mode controls', async () => {
-    const slot = mount({ status: 'active' }); await slot.findByText('Hello'); expect(slot.queryByRole('button', { name: 'Stop work' })).toBeNull(); expect(slot.queryByRole('button', { name: 'Queue' })).toBeNull();
+    const slot = mount({ status: 'active' }); await ready(slot); expect(slot.queryByRole('button', { name: 'Stop work' })).toBeNull(); expect(slot.queryByRole('button', { name: 'Queue' })).toBeNull();
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Change direction' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'steer-if-active' }] }));
   });
   it.each([['MacIntel', 'metaKey'], ['Win32', 'ctrlKey']])('queues modified Enter on %s', async (platform, modifier) => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform as string);
-    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
+    const slot = mount({ status: 'active' }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Follow up' } });
     fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', [modifier as string]: true });
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
   });
   it('steers Enter without reading the BB send preference', async () => {
-    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
+    const slot = mount({ status: 'active' }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After this' } });
     fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter' });
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'steer-if-active' }] }));
@@ -273,7 +263,7 @@ describe('Custom conversation', () => {
   });
   it('never sends unsupported modifiers, IME composition, key repeat or Shift+Enter', async () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
-    const slot = mount({ status: 'active' }); await slot.findByText('Hello');
+    const slot = mount({ status: 'active' }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Keep editing' } });
     for (const keys of [{ ctrlKey: true }, { metaKey: true, ctrlKey: true }, { altKey: true }, { metaKey: true, altKey: true }, { shiftKey: true }, { isComposing: true }, { keyCode: 229 }, { repeat: true }]) fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', ...keys });
     expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(0);
@@ -281,7 +271,7 @@ describe('Custom conversation', () => {
   });
   it.each([false, true])('queues while stopping with modifier=%s', async modified => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
-    const slot = mount({ status: 'stopping' }); await slot.findByText('Hello');
+    const slot = mount({ status: 'stopping' }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'After stopping' } });
     fireEvent.keyDown(slot.getByRole('textbox'), { key: 'Enter', metaKey: modified });
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ mode: 'queue-if-active' }] }));
@@ -292,7 +282,7 @@ describe('Custom conversation', () => {
     const queue = slot.getByRole('region', { name: 'Queued messages' });
     expect(queue.closest('[role=log]')).toBeNull();
     expect(queue.nextElementSibling).toBe(slot.getByRole('textbox').closest('form'));
-    expect(slot.getByRole('status').closest('[role=log]')).toBeTruthy();
+    expect(slot.queryByText('Working…')).toBeNull();
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Unsent draft' } });
     fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.queuedMessages.send')).toMatchObject({ args: [{ threadId: 'thread-a', queuedMessageId: 'queue-a', mode: 'steer' }] }));
@@ -308,20 +298,12 @@ describe('Custom conversation', () => {
     fireEvent.click(slot.getByRole('button', { name: 'Send queued message now' }));
     await slot.findByRole('alert'); expect(slot.getByText('Still queued')).toBeTruthy(); expect(sendQueued).toHaveBeenCalledTimes(1);
   });
-  it('merges streaming updates without losing paginated history', () => {
-    expect(mergeRows([row('old', 1, 'Earlier'), row('live', 3, 'Hel')], [row('live', 3, 'Hello'), row('new', 4, 'Next')]).map(item => item.id)).toEqual(['old', 'live', 'new']);
-    expect(mergeRows([row('live', 3, 'Hel')], [row('live', 3, 'Hello')])[0]).toMatchObject({ text: 'Hello' });
-  });
   it('clears an accepted send from its originating saved draft after navigation', async () => {
     let finish!: () => void; const pending = new Promise<void>(resolve => { finish = resolve; });
-    const slot = mount({ send: () => pending }); await slot.findByText('Hello');
+    const slot = mount({ send: () => pending }); await ready(slot);
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Send once' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     slot.unmount(); await act(async () => { finish(); await pending; });
     expect(JSON.parse(localStorage.getItem('fluently-agents.draft.thread-a') || '{}').text).toBe('');
-  });
-  it('reconciles condensed turns without retaining duplicate source messages', () => {
-    const turn = { kind: 'turn', id: 'turn', sourceSeqStart: 2, sourceSeqEnd: 7, children: [row('inside', 3, 'Hello')] } as ChatRow;
-    expect(reconcileRows([row('old', 1, 'Previous'), row('inside', 3, 'Hello')], [turn]).map(item => item.id)).toEqual(['old', 'turn']);
   });
   it('preserves newer draft edits when removing an accepted submission', () => {
     expect(removeSubmittedDraft({ text: 'Original plus more', attachments: [] }, { text: 'Original', attachments: [] })).toEqual({ text: ' plus more', attachments: [] });
@@ -329,13 +311,13 @@ describe('Custom conversation', () => {
   });
   it('acknowledges voice requests before recording so remounts do not replay them', async () => {
     voice.toggle.mockClear(); const handled = vi.fn();
-    const slot = mount({}, { voiceRequest: 5, onVoiceRequestHandled: handled }); await slot.findByText('Hello');
+    const slot = mount({}, { voiceRequest: 5, onVoiceRequestHandled: handled }); await ready(slot);
     expect(handled).toHaveBeenCalledWith(5); expect(voice.toggle).toHaveBeenCalledTimes(1);
-    slot.unmount(); const next = mount({}, { voiceRequest: 0, onVoiceRequestHandled: handled }); await next.findByText('Hello'); expect(voice.toggle).toHaveBeenCalledTimes(1);
+    slot.unmount(); const next = mount({}, { voiceRequest: 0, onVoiceRequestHandled: handled }); await ready(next); expect(voice.toggle).toHaveBeenCalledTimes(1);
   });
 
   it('auto-sends a completed voice message only when the original draft is empty', async () => {
-    const slot = mount(); await slot.findByText('Hello');
+    const slot = mount(); await ready(slot);
     await act(async () => { voice.onTranscript?.('Voice request'); });
     expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ threadId: 'thread-a', input: [{ type: 'text', text: 'Voice request' }] }] });
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Existing draft' } });
@@ -344,7 +326,7 @@ describe('Custom conversation', () => {
     expect(slot.inspection.sdkCalls.filter(call => call.method === 'threads.send')).toHaveLength(1);
   });
   it('keeps a voice transcript when delivery fails without invoking transcription again', async () => {
-    const slot = mount({ send: async () => { throw new Error('Delivery uncertain'); } }); await slot.findByText('Hello');
+    const slot = mount({ send: async () => { throw new Error('Delivery uncertain'); } }); await ready(slot);
     await act(async () => { voice.onTranscript?.('Save this voice request'); });
     expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Save this voice request');
     expect(slot.getByRole('alert').textContent).toContain('Delivery uncertain');
@@ -352,9 +334,9 @@ describe('Custom conversation', () => {
 
   it('keeps an in-flight send locked across navigation and updates a remounted draft on acceptance', async () => {
     let finish!: () => void; const pending = new Promise<void>(resolve => { finish = resolve; }); const send = vi.fn(() => pending);
-    const first = mount({ send }); await first.findByText('Hello');
+    const first = mount({ send }); await ready(first);
     fireEvent.change(first.getByRole('textbox'), { target: { value: 'Do not duplicate' } }); fireEvent.click(first.getByRole('button', { name: 'Send message' })); first.unmount();
-    const second = mount({ send }); await second.findByText('Hello');
+    const second = mount({ send }); await ready(second);
     expect((second.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.keyDown(second.getByRole('textbox'), { key: 'Enter' }); expect(send).toHaveBeenCalledTimes(1);
     await act(async () => { finish(); await pending; });
@@ -362,18 +344,20 @@ describe('Custom conversation', () => {
     expect(JSON.parse(localStorage.getItem('fluently-agents.draft.thread-a') || '{}').text).toBe('');
   });
 
-  it('refreshes a changed idle conversation from public realtime events', async () => {
+  it('refreshes queued messages through public events without fetching the transcript', async () => {
     let changed: (() => void) | undefined;
-    const rows = [row('first', 1, 'Before update')];
+    const queued: unknown[] = [];
     const subscribe: PluginBrowserBbSdk['subscribe'] = args => { if (args.event === 'thread:changed') changed = () => args.callback({} as never); return () => {}; };
-    const slot = mount({ rows, subscribe }); await slot.findByText('Before update');
-    rows.push(row('second', 2, 'Realtime reply')); act(() => changed?.());
-    await slot.findByText('Realtime reply');
+    const slot = mount({ queued, subscribe }); await ready(slot);
+    queued.push({ id: 'new-queue', content: [{ type: 'text', text: 'New queued request' }] });
+    act(() => changed?.());
+    await slot.findByText('New queued request');
+    expect(slot.inspection.sdkCalls.some(call => call.method === 'threads.timeline')).toBe(false);
   });
 
   it('keeps voice shortcuts outside the text editor after opening and acknowledging recording', async () => {
     const handled = vi.fn();
-    const slot = mount({}, { focusRequest: 0, voiceRequest: 1, onVoiceRequestHandled: handled }); await slot.findByText('Hello');
+    const slot = mount({}, { focusRequest: 0, voiceRequest: 1, onVoiceRequestHandled: handled }); await ready(slot);
     expect(document.activeElement).not.toBe(slot.getByRole('textbox'));
     slot.rerender(<Chat threadId="thread-a" focusRequest={0} voiceRequest={0} onVoiceRequestHandled={handled} />);
     expect(document.activeElement).not.toBe(slot.getByRole('textbox'));
@@ -382,12 +366,4 @@ describe('Custom conversation', () => {
     slot.rerender(<Chat threadId="thread-a" focusRequest={1} voiceRequest={2} onVoiceRequestHandled={handled} />);
     expect(document.activeElement).not.toBe(slot.getByRole('textbox'));
   });
-
-  it.each(['/storage/thread-a/check.md:7', 'file:///storage/thread-a/check.md:7'])('opens storage artifact %s with a valid relative preview target', async href => {
-    const slot = mount(); await slot.findByText('Hello');
-    const link = document.createElement('a'); link.href = href; link.textContent = 'Artifact'; slot.getByRole('log').append(link);
-    fireEvent.click(link);
-    expect(slot.inspection.navigateCalls).toContainEqual({ method: 'experimental_openFilePreview', options: { target: { kind: 'thread-storage', threadId: 'thread-a', path: 'check.md' }, location: { kind: 'line', line: 7, column: null } } });
-  });
-
 });

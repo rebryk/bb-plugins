@@ -17,10 +17,10 @@
   container-type: inline-size;
 }
 .fa-app *, .fa-app *::before, .fa-app *::after { box-sizing: border-box; }
-.fa-app button { font: inherit; color: inherit; cursor: pointer; }
-.fa-app button:disabled { cursor: wait; opacity: .5; }
+.fa-app button:not(.fa-native-transcript *) { font: inherit; color: inherit; cursor: pointer; }
+.fa-app button:disabled:not(.fa-native-transcript *) { cursor: wait; opacity: .5; }
 .fa-app button:focus-visible, .fa-app a:focus-visible, .fa-app input:focus-visible, .fa-app [role=separator]:focus-visible { outline: 2px solid var(--fa-blue); outline-offset: 2px; }
-.fa-app svg { width: 16px; height: 16px; flex-shrink: 0; }
+.fa-app svg:not(.fa-native-transcript *) { width: 16px; height: 16px; flex-shrink: 0; }
 .fa-app .fa-topbar { position: absolute; z-index: 30; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
 .fa-app .fa-topbar > * { pointer-events: auto; }
 .fa-app .fa-pill { height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--fa-line); border-radius: 18px; background: var(--fa-raised); }
