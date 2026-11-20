@@ -421,6 +421,33 @@
           "subdir": "voice-input"
         }
       }
+    },
+    {
+      "id": "fluently-agents",
+      "displayName": "Fluently Agents",
+      "description": "Delegate tasks to persistent agents and review their work on a live board.",
+      "icon": "Bot",
+      "tags": [
+        "agents",
+        "tasks",
+        "parallel",
+        "board",
+        "memory"
+      ],
+      "author": {
+        "name": "Yurii Rebryk",
+        "github": "rebryk",
+        "url": "https://github.com/rebryk"
+      },
+      "category": "navigation",
+      "overview": "Talk to a standing agent, then review its tasks on one board.\n\n## Board and Inbox\n\nRunning cards show progress, active agents and an estimated finish time when\nreported. Needs you cards show the decision or review requested. Inbox keeps\nthose tasks above a chat in one shared-width column. Both panels float over\nthe workspace without moving it.\n\n## Persistent conversations\n\nAgent avatars open persistent coordinator conversations. A task opens its own\nBB conversation. Each task can delegate independent work to several workers;\nworkers can delegate again within the same budget. Native BB chat retains\nstreaming, queued messages, attachments, permissions and voice transcription.\nPress N to focus the conversation. Voice uses BB's microphone control.\n\n## Shared memory and execution\n\nAll conversations retain BB's memory, skills and permissions. Role instructions\nask agents to parallelize substantial independent work and pass explicit briefs\nbetween conversations. Model selection reads the live model catalog and uses\nPool Usage's provider-wide quota estimates when installed. Missing capacity\nreadings remain unknown; exhausted providers are skipped. Coordinators prefer\nmedium reasoning; task leads and workers prefer xhigh when supported.\n\n## Lifecycle\n\nMark done archives the task after its work stops. Snooze hides a card until a\nchosen time or until it is reopened. An automation can run\n`bb agents reopen <task-id> <message>` to resume the same conversation.\n",
+      "source": {
+        "git": {
+          "url": "https://github.com/rebryk/bb-plugins.git",
+          "ref": "main",
+          "subdir": "fluently-agents"
+        }
+      }
     }
   ]
 }
