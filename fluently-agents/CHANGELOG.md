@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — 2026-11-20
+
+- Adopt the approved quiet Activity row with compact, expandable details.
+- Use a subtle processing indicator and respect reduced motion.
+
 ## 0.1.5 — 2026-11-20
 
 - Use compact single-line inbox rows and highlight breadcrumb navigation.

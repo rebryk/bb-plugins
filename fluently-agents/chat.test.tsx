@@ -135,12 +135,31 @@ describe('Custom conversation', () => {
     const slot = mount({ rows: [...events, row('answer', 3, 'Result')] });
     await slot.findByText('Result');
     expect(slot.queryByText('Internal event 1')).toBeNull();
-    const group = slot.getByText('Activity · 2').closest('details')!;
+    const group = slot.getByText('Activity').closest('details')!;
     group.open = true; fireEvent(group, new Event('toggle'));
     await slot.findByText('Internal event 1');
     expect(slot.getByText('Result')).toBeTruthy();
     group.open = false; fireEvent(group, new Event('toggle'));
     await waitFor(() => expect(slot.queryByText('Internal event 1')).toBeNull());
+  });
+
+  it('uses actual pending activity presentation and renders one quiet runtime indicator', async () => {
+    const pending = { kind: 'tool', id: 'pending', sourceSeqStart: 1, sourceSeqEnd: 1, status: 'pending', presentation: { title: 'Inspecting screenshots', label: { pending: 'Inspecting', completed: 'Inspected' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
+    const completed = { ...pending, id: 'completed', sourceSeqStart: 2, sourceSeqEnd: 2, status: 'completed', presentation: { title: 'Later completed step', label: { pending: 'Working', completed: 'Completed' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
+    const slot = mount({ status: 'active', rows: [pending, completed] });
+    await slot.findByText('Inspecting screenshots');
+    expect(slot.queryByText('Later completed step')).toBeNull();
+    expect(slot.getAllByRole('status')).toHaveLength(1);
+    expect(slot.getByRole('status').textContent).toBe('Working…');
+    expect(slot.getByRole('status').closest('[role="log"]')).toBeNull();
+  });
+
+  it('does not label failed activity as completed or show processing behind an interaction', async () => {
+    const failed = { kind: 'tool', id: 'failed', sourceSeqStart: 1, sourceSeqEnd: 1, status: 'error', presentation: { label: { pending: 'Checking', completed: 'Checks passed' }, icon: { glyph: 'Toolbox' } } } as unknown as ChatRow;
+    const slot = mount({ status: 'active', rows: [failed], interactions: [{ id: 'i', payload: { kind: 'form', title: 'Question' } }] });
+    await slot.findByText('Activity');
+    expect(slot.queryByText('Checks passed')).toBeNull();
+    expect(slot.queryByRole('status')).toBeNull();
   });
   it('keeps the draft on ambiguous send failure and never retries automatically', async () => {
     const send = vi.fn(async () => { throw new Error('Connection lost'); }); const slot = mount({ send }); await slot.findByText('Hello');

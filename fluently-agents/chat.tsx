@@ -54,10 +54,16 @@ function AttachmentPreview({ file, projectId }: { file: Pick<Attachment, "type" 
   return src ? <><button type="button" className="fa-attachment-preview" aria-label={`Preview ${file.name}`} onClick={() => setOpen(true)}><img src={src} alt={file.name} /></button><ImageLightbox imageSrc={src} imageAlt={file.name} title={file.name} isOpen={open} onClose={() => setOpen(false)} /></> : null;
 }
 type RowContext = { document?: MarkdownDocument; storage?: StorageLocation; projectId?: string };
+function activityLabel(rows: ChatRow[]) {
+  const current = [...rows].reverse().find(row => 'status' in row && row.status === 'pending') ?? rows.at(-1);
+  if (!current || !('presentation' in current) || !current.presentation) return 'Activity';
+  const presentation = current.presentation;
+  return presentation.title || (current.status === 'pending' ? presentation.label.pending : current.status === 'completed' ? presentation.label.completed : undefined) || 'Activity';
+}
 function Activity({ rows, ...context }: RowContext & { rows: ChatRow[] }) {
   const [open, setOpen] = useState(false);
   return <details className="fa-activity-group" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>Activity · {rows.length}</summary>
+    <summary><Icon name="ChevronRight" /><span>{activityLabel(rows)}</span></summary>
     {open && rows.map(row => <Row key={row.id} row={row} {...context} />)}
   </details>;
 }
@@ -235,10 +241,11 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
     <div className="fa-chat-transcript" ref={scroll} role="log" aria-label="Conversation" onClickCapture={openStorageLink} onScroll={() => { const el = scroll.current; if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
       {older && <button className="fa-load-history" disabled={busy} onClick={() => void mutate(async () => { const page = await sdk.threads.timeline({ threadId, beforeAnchorId: older.anchorId, beforeAnchorSeq: String(older.anchorSeq), includeNestedRows: 'true', deferContent: 'false', segmentLimit: '40' }); if (alive.current) { olderLoaded.current = true; setRows(old => mergeRows(old, page.rows)); setOlder(page.timelinePage.olderCursor); } })}>Load earlier messages</button>}
       {!loaded && <p className="fa-chat-note">Loading conversation…</p>}{loaded && !rows.length && <p className="fa-chat-note">What would you like to work on?</p>}
-      <Rows rows={rows} document={documentContext} storage={storage} projectId={thread?.projectId} />{running && <div className="fa-chat-activity"><i className="fa-dot" />Working</div>}
+      <Rows rows={rows} document={documentContext} storage={storage} projectId={thread?.projectId} />
       {interactions.map(item => <div className="fa-interaction" key={item.id}><strong>{item.payload.kind === 'approval' ? 'Permission requested' : 'Your input is needed'}</strong>{item.payload.kind === 'approval' && item.payload.reason && <p>{item.payload.reason}</p>}<details><summary>Request details</summary><Detail value={item.payload} /></details>{item.payload.kind === 'approval' && item.payload.subject.kind !== 'permission_grant' && item.payload.availableDecisions.filter(decision => decision !== 'allow_for_session').map(decision => <button key={decision} disabled={busy} onClick={() => void mutate(() => sdk.threads.interactions.resolve({ threadId, interactionId: item.id, resolution: decision === 'deny' ? { decision } : { decision, grantedPermissions: null } }))}>{decision === 'allow_once' ? 'Allow once' : 'Deny'}</button>)}<button onClick={() => setAdvanced(true)}>Review request</button></div>)}
       {queue && queue.map(item => <div className="fa-queued-message" key={item.id}><small>Queued</small><span>{item.content.filter(part => part.visibility !== 'agent-only').filter(part => part.type === 'text').map(part => part.text).join('\n') || 'Attachments'}</span><button aria-label="Remove queued message" onClick={() => void mutate(() => sdk.threads.queuedMessages.delete({ threadId, queuedMessageId: item.id }))}><Icon name="X" /></button></div>)}
     </div>
+    {running && !interactions.length && <div className="fa-chat-activity" role="status"><i />{thread.status === 'pending' ? 'Waiting to start…' : thread.status === 'starting' ? 'Starting…' : thread.status === 'stopping' ? 'Stopping…' : 'Working…'}</div>}
     {error && <div role="alert" className="fa-chat-error">{error}<button onClick={() => { setError(null); void refresh().catch(report); }}>Refresh</button></div>}
     {!!draft.attachments.length && <div className="fa-draft-files">{draft.attachments.map((file, index) => <span key={`${file.path}-${index}`}><AttachmentPreview file={file} projectId={thread?.projectId} />{file.name}<button aria-label={`Remove ${file.name}`} onClick={() => setDraft(old => ({ ...old, attachments: old.attachments.filter((_, i) => i !== index) }))}><Icon name="X" /></button></span>)}</div>}
     {uploading && <div className="fa-upload-status" role="status">Attaching files…</div>}

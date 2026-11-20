@@ -11,7 +11,9 @@
 .fa-app .fa-tool-event summary span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fa-app .fa-tool-event small { margin-left: auto; opacity: .7; }
 .fa-app .fa-tool-event pre, .fa-app .fa-interaction pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; padding: 9px; background: var(--fa-card); border-radius: 8px; font-size: 10px; }
-.fa-app .fa-chat-activity { display: flex; gap: 6px; align-items: center; color: var(--fa-muted); font-size: 11px; margin-top: 10px; }
+.fa-app .fa-chat-activity { display: flex; flex-shrink: 0; gap: 6px; align-items: center; color: var(--fa-muted); font-size: 11px; line-height: 18px; padding: 4px 8px; }
+.fa-app .fa-chat-activity i { width: 5px; height: 5px; flex: none; border-radius: 50%; background: var(--fa-blue); animation: fa-chat-breathe 1.5s ease-in-out infinite; }
+@keyframes fa-chat-breathe { 50% { opacity: .3; transform: scale(.8); } }
 .fa-app .fa-message-composer { display: flex; align-items: flex-end; gap: 2px; flex-shrink: 0; margin: 0 6px 3px; padding: 6px; border: 1px solid var(--fa-line); background: transparent; border-radius: 21px; }
 .fa-app .fa-message-composer textarea { display: block; flex: 1; min-width: 0; resize: none; height: 28px; min-height: 28px; max-height: 92px; width: 100%; padding: 4px 6px; font: inherit; line-height: 20px; border: 0; outline: none; color: inherit; background: transparent; }
 .fa-app .fa-message-composer textarea::placeholder { color: var(--fa-faint); }
@@ -39,8 +41,14 @@
 
 .fa-app .fa-message-files button { border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; }
 
-.fa-app .fa-activity-group { margin: 1px 0; color: var(--fa-muted); font-size: 11px; }
-.fa-app .fa-activity-group > summary { width: fit-content; cursor: pointer; padding: 1px 0; line-height: 16px; }
+.fa-app .fa-activity-group { margin: 0; color: var(--fa-muted); font-size: 11px; line-height: 18px; }
+.fa-app .fa-activity-group > summary { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; cursor: pointer; list-style: none; padding: 0; }
+@media (hover: hover) { .fa-app .fa-activity-group > summary:hover { color: var(--fa-text); } }
+.fa-app .fa-activity-group > summary::-webkit-details-marker { display: none; }
+.fa-app .fa-activity-group > summary svg { width: 12px; height: 12px; flex: none; transition: transform .15s; }
+.fa-app .fa-activity-group[open] > summary svg { transform: rotate(90deg); }
+.fa-app .fa-activity-group > summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .fa-app .fa-chat-activity i { animation: none; } .fa-app .fa-activity-group > summary svg { transition: none; } }
 
 .fa-app .fa-message:has(+ .fa-activity-group) { margin-bottom: 4px; }
 .fa-app .fa-activity-group + .fa-message { margin-top: 4px; }
