@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.11 — 2026-11-20
+
+- Keep Inbox corner radii fixed while expanding and collapsing.
+- Align sidebar corners and breadcrumb hover geometry.
+
 ## 0.1.10 — 2026-11-20
 
 - Keep avatar selection and focus rings visible in the composer.
