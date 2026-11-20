@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14 — 2026-11-20
+
+- Align the first draft attachment with chat text while keeping the strip scrollable.
+
 ## 0.1.13 — 2026-11-20
 
 - Keep recording, processing and retry controls inside the voice button.
