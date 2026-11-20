@@ -24,10 +24,7 @@
 .fa-app .fa-topbar { position: absolute; z-index: 30; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
 .fa-app .fa-topbar > * { pointer-events: auto; }
 .fa-app .fa-pill { height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--fa-line); border-radius: 999px; background: var(--fa-raised); }
-.fa-app .fa-navigation { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: calc(100% - 100px); }
-.fa-app .fa-inbox-toggle { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--fa-line); border-radius: 50%; background: var(--fa-raised); }
-.fa-app .fa-inbox-toggle[aria-pressed=true] { background: var(--fa-control); }
-.fa-app .fa-breadcrumb { padding: 3px 12px; min-width: 0; }
+.fa-app .fa-breadcrumb { box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06); padding: 3px 12px 3px 3px; min-width: 0; max-width: calc(100% - 100px); }
 .fa-app .fa-icon-button { width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 50%; flex-shrink: 0; }
 .fa-app .fa-root-crumb { position: relative; isolation: isolate; height: 28px; padding: 0; border: 0; background: none; text-align: left; flex-shrink: 0; }
 .fa-app .fa-root-crumb::before { content: ""; position: absolute; inset: 0 -3px; border-radius: 8px; z-index: -1; pointer-events: none; }
@@ -36,7 +33,7 @@
 .fa-app .fa-agent-count { padding: 0 12px; gap: 7px; white-space: nowrap; }
 .fa-app .fa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fa-blue); flex-shrink: 0; }
 .fa-app .fa-amber { background: var(--fa-amber); }
-.fa-app .fa-canvas { container: fa-content / inline-size; position: absolute; inset: 56px 0 60px calc(min(var(--fa-column-width), calc(100% - 320px)) + 24px); overflow: auto; }
+.fa-app .fa-canvas { container: fa-content / inline-size; position: absolute; inset: 56px 0 12px calc(min(var(--fa-column-width), calc(100% - 320px)) + 24px); overflow: auto; transition: left 220ms ease, height 220ms ease; }
 .fa-app .fa-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: min(644px, 100%); margin: 20px auto; padding: 0 24px 24px; }
 .fa-app .fa-board-column h2 { margin: 0 0 14px; display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500; }
 .fa-app .fa-board-column h2 > span { margin-left: auto; color: var(--fa-faint); font-size: 12px; }
@@ -59,14 +56,18 @@
 .fa-app .fa-artifact strong { flex: 1; font-weight: 500; overflow-wrap: anywhere; }
 .fa-app .fa-artifact svg { color: var(--fa-muted); }
 .fa-app .fa-reopen { position: relative; display: block; margin: 24px auto; border: 1px solid var(--fa-line); background: var(--fa-raised); padding: 8px 16px; border-radius: 18px; }
-.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 60px; width: min(var(--fa-column-width), calc(100% - 320px)); display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 12px; width: min(var(--fa-column-width), calc(100% - 320px)); display: flex; flex-direction: column; gap: 12px; pointer-events: none; visibility: visible; transition: transform 220ms ease, opacity 220ms ease; }
 .fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 28px; box-shadow: 0 3px 5px -3px rgba(0,0,0,.24); pointer-events: auto; }
 .fa-app .fa-inbox { max-height: 40%; min-height: 70px; flex: 0 1 auto; display: flex; flex-direction: column; }
-.fa-app .fa-inbox h2 { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 17px 20px 8px; color: var(--fa-muted); font-size: 11px; font-weight: 500; }
-.fa-app .fa-inbox h2 span { color: var(--fa-faint); }
+.fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 38px; }
+.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 38px; padding: 0 20px; border: 0; background: transparent; color: var(--fa-muted); text-align: left; font-size: 11px; }
+.fa-app .fa-inbox-header span { flex: 1; }
+.fa-app .fa-inbox-header small { color: var(--fa-faint); font-size: 10px; }
+.fa-app .fa-inbox-header svg { width: 12px; height: 12px; }
 .fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 7px 10px; border-radius: 0 0 26px 26px; }
 .fa-app .fa-inbox-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 4px 12px; text-align: left; border: 0; background: none; border-radius: 13px; }
-.fa-app .fa-inbox-item strong { display: block; flex: 1; min-width: 0; font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-app .fa-inbox-item strong { display: block; flex: 0 1 auto; max-width: 55%; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-app .fa-inbox-task-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fa-muted); font-size: 11px; }
 .fa-app .fa-inbox-item small { flex-shrink: 0; white-space: nowrap; font-size: 10px; color: var(--fa-faint); }
 .fa-app .fa-inbox-item.fa-active { background: var(--fa-hover); }
 .fa-app .fa-inbox-empty { margin: 5px 12px 7px; color: var(--fa-faint); font-size: 12px; }
@@ -80,7 +81,7 @@
 .fa-app .fa-worker-actions button svg:last-child { margin-left: auto; }
 .fa-app .fa-voice-hint { display: flex; gap: 8px; font-size: 11px; color: var(--fa-muted); padding: 8px 12px; }
 .fa-app .fa-voice-hint button { align-self: start; background: none; border: 0; padding: 0; }
-.fa-app .fa-footer { position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 30; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.fa-app .fa-footer { flex: 0 0 36px; min-height: 36px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
 .fa-app .fa-footer > * { pointer-events: auto; }
 .fa-app .fa-chat-toggle { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--fa-line); border-radius: 50%; background: var(--fa-raised); color: var(--fa-muted); }
 .fa-app .fa-chat-toggle.fa-selected { background: var(--fa-control); color: var(--fa-text); }
@@ -103,7 +104,6 @@
 .fa-app .fa-rename-dialog > div { display: flex; justify-content: end; gap: 8px; margin-top: 16px; }
 .fa-app .fa-rename-dialog button { border: 0; background: var(--fa-control); padding: 7px 12px; border-radius: 12px; }
 @media (hover: hover) {
-  .fa-app .fa-inbox-toggle:hover { background: var(--fa-hover); }
   .fa-app .fa-root-crumb:hover::before { background: var(--fa-hover); }
   .fa-app .fa-icon-button:hover, .fa-app .fa-menu button:hover, .fa-app .fa-inbox-item:hover { background: var(--fa-hover); }
   .fa-app .fa-task-card:hover { border-color: var(--fa-muted); background: var(--fa-hover); }
@@ -113,9 +113,10 @@
 }
 @container (max-width: 600px) {
   .fa-app .fa-canvas { inset: 56px 0 auto; height: calc((100% - 128px) * .38); }
-  .fa-app .fa-communications { top: calc(68px + (100% - 128px) * .38); bottom: 60px; width: calc(100% - 24px); gap: 8px; }
+  .fa-app .fa-communications { top: calc(68px + (100% - 128px) * .38); bottom: 12px; width: calc(100% - 24px); gap: 8px; }
   .fa-app .fa-inbox { max-height: 32%; min-height: 62px; }
-  .fa-app .fa-inbox h2 { padding-top: 10px; padding-bottom: 4px; }
+  .fa-app .fa-inbox-collapsed { min-height: 0; }
+  .fa-app[data-sidebar-open=false] .fa-canvas { height: auto; inset: 56px 0 12px; }
   .fa-app .fa-resize { display: none; }
   .fa-app .fa-project-tag { max-width: 100px; }
   .fa-app .fa-agent-count { font-size: 11px; padding: 0 9px; }
@@ -132,3 +133,7 @@
   .fa-app .fa-board { padding: 0 14px 16px; gap: 14px; margin-top: 18px; grid-template-columns: minmax(0, 1fr); }
   .fa-app .fa-board-column + .fa-board-column { margin-top: 10px; }
 }
+
+.fa-app[data-sidebar-open=false] .fa-communications { transform: translateX(-110%); opacity: 0; visibility: hidden; pointer-events: none; transition: transform 220ms ease, opacity 220ms ease, visibility 0s linear 220ms; }
+.fa-app[data-sidebar-open=false] .fa-canvas { left: 0; }
+@media (prefers-reduced-motion: reduce) { .fa-app[data-sidebar-open] .fa-communications, .fa-app .fa-canvas { transition: none; } }

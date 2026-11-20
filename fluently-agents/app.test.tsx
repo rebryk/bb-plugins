@@ -71,7 +71,6 @@ describe('Agents board interactions', () => {
     const rootControl = slot.getByRole('button', { name: 'Board' });
     const canvas = slot.container.querySelector('.fa-canvas');
     const footer = slot.container.querySelector('.fa-footer');
-    fireEvent.click(slot.getByRole('button', { name: 'Toggle inbox' }));
     expect(slot.getByRole('button', { name: 'Board' })).toBe(rootControl);
     const column = slot.getByRole('complementary', { name: 'Conversations' });
     expect(column.querySelector('.fa-inbox')).not.toBeNull();
@@ -81,7 +80,7 @@ describe('Agents board interactions', () => {
     fireEvent.keyDown(handles[0]!, { key: 'ArrowRight' });
     expect(handles.map(handle => handle.getAttribute('aria-valuenow'))).toEqual(['380', '380']);
     expect(localStorage.getItem('fluently-agents.communication-width')).toBe('380');
-    fireEvent.click(within(slot.getByRole('region', { name: 'Needs you' })).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Inbox' })).getByRole('button', { name: /Review campaign/ }));
     expect(slot.getByRole('button', { name: 'Board' })).toBe(rootControl);
     expect(slot.container.querySelector('.fa-canvas')).toBe(canvas);
     expect(slot.container.querySelector('.fa-footer')).toBe(footer);
@@ -152,10 +151,8 @@ describe('Agents board interactions', () => {
     const nextTask = { ...reviewTask, id: 'next', title: 'Review landing', threadId: 'next-thread', pendingWorkers: [] };
     let current = { ...boardData, tasks: [reviewTask, nextTask] };
     const slot = mount({ board: () => current, completeTask: () => { current = { ...current, tasks: [nextTask] }; return null; } });
-    await slot.findByRole('button', { name: 'Toggle inbox' });
     await slot.findByRole('button', { name: /Review campaign.*Marketing/ });
-    fireEvent.click(slot.getByRole('button', { name: 'Toggle inbox' }));
-    fireEvent.click(within(slot.getByRole('region', { name: 'Needs you' })).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Inbox' })).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
     expect(slot.getByRole('button', { name: 'Board' })).not.toBeNull();
@@ -195,17 +192,19 @@ describe('Agents board interactions', () => {
   it('keeps inbox independent while switching tasks and returning to the board', async () => {
     const next = { ...reviewTask, id: 'next', title: 'Review second task', threadId: 'next-thread' };
     const slot = mount({ board: () => ({ ...boardData, tasks: [reviewTask, next] }) }); await slot.findByTestId('agents-chat');
-    const toggle = slot.getByRole('button', { name: 'Toggle inbox' }); fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    const toggle = within(slot.getByRole('region', { name: 'Inbox' })).getByRole('button', { name: /^Inbox/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(slot.container.querySelector('.fa-board')).not.toBeNull();
-    const inbox = slot.getByRole('region', { name: 'Needs you' });
+    const inbox = slot.getByRole('region', { name: 'Inbox' });
     fireEvent.click(within(inbox).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(within(inbox).getByRole('button', { name: /Review second task/ }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread');
     fireEvent.click(slot.getByRole('button', { name: 'Board' }));
-    expect(slot.getByRole('region', { name: 'Needs you' })).toBe(inbox);
+    expect(slot.getByRole('region', { name: 'Inbox' })).toBe(inbox);
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('general-thread');
-    fireEvent.click(toggle); expect(slot.queryByRole('region', { name: 'Needs you' })).toBeNull();
+    fireEvent.click(toggle); expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(within(inbox).queryByRole('button', { name: /Review campaign/ })).toBeNull();
+    expect(slot.getByRole('region', { name: 'Inbox' })).toBe(inbox);
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('general-thread');
   });
 
@@ -235,6 +234,47 @@ describe('Agents board interactions', () => {
     expect(Number(chat.getAttribute('data-focus-request'))).toBe(2);
     fireEvent.click(slot.getByRole('button', { name: /Review campaign.*Marketing/ }));
     await act(async () => { finish({ threadId: 'general-thread' }); await pending; });
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
+  });
+
+  it('collapses the unified sidebar without unmounting chat and N restores it', async () => {
+    const slot = mount(); const chat = await slot.findByTestId('agents-chat');
+    const sidebar = slot.getByRole('complementary', { name: 'Conversations' });
+    expect(sidebar.contains(slot.getByRole('button', { name: 'Chat with General' }))).toBe(true);
+    const toggle = slot.getByRole('button', { name: 'Toggle sidebar' });
+    expect(slot.getByRole('navigation', { name: 'Agents navigation' }).contains(toggle)).toBe(true);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(sidebar.getAttribute('aria-hidden')).toBe('true'); expect(sidebar.hasAttribute('inert')).toBe(true);
+    expect(slot.queryByRole('button', { name: 'Chat with General' })).toBeNull();
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(sidebar.getAttribute('aria-hidden')).toBe('false'); expect(sidebar.hasAttribute('inert')).toBe(false);
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+  });
+
+  it('shows the requested action before the muted task title and preserves task selection on inbox collapse', async () => {
+    const slot = mount(); await slot.findByTestId('agents-chat');
+    const inbox = slot.getByRole('region', { name: 'Inbox' });
+    const item = within(inbox).getByRole('button', { name: /Approve direction.*Review campaign/ });
+    expect(item.getAttribute('title')).toBe('Marketing / Review campaign · Approve direction');
+    expect(item.querySelector('strong')?.textContent).toBe('Approve direction');
+    expect(item.querySelector('.fa-inbox-task-title')?.textContent).toBe('Review campaign');
+    fireEvent.click(item); const chat = slot.getByTestId('agents-chat');
+    fireEvent.click(within(inbox).getByRole('button', { name: /^Inbox/ }));
+    expect(slot.getByTestId('agents-chat')).toBe(chat); expect(chat.getAttribute('data-thread-id')).toBe('task-thread');
+  });
+
+  it('does not reopen a sidebar hidden while task completion is pending', async () => {
+    let finish!: () => void; const pending = new Promise<null>(resolve => { finish = () => resolve(null); });
+    const next = { ...reviewTask, id: 'next', title: 'Next review', threadId: 'next-thread' };
+    const slot = mount({ board: () => ({ ...boardData, tasks: [reviewTask, next] }), completeTask: () => pending });
+    fireEvent.click(await slot.findByRole('button', { name: /Review campaign.*Marketing/ }));
+    fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
+    const toggle = slot.getByRole('button', { name: 'Toggle sidebar' }); fireEvent.click(toggle);
+    await act(async () => { finish(); await pending; });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
   });
 

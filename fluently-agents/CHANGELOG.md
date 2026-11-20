@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8 — 2026-11-20
+
+- Collapse the complete conversation sidebar from the navigation pill.
+- Keep Inbox available with collapsible, action-first task rows.
+- Show image attachments as a scrollable preview strip with corner removal.
+
 ## 0.1.7 — 2026-11-20
 
 - Keep chat open and reserve its space beside the board and task results.

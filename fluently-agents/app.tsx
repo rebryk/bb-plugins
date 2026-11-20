@@ -49,7 +49,8 @@ function AgentsPage() {
   const root = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState(() => readPreference(AGENT_KEY, ''));
   const [agentThreads, setAgentThreads] = useState<Record<string, string>>({});
@@ -73,8 +74,8 @@ function AgentsPage() {
   const uploadAgent = useRef<Agent | null>(null);
   const openingSequence = useRef(0);
   const fetchSequence = useRef(0);
-  const navigation = useRef({ taskId, inboxOpen });
-  navigation.current = { taskId, inboxOpen };
+  const navigation = useRef({ taskId, inboxOpen, sidebarOpen });
+  navigation.current = { taskId, inboxOpen, sidebarOpen };
   const report = useCallback((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)), []);
   const refresh = useCallback(() => {
     const sequence = ++fetchSequence.current;
@@ -121,10 +122,12 @@ function AgentsPage() {
     if (!taskId && agent && !threadId && !attemptedAgents.current.has(agent.id)) void openAgent(agent);
   }, [taskId, agent, threadId, openAgent]);
   const focusChat = useCallback(() => {
+    setSidebarOpen(true);
     if (task || threadId) setFocus(value => value + 1);
     else if (agent) void openAgent(agent, true);
   }, [task, threadId, agent, openAgent]);
   const activateVoice = useCallback(async () => {
+    setSidebarOpen(true);
     const target = threadId ?? (agent ? await openAgent(agent) : undefined);
     if (target) setVoiceRequest(previous => ({ threadId: target, nonce: previous.nonce + 1 }));
   }, [threadId, agent, openAgent]);
@@ -158,16 +161,17 @@ function AgentsPage() {
     setMenu(kind === 'agent' && next ? { kind, agent: next, ...position } : { kind: 'mode', ...position });
   };
   const openTask = (next: Task) => {
+    setSidebarOpen(true);
     openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null); setVoice({ state: 'idle', level: 0 });
   };
   const returnHome = () => { setTaskId(null); setWorkerThread(null); setMenu(null); };
   const act = async (operation: () => Promise<unknown>, closeTask = false) => {
-    const origin = { taskId, inboxOpen };
+    const origin = { taskId, inboxOpen, sidebarOpen };
     setBusy(true); setMenu(null);
     try {
       await operation();
-      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.inboxOpen === origin.inboxOpen) {
-        const next = origin.inboxOpen ? needs.find(item => item.id !== origin.taskId) : null;
+      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.inboxOpen === origin.inboxOpen && navigation.current.sidebarOpen === origin.sidebarOpen) {
+        const next = origin.inboxOpen && origin.sidebarOpen ? needs.find(item => item.id !== origin.taskId) : null;
         if (next) openTask(next); else returnHome();
       }
       refresh();
@@ -196,15 +200,13 @@ function AgentsPage() {
     event.preventDefault(); const next = Math.max(280, Math.min(560, width + (event.key === 'ArrowRight' ? 20 : -20))); setWidth(next); writePreference(WIDTH_KEY, String(next));
   }} />;
 
-  return <div className="fa-app" ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
+  return <div className="fa-app" data-sidebar-open={sidebarOpen} ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
     <header className="fa-topbar">
-      <div className="fa-navigation">
-        <button className="fa-inbox-toggle" title={inboxOpen ? 'Hide inbox' : 'Show inbox'} aria-label="Toggle inbox" aria-pressed={inboxOpen} onClick={() => { setInboxOpen(value => !value); setMenu(null); }}><Icon name="MailOpen" /></button>
-        <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
-          <button className="fa-root-crumb" onClick={returnHome}>Board</button>
-          {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
-        </nav>
-      </div>
+      <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
+        <button className="fa-icon-button" title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'} aria-label="Toggle sidebar" aria-expanded={sidebarOpen} onClick={event => { event.currentTarget.focus(); setSidebarOpen(value => !value); setMenu(null); }}><Icon name="PanelLeft" /></button>
+        <span className="fa-crumb-divider">/</span><button className="fa-root-crumb" onClick={returnHome}>Board</button>
+        {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
+      </nav>
       <div className="fa-top-actions">
         {task ? <div className="fa-pill">
           <button className="fa-icon-button" disabled={busy} title="Snooze" aria-label="Snooze task" onClick={() => setMenu(value => value?.kind === 'snooze' ? null : { kind: 'snooze' })}><Icon name="Clock" /></button>
@@ -227,12 +229,12 @@ function AgentsPage() {
       </div>}
     </main>
 
-    <aside className="fa-communications" aria-label="Conversations">
-      {inboxOpen && <section className="fa-inbox fa-panel" aria-label="Needs you">
-        <h2>Needs you<span>{needs.length}</span></h2>
-        <div className="fa-inbox-list">{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><strong title={item.title}>{item.title}</strong><small title="Waiting for you">{elapsed(item.needsSince ?? item.updatedAt, now)}</small></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
+    <aside className="fa-communications" aria-label="Conversations" aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
+      <section className={`fa-inbox fa-panel${inboxOpen ? '' : ' fa-inbox-collapsed'}`} aria-label="Inbox">
+        <button className="fa-inbox-header" aria-expanded={inboxOpen} onClick={() => setInboxOpen(value => !value)}><span>Inbox</span><small>{needs.length}</small><Icon name={inboxOpen ? 'ChevronDown' : 'ChevronRight'} /></button>
+        <div className="fa-inbox-list" hidden={!inboxOpen}>{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title} · ${item.ask || 'Review task'}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><strong>{item.ask || 'Review task'}</strong><span className="fa-inbox-task-title">{item.title}</span><small title="Waiting for you">{elapsed(item.needsSince ?? item.updatedAt, now)}</small></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
         {resizeHandle}
-      </section>}
+      </section>
       <section className="fa-chat fa-panel" aria-label="Chat">
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}
@@ -240,12 +242,11 @@ function AgentsPage() {
         {opening ? <div className="fa-chat-empty" role="status">Opening conversation…</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} onVoiceState={onVoiceState} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}</div>}
         {resizeHandle}
       </section>
-    </aside>
-
     <footer className="fa-footer">
       <button className={`fa-chat-toggle fa-selected${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} title={mode === 'voice' ? 'Voice · N' : 'Chat · N'} aria-label={voice.state === 'recording' ? 'Stop and send voice message' : mode === 'voice' ? 'Record voice message' : 'Focus chat'} disabled={voice.state === 'starting' || voice.state === 'transcribing'} aria-expanded={true} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (mode === 'voice') void activateVoice(); else focusChat(); }}><Icon name={voice.state === 'recording' ? 'Square' : mode === 'voice' ? 'Mic' : 'MessageSquare'} /></button>
       {!task && board && board.agents.length > 0 && <div className="fa-pill fa-avatars" aria-label="Agents">{board.agents.map(item => <button className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>}
     </footer>
+    </aside>
 
     {menu && <div className={`fa-menu${menu.kind === 'snooze' ? ' fa-snooze-menu' : ''}`} role="menu" style={menu.kind === 'snooze' ? undefined : { left: menu.left, bottom: menu.bottom }}>
       {menu.kind === 'snooze' && task ? <><div className="fa-menu-label">Snooze until</div>{[

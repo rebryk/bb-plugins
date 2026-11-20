@@ -31,7 +31,7 @@ describe('Custom conversation', () => {
     expect(fireEvent.paste(textbox, { clipboardData: { files: [], items: [{ kind: 'string' }], getData: () => 'plain text' } })).toBe(true);
     expect(upload).not.toHaveBeenCalled();
     expect(fireEvent.paste(textbox, { clipboardData: { files: [image], items: [{ kind: 'file', getAsFile: () => image }] } })).toBe(false);
-    await slot.findByText('Screenshot.png'); expect(upload).toHaveBeenCalledTimes(1);
+    await slot.findByRole('button', { name: 'Remove Screenshot.png' }); expect(upload).toHaveBeenCalledTimes(1);
     expect(upload).toHaveBeenCalledWith({ projectId: 'project-a', clientFile: image });
     fireEvent.click(slot.getByRole('button', { name: 'Send message' }));
     await waitFor(() => expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ input: [{ type: 'localImage', path: 'attachments/shot.png' }] }] }));
@@ -101,12 +101,35 @@ describe('Custom conversation', () => {
       await slot.findByRole('button', { name: 'Preview preview.png' });
       expect(slot.queryByRole('button', { name: 'Preview unsafe.svg' })).toBeNull();
       expect(create).toHaveBeenCalledTimes(1);
+      expect(slot.queryByText('preview.png')).toBeNull();
+      expect(slot.getByRole('img', { name: 'Preview unavailable: unsafe.svg' })).toBeTruthy();
+      expect(slot.getByRole('button', { name: 'Remove unsafe.svg' })).toBeTruthy();
+      const preview = slot.getByRole('button', { name: 'Preview preview.png' });
+      fireEvent.click(preview);
+      expect(slot.getAllByRole('img', { name: 'preview.png' })).toHaveLength(2);
+      fireEvent.error(preview.querySelector('img')!);
+      expect(slot.getByRole('img', { name: 'Preview unavailable: preview.png' })).toBeTruthy();
+      expect(slot.queryByRole('button', { name: 'Preview preview.png' })).toBeNull();
       fireEvent.click(slot.getByRole('button', { name: 'Remove preview.png' }));
       expect(revoke).toHaveBeenCalledWith('blob:preview');
     } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; }
   });
 
 
+
+  it('keeps loading image previews accessible and removable before the read finishes', async () => {
+    let finish!: (value: Awaited<ReturnType<ReadAttachment>>) => void;
+    const upload = vi.fn<Upload>(async () => ({ type: 'localImage', path: 'loading.png', name: 'loading.png', sizeBytes: 1 }));
+    const readAttachment = vi.fn<ReadAttachment>(() => new Promise(resolve => { finish = resolve; }));
+    const slot = mount({ upload, readAttachment }); await slot.findByText('Hello');
+    fireEvent.paste(slot.getByRole('textbox'), { clipboardData: { files: [new File(['png'], 'loading.png')] } });
+    await slot.findByRole('img', { name: 'Loading preview: loading.png' });
+    expect(slot.queryByText('loading.png')).toBeNull();
+    fireEvent.click(slot.getByRole('button', { name: 'Remove loading.png' }));
+    await act(async () => finish({ bytes: new Uint8Array([1]), mimeType: 'image/png', sizeBytes: 1 }));
+    expect(slot.queryByRole('button', { name: 'Preview loading.png' })).toBeNull();
+    expect(slot.queryByRole('img', { name: 'Loading preview: loading.png' })).toBeNull();
+  });
   it('renders sent local images through BB attachment reads with a link fallback', async () => {
     const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
     URL.createObjectURL = vi.fn(() => 'blob:sent'); URL.revokeObjectURL = vi.fn();
@@ -117,6 +140,8 @@ describe('Custom conversation', () => {
       await slot.findByRole('button', { name: 'Preview sent.png' });
       expect(slot.queryByRole('button', { name: 'Preview missing.png' })).toBeNull();
       expect(slot.getByRole('button', { name: 'missing.png' })).toBeTruthy();
+      expect(slot.queryByText('sent.png')).toBeNull();
+      expect(slot.queryByRole('button', { name: 'Remove sent.png' })).toBeNull();
       expect(readAttachment).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'project-a', path: 'attachments/sent.png' }));
       slot.unmount();
     } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; }

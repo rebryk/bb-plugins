@@ -16,13 +16,15 @@ Right-click an avatar to rename it or upload an image.
 
 ## Layout
 
-Chat stays open on the left. The board and task results use the remaining
-space on the right. Resize the shared chat and inbox column to adjust both.
-On narrow screens, content sits above the conversation instead.
+Chat opens on the left. The board and task results use the remaining space
+on the right. Resize the shared column to adjust both. On narrow screens,
+content sits above the conversation instead.
 
-The Inbox button independently shows tasks that need you above the chat.
-It keeps the current board or task open. Select another inbox row to switch
-tasks directly; click Board to return to the board.
+The sidebar button in the navigation pill smoothly hides or restores Inbox,
+chat and the agent controls together. Inbox stays at the top of the sidebar;
+click its header to collapse or expand the task list. Each row shows the
+requested action, task name and waiting time. Select a row to switch tasks
+directly; click Board to return to the board.
 
 ## Existing BB threads
 
@@ -53,7 +55,8 @@ Queued messages, file uploads and stop controls use BB APIs. Complex permission
 and question requests open BB's own controls from the conversation.
 
 Paste screenshots or drop files into the chat to attach them. Raster images
-have a preview; other files keep their download link. Uploads finish before
+appear in a scrollable preview strip; remove a draft image with its corner
+button. Other files keep their download link. Uploads finish before
 sending. Internal activity stays collapsed until you expand it.
 
 The custom chat uses BB Markdown. Message-specific plugin embeds require
