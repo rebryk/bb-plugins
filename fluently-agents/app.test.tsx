@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { loadPluginApp, renderSlot } from '@get-bb/plugin-sdk/testing/app';
 import { CHANGED, rpcContract, type Agent, type Task } from './shared';
 
-vi.mock('./chat', () => ({ Chat: ({ threadId, focusRequest, voiceRequest }: { threadId: string; focusRequest?: number; voiceRequest?: number }) => <div data-testid="agents-chat" data-thread-id={threadId} data-focus-request={focusRequest} data-voice-request={voiceRequest} /> }));
+vi.mock('./chat', () => ({ Chat: ({ threadId, focusRequest, voiceRequest, composerAgents, onVoiceContextMenu }: import('./chat').ChatProps) => <div data-testid="agents-chat" data-thread-id={threadId} data-focus-request={focusRequest} data-voice-request={voiceRequest}>{composerAgents}<button aria-label="Record voice message" onContextMenu={onVoiceContextMenu} /></div> }));
 
 const general: Agent = { id: 'general', name: 'General', avatar: '', instructions: '', projectId: null, threadId: 'general-thread', execution: null };
 const ads: Agent = { ...general, id: 'ads', name: 'Ads', threadId: 'ads-thread' };
@@ -66,7 +66,7 @@ describe('Agents board interactions', () => {
   it('shares one resizable column and keeps the root control mounted through inbox and task navigation', async () => {
     const slot = mount();
     await slot.findByRole('button', { name: 'Chat with General' });
-    fireEvent.click(slot.getByRole('button', { name: 'Focus chat' }));
+    fireEvent.keyDown(window, { key: 'n' });
     await slot.findByTestId('agents-chat');
     const rootControl = slot.getByRole('button', { name: 'Board' });
     const canvas = slot.container.querySelector('.fa-canvas');
@@ -175,7 +175,7 @@ describe('Agents board interactions', () => {
     expect(chat.getAttribute('data-thread-id')).toBe('general-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(0);
     fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
-    fireEvent.click(slot.getByRole('button', { name: 'Focus chat' }));
+    fireEvent.keyDown(window, { key: 'n' });
     expect(slot.getByTestId('agents-chat')).toBe(chat);
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
@@ -276,6 +276,19 @@ describe('Agents board interactions', () => {
     await act(async () => { finish(); await pending; });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
+  });
+
+  it('places coordinator avatars in the composer slot and exposes input mode from voice context menu', async () => {
+    const slot = mount(); const chat = await slot.findByTestId('agents-chat');
+    expect(chat.contains(slot.getByRole('button', { name: 'Chat with Ads' }))).toBe(true);
+    expect(slot.container.querySelector('.fa-footer')).toBeNull();
+    fireEvent.contextMenu(slot.getByRole('button', { name: 'Record voice message' }));
+    fireEvent.click(slot.getByRole('menuitem', { name: 'Voice input' }));
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(Number(chat.getAttribute('data-voice-request'))).toBeGreaterThan(0);
+    fireEvent.click(slot.getByRole('button', { name: /Review campaign.*Marketing/ }));
+    expect(slot.queryByRole('button', { name: 'Chat with Ads' })).toBeNull();
+    expect(slot.getByRole('button', { name: 'Record voice message' })).not.toBeNull();
   });
 
 });

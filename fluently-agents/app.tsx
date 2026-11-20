@@ -4,7 +4,6 @@ import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useRea
 import { CHANGED, type Agent, type Task, type rpcContract } from './shared';
 import './styles.css';
 import { Chat } from './chat';
-import type { VoiceState } from './voice';
 
 const WIDTH_KEY = 'fluently-agents.communication-width';
 const AGENT_KEY = 'fluently-agents.selected-agent';
@@ -66,9 +65,7 @@ function AgentsPage() {
   const [opening, setOpening] = useState(false);
   const [mode, setMode] = useState<'text' | 'voice'>(() => readPreference('fluently-agents.input-mode', 'text') === 'voice' ? 'voice' : 'text');
   const [voiceRequest, setVoiceRequest] = useState({ threadId: '', nonce: 0 });
-  const [voice, setVoice] = useState<{ state: VoiceState; level: number }>({ state: 'idle', level: 0 });
   const onVoiceRequestHandled = useCallback((nonce: number) => setVoiceRequest(previous => previous.nonce === nonce ? { ...previous, threadId: '' } : previous), []);
-  const onVoiceState = useCallback((next: { state: VoiceState; level: number }) => setVoice(next), []);
   const [now, setNow] = useState(Date.now());
   const upload = useRef<HTMLInputElement>(null);
   const uploadAgent = useRef<Agent | null>(null);
@@ -162,7 +159,7 @@ function AgentsPage() {
   };
   const openTask = (next: Task) => {
     setSidebarOpen(true);
-    openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null); setVoice({ state: 'idle', level: 0 });
+    openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null);
   };
   const returnHome = () => { setTaskId(null); setWorkerThread(null); setMenu(null); };
   const act = async (operation: () => Promise<unknown>, closeTask = false) => {
@@ -199,6 +196,8 @@ function AgentsPage() {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault(); const next = Math.max(280, Math.min(560, width + (event.key === 'ArrowRight' ? 20 : -20))); setWidth(next); writePreference(WIDTH_KEY, String(next));
   }} />;
+
+  const agentSelector = !task && board && board.agents.length > 0 && <div className="fa-avatars" aria-label="Agents">{board.agents.map(item => <button type="button" className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>;
 
   return <div className="fa-app" data-sidebar-open={sidebarOpen} ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
     <header className="fa-topbar">
@@ -239,13 +238,9 @@ function AgentsPage() {
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}
         </div>}
-        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} onVoiceState={onVoiceState} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}</div>}
+        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…{agentSelector}</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} composerAgents={agentSelector} onVoiceContextMenu={event => showMenu(event, 'mode')} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}{agentSelector}</div>}
         {resizeHandle}
       </section>
-    <footer className="fa-footer">
-      <button className={`fa-chat-toggle fa-selected${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} title={mode === 'voice' ? 'Voice · N' : 'Chat · N'} aria-label={voice.state === 'recording' ? 'Stop and send voice message' : mode === 'voice' ? 'Record voice message' : 'Focus chat'} disabled={voice.state === 'starting' || voice.state === 'transcribing'} aria-expanded={true} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (mode === 'voice') void activateVoice(); else focusChat(); }}><Icon name={voice.state === 'recording' ? 'Square' : mode === 'voice' ? 'Mic' : 'MessageSquare'} /></button>
-      {!task && board && board.agents.length > 0 && <div className="fa-pill fa-avatars" aria-label="Agents">{board.agents.map(item => <button className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>}
-    </footer>
     </aside>
 
     {menu && <div className={`fa-menu${menu.kind === 'snooze' ? ' fa-snooze-menu' : ''}`} role="menu" style={menu.kind === 'snooze' ? undefined : { left: menu.left, bottom: menu.bottom }}>

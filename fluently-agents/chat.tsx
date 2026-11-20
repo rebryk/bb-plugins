@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import { Markdown, ThreadChat, UrlLink, experimental_ImageLightbox as ImageLightbox, experimental_Icon as Icon, experimental_FileLink as FileLink, experimental_saveFile as saveFile, useBbNavigate, useSdk } from '@get-bb/plugin-sdk/app';
 import { useVoiceTranscript, type VoiceState } from './voice';
 import './chat.css';
@@ -12,7 +12,7 @@ type Interactions = Awaited<ReturnType<Sdk['threads']['interactions']['list']>>;
 type MarkdownDocument = NonNullable<ComponentProps<typeof Markdown>['experimental_document']>;
 type StorageLocation = Awaited<ReturnType<Sdk['threads']['storageLocation']>>;
 type Queue = Awaited<ReturnType<Sdk['threads']['queuedMessages']['list']>>;
-export interface ChatProps { threadId: string; focusRequest?: number; voiceRequest?: number; onVoiceRequestHandled?(nonce: number): void; onVoiceState?(value: { state: VoiceState; level: number }): void; className?: string; }
+export interface ChatProps { threadId: string; focusRequest?: number; voiceRequest?: number; onVoiceRequestHandled?(nonce: number): void; onVoiceState?(value: { state: VoiceState; level: number }): void; composerAgents?: ReactNode; onVoiceContextMenu?(event: MouseEvent<HTMLButtonElement>): void; className?: string; }
 export function mergeRows(old: ChatRow[], next: ChatRow[]) { const map = new Map(old.map(row => [row.id, row])); next.forEach(row => map.set(row.id, row)); return [...map.values()].sort((a, b) => a.sourceSeqStart - b.sourceSeqStart); }
 export function reconcileRows(old: ChatRow[], snapshot: ChatRow[]) {
   if (!snapshot.length) return [];
@@ -94,7 +94,7 @@ function draftFor(id: string): { text: string; attachments: Attachment[] } {
   try { const item = JSON.parse(localStorage.getItem(`fluently-agents.draft.${id}`) || '{}'); return { text: typeof item.text === 'string' ? item.text : '', attachments: Array.isArray(item.attachments) ? item.attachments.filter((file: Attachment) => file && typeof file.path === 'string' && (file.type === 'localFile' || file.type === 'localImage')) : [] }; } catch { return { text: '', attachments: [] }; }
 }
 export function Chat(props: ChatProps) { return <ChatSession key={props.threadId} {...props} />; }
-function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoiceRequestHandled, className = '' }: ChatProps) {
+function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoiceRequestHandled, composerAgents, onVoiceContextMenu, className = '' }: ChatProps) {
   const sdk = useSdk(), navigate = useBbNavigate();
   const [draft, setDraft] = useState(() => draftFor(threadId));
   const [rows, setRows] = useState<ChatRow[]>([]);
@@ -259,9 +259,9 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
         {running && <><button type="button" aria-pressed={steer} title="Choose how to send while running" onClick={() => setSteer(value => !value)}>{steer ? 'Steer' : 'Queue'}</button><button type="button" aria-label="Stop work" disabled={busy} onClick={() => void mutate(() => sdk.threads.stop({ threadId }))}><Icon name="Square" /></button></>}
 </div>}
     <form className="fa-message-composer" onSubmit={event => { event.preventDefault(); send(); }}><textarea ref={input} value={draft.text} placeholder="Message…" aria-label="Message" rows={1} onChange={event => setDraft(old => ({ ...old, text: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
-      <div className="fa-compose-actions"><button type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><Icon name="FileAttachment" /></button><button type="button" aria-label={voice.state === 'recording' ? 'Finish recording' : 'Record voice message'} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={voice.state === 'recording' ? 'fa-recording' : ''} onClick={() => void voice.toggle()}><Icon name={voice.state === 'recording' ? 'Square' : 'Mic'} /></button>
-        <button type="submit" className="fa-send-message" aria-label="Send message" disabled={busy || uploading || !!failedFiles.length || !loaded || !!interactions.length || voiceBusy || (!draft.text.trim() && !draft.attachments.length)}><Icon name="ArrowUp" /></button>
-      </div>
+      <div className="fa-compose-actions"><div className="fa-compose-left"><button className="fa-composer-tool" type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><Icon name="FileAttachment" /></button>{composerAgents}</div><div className="fa-compose-right"><button type="button" aria-label={voice.state === 'recording' ? 'Finish recording' : 'Record voice message'} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={`fa-composer-tool${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} onContextMenu={onVoiceContextMenu} onClick={() => void voice.toggle()}><Icon name={voice.state === 'recording' ? 'Square' : 'Mic'} /></button>
+        <button type="submit" className="fa-composer-tool fa-send-message" aria-label="Send message" disabled={busy || uploading || !!failedFiles.length || !loaded || !!interactions.length || voiceBusy || (!draft.text.trim() && !draft.attachments.length)}><Icon name="ArrowUp" /></button>
+      </div></div>
     </form>
     <input className="fa-file-input" type="file" multiple ref={files} aria-label="Message attachments" onChange={event => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ''; uploadFiles(selected); }} />
     {advanced && <div className="fa-advanced-overlay" role="dialog" aria-modal="true" aria-label="Review agent request"><header><strong>Review agent request</strong><button aria-label="Return to conversation" onClick={() => { setAdvanced(false); void refresh().catch(report); }}><Icon name="X" /></button></header><p>Answer this request using BB’s permission and question controls. Your conversation stays here.</p><ThreadChat threadId={threadId} variant="compact" layout="contained" /></div>}

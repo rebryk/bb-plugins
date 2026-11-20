@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 — 2026-11-20
+
+- Give message text the full composer width above a compact control row.
+- Place agent selection beside attachments inside the composer.
+
 ## 0.1.8 — 2026-11-20
 
 - Collapse the complete conversation sidebar from the navigation pill.

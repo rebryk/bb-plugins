@@ -9,7 +9,7 @@ bb plugin install fluently-agents@sf-plugins
 ```
 
 Open **Agents** in BB's navigation rail. The selected agent's chat opens
-automatically. Choose an avatar below it to switch agents.
+automatically. Choose an avatar in the composer to switch agents.
 Ask it to execute work; it creates a task with its own conversation. Ask it to
 create another agent, set its default BB project or change its instructions.
 Right-click an avatar to rename it or upload an image.
@@ -51,6 +51,10 @@ A coordinator keeps its own BB thread. Every task gets a standalone thread;
 its workers are child threads. A task's normal messages go directly to its
 lead. The plugin draws the messages, tool activity and composer; BB owns the
 history, permissions and execution. Drafts stay in this browser per thread.
+The text field spans the composer width. Attachments and agent selection sit
+below it, with voice and send controls on the right. Task conversations omit
+the agent selector.
+
 Queued messages, file uploads and stop controls use BB APIs. Complex permission
 and question requests open BB's own controls from the conversation.
 
@@ -103,7 +107,7 @@ Model choice happens at launch; an existing conversation keeps its model.
   conversation before closing the task.
 - Snooze hides a card for three hours, until tomorrow at 09:00, or indefinitely.
   It does not stop work. Time-based snoozes expire on the next refresh.
-- Right-click the chat button to choose text or voice mode. N focuses the
+- Right-click the microphone button to choose text or voice mode. N focuses the
   composer in text mode. In voice mode, N starts recording; press it again to
   finish. The microphone button also records in either mode.
 - Voice uses BB's configured transcription service. An empty composer sends the

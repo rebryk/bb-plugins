@@ -81,11 +81,7 @@
 .fa-app .fa-worker-actions button svg:last-child { margin-left: auto; }
 .fa-app .fa-voice-hint { display: flex; gap: 8px; font-size: 11px; color: var(--fa-muted); padding: 8px 12px; }
 .fa-app .fa-voice-hint button { align-self: start; background: none; border: 0; padding: 0; }
-.fa-app .fa-footer { flex: 0 0 36px; min-height: 36px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
-.fa-app .fa-footer > * { pointer-events: auto; }
-.fa-app .fa-chat-toggle { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--fa-line); border-radius: 50%; background: var(--fa-raised); color: var(--fa-muted); }
-.fa-app .fa-chat-toggle.fa-selected { background: var(--fa-control); color: var(--fa-text); }
-.fa-app .fa-avatars { gap: 3px; max-width: calc(100% - 44px); overflow-x: auto; scrollbar-width: none; }
+.fa-app .fa-avatars { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; gap: 3px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .fa-app .fa-avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--fa-control); color: var(--fa-text); border: 2px solid transparent; opacity: .55; overflow: hidden; font-size: 9px; }
 .fa-app .fa-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .fa-app .fa-avatar.fa-selected { opacity: 1; border-color: var(--fa-muted); }
@@ -108,12 +104,11 @@
   .fa-app .fa-icon-button:hover, .fa-app .fa-menu button:hover, .fa-app .fa-inbox-item:hover { background: var(--fa-hover); }
   .fa-app .fa-task-card:hover { border-color: var(--fa-muted); background: var(--fa-hover); }
   .fa-app .fa-avatar:hover { opacity: 1; }
-  .fa-app .fa-chat-toggle:hover { background: var(--fa-control); }
   .fa-app .fa-resize:hover { background: var(--fa-line); }
 }
 @container (max-width: 600px) {
-  .fa-app .fa-canvas { inset: 56px 0 auto; height: calc((100% - 128px) * .38); }
-  .fa-app .fa-communications { top: calc(68px + (100% - 128px) * .38); bottom: 12px; width: calc(100% - 24px); gap: 8px; }
+  .fa-app .fa-canvas { inset: 56px 0 auto; height: calc((100% - 80px) * .38); }
+  .fa-app .fa-communications { top: calc(68px + (100% - 80px) * .38); bottom: 12px; width: calc(100% - 24px); gap: 8px; }
   .fa-app .fa-inbox { max-height: 32%; min-height: 62px; }
   .fa-app .fa-inbox-collapsed { min-height: 0; }
   .fa-app[data-sidebar-open=false] .fa-canvas { height: auto; inset: 56px 0 12px; }
@@ -126,8 +121,6 @@
 .fa-app .fa-worker-dialog > header strong { font-size: 13px; font-weight: 500; display: block; }
 .fa-app .fa-worker-dialog > header small { font-size: 11px; color: var(--fa-muted); }
 .fa-app .fa-worker-dialog > p { font-size: 11px; color: var(--fa-muted); padding: 8px; margin: 0; }
-.fa-app .fa-chat-toggle.fa-recording { background: #416bc4; color: white; border-color: #8ab2ff; box-shadow: 0 0 0 calc(3px + var(--voice-level, 0) * 12px) rgba(91,141,239,.22); transition: box-shadow 80ms linear; }
-.fa-app .fa-chat-toggle:disabled { opacity: .65; }
 
 @container fa-content (max-width: 560px) {
   .fa-app .fa-board { padding: 0 14px 16px; gap: 14px; margin-top: 18px; grid-template-columns: minmax(0, 1fr); }
