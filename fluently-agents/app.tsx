@@ -49,12 +49,13 @@ function AgentsPage() {
   const root = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'board' | 'inbox'>('board');
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState(() => readPreference(AGENT_KEY, ''));
-  const [agentThread, setAgentThread] = useState<{ agentId: string; threadId: string } | null>(null);
+  const [agentThreads, setAgentThreads] = useState<Record<string, string>>({});
+  const attemptedAgents = useRef(new Set<string>());
+  const pendingOpens = useRef(new Map<string, Promise<{ threadId: string }>>());
   const [workerThread, setWorkerThread] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
   const [focus, setFocus] = useState(0);
   const [width, setWidth] = useState(() => Math.max(280, Math.min(560, Number(readPreference(WIDTH_KEY, '360')) || 360)));
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -72,8 +73,8 @@ function AgentsPage() {
   const uploadAgent = useRef<Agent | null>(null);
   const openingSequence = useRef(0);
   const fetchSequence = useRef(0);
-  const navigation = useRef({ taskId, view });
-  navigation.current = { taskId, view };
+  const navigation = useRef({ taskId, inboxOpen });
+  navigation.current = { taskId, inboxOpen };
   const report = useCallback((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)), []);
   const refresh = useCallback(() => {
     const sequence = ++fetchSequence.current;
@@ -89,31 +90,41 @@ function AgentsPage() {
   }, [refresh]);
   const agent = board?.agents.find(item => item.id === selectedAgent) ?? board?.agents[0] ?? null;
   const task = board?.tasks.find(item => item.id === taskId) ?? null;
-  const threadId = task ? task.threadId : agentThread && agentThread.agentId === agent?.id ? agentThread.threadId : null;
+  const threadId = task ? task.threadId : agent ? agentThreads[agent.id] ?? agent.threadId : null;
   const needs = board?.tasks.filter(item => item.state === 'needs-you') ?? [];
   const running = board?.tasks.filter(item => item.state === 'running' || item.state === 'queued') ?? [];
 
   const openAgent = useCallback(async (next: Agent, focusComposer = false) => {
     const sequence = ++openingSequence.current;
     setSelectedAgent(next.id); writePreference(AGENT_KEY, next.id);
-    setOpening(true); setChatOpen(true); setWorkerThread(null);
+    const existing = agentThreads[next.id] ?? next.threadId;
+    attemptedAgents.current.add(next.id);
+    setOpening(!existing); setWorkerThread(null);
+    if (existing && focusComposer) setFocus(value => value + 1);
     try {
-      const result = await rpc.call('openAgent', { agentId: next.id });
+      let pending = pendingOpens.current.get(next.id);
+      if (!pending) {
+        pending = rpc.call('openAgent', { agentId: next.id });
+        pendingOpens.current.set(next.id, pending);
+        void pending.finally(() => pendingOpens.current.delete(next.id)).catch(() => {});
+      }
+      const result = await pending;
+      setAgentThreads(current => ({ ...current, [next.id]: result.threadId }));
       if (sequence === openingSequence.current) {
-        setAgentThread({ agentId: next.id, threadId: result.threadId });
-        if (focusComposer) setFocus(value => value + 1);
+        if (focusComposer && !existing) setFocus(value => value + 1);
         return result.threadId;
       }
-    } catch (cause) { report(cause); }
+    } catch (cause) { if (sequence === openingSequence.current) report(cause); }
     finally { if (sequence === openingSequence.current) setOpening(false); }
-  }, [rpc, report]);
+  }, [rpc, report, agentThreads]);
+  useEffect(() => {
+    if (!taskId && agent && !threadId && !attemptedAgents.current.has(agent.id)) void openAgent(agent);
+  }, [taskId, agent, threadId, openAgent]);
   const focusChat = useCallback(() => {
-    setChatOpen(true);
     if (task || threadId) setFocus(value => value + 1);
     else if (agent) void openAgent(agent, true);
   }, [task, threadId, agent, openAgent]);
   const activateVoice = useCallback(async () => {
-    setChatOpen(true);
     const target = threadId ?? (agent ? await openAgent(agent) : undefined);
     if (target) setVoiceRequest(previous => ({ threadId: target, nonce: previous.nonce + 1 }));
   }, [threadId, agent, openAgent]);
@@ -148,16 +159,15 @@ function AgentsPage() {
   };
   const openTask = (next: Task) => {
     openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null); setVoice({ state: 'idle', level: 0 });
-    setChatOpen(true);
   };
   const returnHome = () => { setTaskId(null); setWorkerThread(null); setMenu(null); };
   const act = async (operation: () => Promise<unknown>, closeTask = false) => {
-    const origin = { taskId, view };
+    const origin = { taskId, inboxOpen };
     setBusy(true); setMenu(null);
     try {
       await operation();
-      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.view === origin.view) {
-        const next = origin.view === 'inbox' ? needs.find(item => item.id !== origin.taskId) : null;
+      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.inboxOpen === origin.inboxOpen) {
+        const next = origin.inboxOpen ? needs.find(item => item.id !== origin.taskId) : null;
         if (next) openTask(next); else returnHome();
       }
       refresh();
@@ -188,11 +198,13 @@ function AgentsPage() {
 
   return <div className="fa-app" ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
     <header className="fa-topbar">
-      <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
-        <button className="fa-icon-button" title={view === 'board' ? 'Show inbox' : 'Show board'} aria-label={view === 'board' ? 'Show inbox' : 'Show board'} onClick={() => { setView(value => value === 'board' ? 'inbox' : 'board'); setMenu(null); }}><Icon name={view === 'board' ? 'Columns2' : 'MailOpen'} /></button>
-        <button className="fa-root-crumb" onClick={returnHome}>{view === 'board' ? 'Board' : 'Inbox'}</button>
-        {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
-      </nav>
+      <div className="fa-navigation">
+        <button className="fa-inbox-toggle" title={inboxOpen ? 'Hide inbox' : 'Show inbox'} aria-label="Toggle inbox" aria-pressed={inboxOpen} onClick={() => { setInboxOpen(value => !value); setMenu(null); }}><Icon name="MailOpen" /></button>
+        <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
+          <button className="fa-root-crumb" onClick={returnHome}>Board</button>
+          {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
+        </nav>
+      </div>
       <div className="fa-top-actions">
         {task ? <div className="fa-pill">
           <button className="fa-icon-button" disabled={busy} title="Snooze" aria-label="Snooze task" onClick={() => setMenu(value => value?.kind === 'snooze' ? null : { kind: 'snooze' })}><Icon name="Clock" /></button>
@@ -215,24 +227,24 @@ function AgentsPage() {
       </div>}
     </main>
 
-    {(view === 'inbox' || chatOpen) && <aside className="fa-communications" aria-label="Conversations">
-      {view === 'inbox' && <section className="fa-inbox fa-panel" aria-label="Needs you">
+    <aside className="fa-communications" aria-label="Conversations">
+      {inboxOpen && <section className="fa-inbox fa-panel" aria-label="Needs you">
         <h2>Needs you<span>{needs.length}</span></h2>
         <div className="fa-inbox-list">{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><strong title={item.title}>{item.title}</strong><small title="Waiting for you">{elapsed(item.needsSince ?? item.updatedAt, now)}</small></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
         {resizeHandle}
       </section>}
-      {chatOpen && <section className="fa-chat fa-panel" aria-label="Chat">
+      <section className="fa-chat fa-panel" aria-label="Chat">
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}
         </div>}
         {opening ? <div className="fa-chat-empty" role="status">Opening conversation…</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} onVoiceState={onVoiceState} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}</div>}
         {resizeHandle}
-      </section>}
-    </aside>}
+      </section>
+    </aside>
 
     <footer className="fa-footer">
-      <button className={`fa-chat-toggle${chatOpen ? ' fa-selected' : ''}${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} title={mode === 'voice' ? 'Voice · N' : 'Chat · N'} aria-label={voice.state === 'recording' ? 'Stop and send voice message' : mode === 'voice' ? 'Record voice message' : chatOpen ? 'Close chat' : 'Open chat'} disabled={voice.state === 'starting' || voice.state === 'transcribing'} aria-expanded={chatOpen} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (mode === 'voice') void activateVoice(); else if (chatOpen) setChatOpen(false); else focusChat(); }}><Icon name={voice.state === 'recording' ? 'Square' : mode === 'voice' ? 'Mic' : 'MessageSquare'} /></button>
-      {!task && board && board.agents.length > 0 && <div className="fa-pill fa-avatars" aria-label="Agents">{board.agents.map(item => <button className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => { if (agent?.id === item.id && chatOpen) setChatOpen(false); else void openAgent(item, true); }}><Avatar agent={item} /></button>)}</div>}
+      <button className={`fa-chat-toggle fa-selected${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} title={mode === 'voice' ? 'Voice · N' : 'Chat · N'} aria-label={voice.state === 'recording' ? 'Stop and send voice message' : mode === 'voice' ? 'Record voice message' : 'Focus chat'} disabled={voice.state === 'starting' || voice.state === 'transcribing'} aria-expanded={true} onContextMenu={event => showMenu(event, 'mode')} onClick={() => { if (mode === 'voice') void activateVoice(); else focusChat(); }}><Icon name={voice.state === 'recording' ? 'Square' : mode === 'voice' ? 'Mic' : 'MessageSquare'} /></button>
+      {!task && board && board.agents.length > 0 && <div className="fa-pill fa-avatars" aria-label="Agents">{board.agents.map(item => <button className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>}
     </footer>
 
     {menu && <div className={`fa-menu${menu.kind === 'snooze' ? ' fa-snooze-menu' : ''}`} role="menu" style={menu.kind === 'snooze' ? undefined : { left: menu.left, bottom: menu.bottom }}>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7 — 2026-11-20
+
+- Keep chat open and reserve its space beside the board and task results.
+- Toggle Inbox independently without leaving the current task.
+- Keep content and conversations visible in a split layout on narrow screens.
+
 ## 0.1.6 — 2026-11-20
 
 - Adopt the approved quiet Activity row with compact, expandable details.

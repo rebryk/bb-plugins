@@ -8,10 +8,21 @@ A task board with persistent coordinator agents and a shared conversation panel.
 bb plugin install fluently-agents@sf-plugins
 ```
 
-Open **Agents** in BB's navigation rail. Click General to open its conversation.
+Open **Agents** in BB's navigation rail. The selected agent's chat opens
+automatically. Choose an avatar below it to switch agents.
 Ask it to execute work; it creates a task with its own conversation. Ask it to
 create another agent, set its default BB project or change its instructions.
 Right-click an avatar to rename it or upload an image.
+
+## Layout
+
+Chat stays open on the left. The board and task results use the remaining
+space on the right. Resize the shared chat and inbox column to adjust both.
+On narrow screens, content sits above the conversation instead.
+
+The Inbox button independently shows tasks that need you above the chat.
+It keeps the current board or task open. Select another inbox row to switch
+tasks directly; click Board to return to the board.
 
 ## Existing BB threads
 
@@ -49,8 +60,8 @@ The custom chat uses BB Markdown. Message-specific plugin embeds require
 BB's native chat renderer and are not rendered inline here.
 
 [UI reference and chat variants](https://an.dev/a/d783ae026b2314ef678e)
-keep the visual direction alongside the implementation. Processing animations
-and HTML result previews in the design study are illustrative.
+keep the visual direction alongside the implementation. The design study uses sample processing text;
+HTML result previews remain illustrative.
 
 All threads retain global BB memory and the memory of their selected project.
 Memory does not copy another thread's live context: agents must pass a brief

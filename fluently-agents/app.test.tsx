@@ -66,13 +66,13 @@ describe('Agents board interactions', () => {
   it('shares one resizable column and keeps the root control mounted through inbox and task navigation', async () => {
     const slot = mount();
     await slot.findByRole('button', { name: 'Chat with General' });
-    fireEvent.click(slot.getByRole('button', { name: 'Open chat' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Focus chat' }));
     await slot.findByTestId('agents-chat');
     const rootControl = slot.getByRole('button', { name: 'Board' });
     const canvas = slot.container.querySelector('.fa-canvas');
     const footer = slot.container.querySelector('.fa-footer');
-    fireEvent.click(slot.getByRole('button', { name: 'Show inbox' }));
-    expect(slot.getByRole('button', { name: 'Inbox' })).toBe(rootControl);
+    fireEvent.click(slot.getByRole('button', { name: 'Toggle inbox' }));
+    expect(slot.getByRole('button', { name: 'Board' })).toBe(rootControl);
     const column = slot.getByRole('complementary', { name: 'Conversations' });
     expect(column.querySelector('.fa-inbox')).not.toBeNull();
     expect(column.querySelector('.fa-chat')).not.toBeNull();
@@ -82,7 +82,7 @@ describe('Agents board interactions', () => {
     expect(handles.map(handle => handle.getAttribute('aria-valuenow'))).toEqual(['380', '380']);
     expect(localStorage.getItem('fluently-agents.communication-width')).toBe('380');
     fireEvent.click(within(slot.getByRole('region', { name: 'Needs you' })).getByRole('button', { name: /Review campaign/ }));
-    expect(slot.getByRole('button', { name: 'Inbox' })).toBe(rootControl);
+    expect(slot.getByRole('button', { name: 'Board' })).toBe(rootControl);
     expect(slot.container.querySelector('.fa-canvas')).toBe(canvas);
     expect(slot.container.querySelector('.fa-footer')).toBe(footer);
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
@@ -91,9 +91,8 @@ describe('Agents board interactions', () => {
   it('ignores an earlier openAgent response after another agent was selected', async () => {
     let finishGeneral!: (result: { threadId: string }) => void;
     const deferred = new Promise<{ threadId: string }>(resolve => { finishGeneral = resolve; });
-    const slot = mount({ openAgent: input => input.agentId === 'general' ? deferred : { threadId: 'ads-thread' } });
+    const slot = mount({ board: () => ({ ...boardData, agents: [{ ...general, threadId: null }, ads] }), openAgent: input => input.agentId === 'general' ? deferred : { threadId: 'ads-thread' } });
     await slot.findByRole('button', { name: 'Chat with General' });
-    fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
     await act(async () => { finishGeneral({ threadId: 'general-thread' }); await deferred; });
@@ -153,13 +152,13 @@ describe('Agents board interactions', () => {
     const nextTask = { ...reviewTask, id: 'next', title: 'Review landing', threadId: 'next-thread', pendingWorkers: [] };
     let current = { ...boardData, tasks: [reviewTask, nextTask] };
     const slot = mount({ board: () => current, completeTask: () => { current = { ...current, tasks: [nextTask] }; return null; } });
-    await slot.findByRole('button', { name: 'Show inbox' });
+    await slot.findByRole('button', { name: 'Toggle inbox' });
     await slot.findByRole('button', { name: /Review campaign.*Marketing/ });
-    fireEvent.click(slot.getByRole('button', { name: 'Show inbox' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Toggle inbox' }));
     fireEvent.click(within(slot.getByRole('region', { name: 'Needs you' })).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
-    expect(slot.getByRole('button', { name: 'Inbox' })).not.toBeNull();
+    expect(slot.getByRole('button', { name: 'Board' })).not.toBeNull();
   });
 
   it('does not override newer task navigation when a prior completion resolves', async () => {
@@ -172,6 +171,71 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: /Prepare creatives/ }));
     await act(async () => { finish(); await completed; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('running-thread');
+  });
+
+  it('shows the saved coordinator by default and never closes it from its controls', async () => {
+    const slot = mount(); const chat = await slot.findByTestId('agents-chat');
+    expect(chat.getAttribute('data-thread-id')).toBe('general-thread');
+    expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(0);
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Focus chat' }));
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+    expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
+  });
+
+  it('opens a missing default conversation once and does not retry failures on board updates', async () => {
+    const openAgent = vi.fn(async () => { throw new Error('Cannot open coordinator'); });
+    const slot = mount({ board: () => ({ ...boardData, agents: [{ ...general, threadId: null }] }), openAgent });
+    await slot.findByRole('alert'); await slot.behavior.emitRealtime(CHANGED, null);
+    expect(openAgent).toHaveBeenCalledTimes(1);
+    fireEvent.click(slot.getByRole('button', { name: 'Open General conversation' }));
+    await waitFor(() => expect(openAgent).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps inbox independent while switching tasks and returning to the board', async () => {
+    const next = { ...reviewTask, id: 'next', title: 'Review second task', threadId: 'next-thread' };
+    const slot = mount({ board: () => ({ ...boardData, tasks: [reviewTask, next] }) }); await slot.findByTestId('agents-chat');
+    const toggle = slot.getByRole('button', { name: 'Toggle inbox' }); fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(slot.container.querySelector('.fa-board')).not.toBeNull();
+    const inbox = slot.getByRole('region', { name: 'Needs you' });
+    fireEvent.click(within(inbox).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(within(inbox).getByRole('button', { name: /Review second task/ }));
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread');
+    fireEvent.click(slot.getByRole('button', { name: 'Board' }));
+    expect(slot.getByRole('region', { name: 'Needs you' })).toBe(inbox);
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('general-thread');
+    fireEvent.click(toggle); expect(slot.queryByRole('region', { name: 'Needs you' })).toBeNull();
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('general-thread');
+  });
+
+  it('keeps a task selected when automatic coordinator creation finishes late', async () => {
+    let finish!: (value: { threadId: string }) => void;
+    const pending = new Promise<{ threadId: string }>(resolve => { finish = resolve; });
+    const slot = mount({ board: () => ({ ...boardData, agents: [{ ...general, threadId: null }] }), openAgent: () => pending });
+    fireEvent.click(await slot.findByRole('button', { name: 'Chat with General' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
+    fireEvent.click(slot.getByRole('button', { name: /Review campaign.*Marketing/ }));
+    await act(async () => { finish({ threadId: 'created-thread' }); await pending; });
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
+    fireEvent.click(slot.getByRole('button', { name: 'Board' }));
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('created-thread');
+    expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
+  });
+
+  it('validates and unarchives an existing coordinator on explicit clicks without hiding its chat', async () => {
+    let finish!: (value: { threadId: string }) => void;
+    const pending = new Promise<{ threadId: string }>(resolve => { finish = resolve; });
+    const openAgent = vi.fn(() => pending); const slot = mount({ openAgent });
+    const chat = await slot.findByTestId('agents-chat'); expect(openAgent).not.toHaveBeenCalled();
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
+    await waitFor(() => expect(openAgent).toHaveBeenCalledTimes(1)); expect(openAgent).toHaveBeenCalledWith({ agentId: 'general' });
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+    expect(Number(chat.getAttribute('data-focus-request'))).toBe(2);
+    fireEvent.click(slot.getByRole('button', { name: /Review campaign.*Marketing/ }));
+    await act(async () => { finish({ threadId: 'general-thread' }); await pending; });
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
   });
 
 });
