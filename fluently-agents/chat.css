@@ -1,7 +1,7 @@
 .fa-app .fa-custom-chat { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 .fa-app .fa-chat-transcript { flex: 1; min-height: 0; overflow: auto; padding: 12px 12px 18px; scrollbar-width: thin; }
 .fa-app .fa-message { margin: 12px 0 20px; line-height: 1.6; overflow-wrap: anywhere; font-size: 13px; }
-.fa-app .fa-message-user { width: fit-content; max-width: 88%; margin-left: auto; padding: 9px 13px; border-radius: 18px 18px 5px 18px; background: #383838; }
+.fa-app .fa-message-user { width: fit-content; max-width: 88%; margin-left: auto; padding: 9px 13px; border-radius: 18px 18px 5px 18px; background: var(--fa-control); }
 .fa-app .fa-message-assistant { width: 100%; padding: 0; background: none; }
 .fa-app .fa-message p:first-child { margin-top: 0; }
 .fa-app .fa-message p:last-child { margin-bottom: 0; }
@@ -10,29 +10,29 @@
 .fa-app .fa-tool-event summary { display: flex; gap: 6px; align-items: center; cursor: pointer; padding: 5px 0; }
 .fa-app .fa-tool-event summary span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fa-app .fa-tool-event small { margin-left: auto; opacity: .7; }
-.fa-app .fa-tool-event pre, .fa-app .fa-interaction pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; padding: 9px; background: #202020; border-radius: 8px; font-size: 10px; }
+.fa-app .fa-tool-event pre, .fa-app .fa-interaction pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; padding: 9px; background: var(--fa-card); border-radius: 8px; font-size: 10px; }
 .fa-app .fa-chat-activity { display: flex; gap: 6px; align-items: center; color: var(--fa-muted); font-size: 11px; margin-top: 10px; }
 .fa-app .fa-message-composer { display: flex; align-items: flex-end; gap: 2px; flex-shrink: 0; margin: 0 6px 3px; padding: 6px; border: 1px solid var(--fa-line); background: transparent; border-radius: 21px; }
 .fa-app .fa-message-composer textarea { display: block; flex: 1; min-width: 0; resize: none; height: 28px; min-height: 28px; max-height: 92px; width: 100%; padding: 4px 6px; font: inherit; line-height: 20px; border: 0; outline: none; color: inherit; background: transparent; }
 .fa-app .fa-message-composer textarea::placeholder { color: var(--fa-faint); }
 .fa-app .fa-compose-actions { display: flex; flex: none; align-items: center; gap: 2px; }
 .fa-app .fa-compose-actions button, .fa-app .fa-compose-status button { display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 4px 6px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
-.fa-app .fa-compose-actions .fa-send-message { background: #404040; color: var(--fa-text); }
+.fa-app .fa-compose-actions .fa-send-message { background: var(--fa-control); color: var(--fa-text); }
 .fa-app .fa-compose-spacer { flex: 1; }
 .fa-app .fa-compose-actions .fa-recording { background: #5b8def; color: white; }
-.fa-app .fa-chat-error { display: flex; gap: 8px; align-items: center; padding: 10px; color: #edb78b; font-size: 11px; }
+.fa-app .fa-chat-error { display: flex; gap: 8px; align-items: center; padding: 10px; color: var(--fa-amber); font-size: 11px; }
 .fa-app .fa-chat-error button, .fa-app .fa-load-history, .fa-app .fa-interaction button { border: 0; background: var(--fa-control); color: inherit; border-radius: 10px; padding: 6px 9px; font-size: 11px; }
 .fa-app .fa-draft-files, .fa-app .fa-message-files { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; font-size: 10px; }
-.fa-app .fa-draft-files > span, .fa-app .fa-message-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: #333; border-radius: 8px; }
+.fa-app .fa-draft-files > span, .fa-app .fa-message-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--fa-control); border-radius: 8px; }
 .fa-app .fa-draft-files button, .fa-app .fa-queued-message button { padding: 0; border: 0; background: none; }
-.fa-app .fa-interaction { margin: 10px 0; padding: 10px; border: 1px solid #584333; border-radius: 14px; font-size: 12px; }
-.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: #303030; border-radius: 12px; padding: 9px; margin-top: 8px; font-size: 11px; }
+.fa-app .fa-interaction { margin: 10px 0; padding: 10px; border: 1px solid color-mix(in srgb, var(--fa-amber) 40%, var(--fa-line)); border-radius: 14px; font-size: 12px; }
+.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: var(--fa-control); border-radius: 12px; padding: 9px; margin-top: 8px; font-size: 11px; }
 .fa-app .fa-queued-message > span { flex: 1; overflow-wrap: anywhere; }
 .fa-app .fa-advanced-overlay { position: absolute; z-index: 10; inset: 0; background: var(--fa-raised); display: flex; flex-direction: column; padding: 8px; border-radius: 20px; min-height: 0; }
 .fa-app .fa-advanced-overlay header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fa-app .fa-advanced-overlay header button { border: 0; background: none; }
 .fa-app .fa-advanced-overlay p { color: var(--fa-muted); font-size: 11px; }
-@media (hover: hover) { .fa-app .fa-compose-actions button:hover { background: #3c3c3c; } }
+@media (hover: hover) { .fa-app .fa-compose-actions button:hover { background: var(--fa-hover); } }
 
 .fa-app .fa-compose-status { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 3px 10px; font-size: 10px; color: var(--fa-muted); }
 @media (max-width: 700px) { .fa-app .fa-message-composer textarea { font-size: 16px; } }

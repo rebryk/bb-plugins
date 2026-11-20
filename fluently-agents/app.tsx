@@ -29,7 +29,7 @@ function Avatar({ agent }: { agent: Agent }) {
 function TaskCard({ task, now, open }: { task: Task; now: number; open(): void }) {
   const needs = task.state === 'needs-you';
   return <button className="fa-task-card" onClick={open}>
-    <span className="fa-card-heading"><strong>{task.title}</strong><span className="fa-project-tag">{task.projectName}</span></span>
+    <span className="fa-card-heading"><strong title={task.title}>{task.title}</strong><span className="fa-project-tag">{task.projectName}</span></span>
     <span className="fa-card-status">
       {needs ? <span className="fa-ask"><i className="fa-dot fa-amber" />{task.ask || 'Review the task'}</span> : <>
         <span><i className="fa-dot" />{task.state === 'queued' ? 'Queued' : `${task.runningAgents} ${task.runningAgents === 1 ? 'agent' : 'agents'}`}</span>

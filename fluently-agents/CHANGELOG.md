@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 — 2026-11-20
+
+- Compact task cards and board columns to match the approved layout.
+- Inherit BB light and dark theme colors across the board, chat and menus.
+
 ## 0.1.2 — 2026-11-19
 
 - Render a shared custom chat with message bubbles, tool activity and uploads.
