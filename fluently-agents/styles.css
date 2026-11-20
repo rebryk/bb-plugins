@@ -24,11 +24,11 @@
 .fa-app .fa-topbar { position: absolute; z-index: 30; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
 .fa-app .fa-topbar > * { pointer-events: auto; }
 .fa-app .fa-pill { height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--fa-line); border-radius: 999px; background: var(--fa-raised); }
-.fa-app .fa-breadcrumb { min-width: 0; max-width: calc(100% - 100px); }
+.fa-app .fa-breadcrumb { padding-right: 12px; min-width: 0; max-width: calc(100% - 100px); }
 .fa-app .fa-icon-button { width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 50%; flex-shrink: 0; }
-.fa-app .fa-root-crumb { height: 28px; width: 49px; padding: 0; border: 0; background: none; text-align: left; flex-shrink: 0; }
+.fa-app .fa-root-crumb { height: 28px; padding: 0; border: 0; background: none; text-align: left; flex-shrink: 0; }
 .fa-app .fa-crumb-divider { color: var(--fa-faint); padding: 0 3px; }
-.fa-app .fa-task-crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 11px; }
+.fa-app .fa-task-crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0; }
 .fa-app .fa-agent-count { padding: 0 12px; gap: 7px; white-space: nowrap; }
 .fa-app .fa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fa-blue); flex-shrink: 0; }
 .fa-app .fa-amber { background: var(--fa-amber); }

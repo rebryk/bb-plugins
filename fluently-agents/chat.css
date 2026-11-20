@@ -38,3 +38,6 @@
 @media (max-width: 700px) { .fa-app .fa-message-composer textarea { font-size: 16px; } }
 
 .fa-app .fa-message-files button { border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; }
+
+.fa-app .fa-activity-group { margin: 6px 0; color: var(--fa-muted); font-size: 11px; }
+.fa-app .fa-activity-group > summary { width: fit-content; cursor: pointer; padding: 3px 0; }

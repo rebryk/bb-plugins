@@ -37,8 +37,27 @@ function AttachmentLink({ path, name, projectId, storage }: { path: string; name
     void sdk.projects.attachments.read({ projectId, path }).then(file => saveFile({ fileName: name, blob: new Blob([new Uint8Array(file.bytes)], { type: file.mimeType }) })).catch(cause => setError(cause instanceof Error ? cause.message : String(cause))).finally(() => setBusy(false));
   }}>{busy ? 'Loading…' : name}</button>{error && <small role="alert">{error}</small>}</span>;
 }
+type RowContext = { document?: MarkdownDocument; storage?: StorageLocation; projectId?: string };
+function Activity({ rows, ...context }: RowContext & { rows: ChatRow[] }) {
+  const [open, setOpen] = useState(false);
+  return <details className="fa-activity-group" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Activity · {rows.length}</summary>
+    {open && rows.map(row => <Row key={row.id} row={row} {...context} />)}
+  </details>;
+}
+function Rows({ rows, ...context }: RowContext & { rows: ChatRow[] }) {
+  const groups: ChatRow[][] = [];
+  for (const row of rows) {
+    const previous = groups.at(-1);
+    if (row.kind !== 'conversation' && row.kind !== 'turn' && previous && previous[0].kind !== 'conversation' && previous[0].kind !== 'turn') previous.push(row);
+    else groups.push([row]);
+  }
+  return <>{groups.map(group => group[0].kind === 'conversation' || group[0].kind === 'turn'
+    ? <Row key={group[0].id} row={group[0]} {...context} />
+    : <Activity key={group[0].id} rows={group} {...context} />)}</>;
+}
 function Row({ row, document, storage, projectId }: { row: ChatRow; document?: MarkdownDocument; storage?: StorageLocation; projectId?: string }) {
-  if (row.kind === 'turn') return <>{row.children?.map(item => <Row key={item.id} row={item} document={document} storage={storage} projectId={projectId} />)}{!row.children && <small>Earlier turn · {row.summaryCount} events</small>}</>;
+  if (row.kind === 'turn') return <>{row.children && <Rows rows={row.children} document={document} storage={storage} projectId={projectId} />}{!row.children && <small>Earlier turn · {row.summaryCount} events</small>}</>;
   if (row.kind === 'conversation') return <article className={`fa-message fa-message-${row.role}`}><Markdown content={row.text} experimental_document={document} />{row.attachments && <div className="fa-message-files">{row.attachments.imageUrls.map(url => <UrlLink key={url} href={url}>Image attachment</UrlLink>)}{row.attachments.localFileDetails.map(file => <AttachmentLink key={file.path} path={file.path} name={file.name} projectId={projectId} storage={storage} />)}{row.attachments.localImagePaths?.map(path => <AttachmentLink key={path} path={path} name={path.split('/').at(-1) || 'Image attachment'} projectId={projectId} storage={storage} />)}</div>}</article>;
   if (row.kind === 'system') return <details className="fa-tool-event"><summary>{row.title}<small>{row.status}</small></summary>{row.detail && <Markdown content={row.detail} experimental_document={document} />}</details>;
   const p = 'presentation' in row ? row.presentation : undefined;
@@ -162,7 +181,7 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
     <div className="fa-chat-transcript" ref={scroll} role="log" aria-label="Conversation" onClickCapture={openStorageLink} onScroll={() => { const el = scroll.current; if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
       {older && <button className="fa-load-history" disabled={busy} onClick={() => void mutate(async () => { const page = await sdk.threads.timeline({ threadId, beforeAnchorId: older.anchorId, beforeAnchorSeq: String(older.anchorSeq), includeNestedRows: 'true', deferContent: 'false', segmentLimit: '40' }); if (alive.current) { olderLoaded.current = true; setRows(old => mergeRows(old, page.rows)); setOlder(page.timelinePage.olderCursor); } })}>Load earlier messages</button>}
       {!loaded && <p className="fa-chat-note">Loading conversation…</p>}{loaded && !rows.length && <p className="fa-chat-note">What would you like to work on?</p>}
-      {rows.map(row => <Row key={row.id} row={row} document={documentContext} storage={storage} projectId={thread?.projectId} />)}{running && <div className="fa-chat-activity"><i className="fa-dot" />Working</div>}
+      <Rows rows={rows} document={documentContext} storage={storage} projectId={thread?.projectId} />{running && <div className="fa-chat-activity"><i className="fa-dot" />Working</div>}
       {interactions.map(item => <div className="fa-interaction" key={item.id}><strong>{item.payload.kind === 'approval' ? 'Permission requested' : 'Your input is needed'}</strong>{item.payload.kind === 'approval' && item.payload.reason && <p>{item.payload.reason}</p>}<details><summary>Request details</summary><Detail value={item.payload} /></details>{item.payload.kind === 'approval' && item.payload.subject.kind !== 'permission_grant' && item.payload.availableDecisions.filter(decision => decision !== 'allow_for_session').map(decision => <button key={decision} disabled={busy} onClick={() => void mutate(() => sdk.threads.interactions.resolve({ threadId, interactionId: item.id, resolution: decision === 'deny' ? { decision } : { decision, grantedPermissions: null } }))}>{decision === 'allow_once' ? 'Allow once' : 'Deny'}</button>)}<button onClick={() => setAdvanced(true)}>Review request</button></div>)}
       {queue && queue.map(item => <div className="fa-queued-message" key={item.id}><small>Queued</small><span>{item.content.filter(part => part.visibility !== 'agent-only').filter(part => part.type === 'text').map(part => part.text).join('\n') || 'Attachments'}</span><button aria-label="Remove queued message" onClick={() => void mutate(() => sdk.threads.queuedMessages.delete({ threadId, queuedMessageId: item.id }))}><Icon name="X" /></button></div>)}
     </div>

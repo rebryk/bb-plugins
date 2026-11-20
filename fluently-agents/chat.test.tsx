@@ -30,6 +30,18 @@ describe('Custom conversation', () => {
     await waitFor(() => expect((slot.getByRole('textbox') as HTMLTextAreaElement).value).toBe(''));
     expect(slot.inspection.sdkCalls.find(call => call.method === 'threads.send')).toMatchObject({ args: [{ threadId: 'thread-a', mode: 'queue-if-active', input: [{ type: 'text', text: 'New task', mentions: [] }] }] });
   });
+  it('collapses internal activity while keeping conversation messages visible', async () => {
+    const events = [1, 2].map(seq => ({ kind: 'system', id: `event-${seq}`, sourceSeqStart: seq, sourceSeqEnd: seq, title: `Internal event ${seq}`, status: 'completed', detail: 'Diagnostic output' }) as ChatRow);
+    const slot = mount({ rows: [...events, row('answer', 3, 'Result')] });
+    await slot.findByText('Result');
+    expect(slot.queryByText('Internal event 1')).toBeNull();
+    const group = slot.getByText('Activity · 2').closest('details')!;
+    group.open = true; fireEvent(group, new Event('toggle'));
+    await slot.findByText('Internal event 1');
+    expect(slot.getByText('Result')).toBeTruthy();
+    group.open = false; fireEvent(group, new Event('toggle'));
+    await waitFor(() => expect(slot.queryByText('Internal event 1')).toBeNull());
+  });
   it('keeps the draft on ambiguous send failure and never retries automatically', async () => {
     const send = vi.fn(async () => { throw new Error('Connection lost'); }); const slot = mount({ send }); await slot.findByText('Hello');
     fireEvent.change(slot.getByRole('textbox'), { target: { value: 'Keep this draft' } }); fireEvent.click(slot.getByRole('button', { name: 'Send message' }));

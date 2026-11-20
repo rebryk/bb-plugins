@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4 — 2026-11-20
+
+- Align breadcrumb spacing without moving the Board label on task navigation.
+- Collapse consecutive internal chat events into an expandable activity row.
+
 ## 0.1.3 — 2026-11-20
 
 - Compact task cards and board columns to match the approved layout.
