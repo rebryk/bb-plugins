@@ -44,9 +44,7 @@ function mount(overrides: {
 }
 
 async function selectReview(slot: ReturnType<typeof mount>) {
-  await slot.findByRole('button', { name: 'Running' });
-  fireEvent.click(slot.getByRole('button', { name: 'Running' }));
-  fireEvent.click(slot.getByRole('menuitemradio', { name: /Review/ }));
+  await slot.findByRole('region', { name: 'Inbox' });
 }
 
 describe('Agents board interactions', () => {
@@ -69,14 +67,14 @@ describe('Agents board interactions', () => {
     await selectReview(slot);
     fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    expect(slot.queryByRole('button', { name: 'Chat with Ads' })).toBeNull();
+    expect(slot.getByRole('button', { name: 'Chat with Ads' })).not.toBeNull();
     fireEvent.click(slot.getByRole('button', { name: 'Permission needed' }));
     const approval = slot.getByRole('dialog', { name: 'Worker approval' });
     expect(within(approval).getByTestId('bb-thread-chat').getAttribute('data-thread-id')).toBe('worker-thread');
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     fireEvent.click(slot.getByRole('button', { name: 'Back to task' }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    fireEvent.click(slot.getByRole('button', { name: 'Back to review' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
@@ -140,7 +138,7 @@ describe('Agents board interactions', () => {
     current = { ...current, tasks: [] };
     await slot.behavior.emitRealtime(CHANGED, null);
     await waitFor(() => expect(slot.queryByRole('button', { name: /Approve direction.*Review campaign/ })).toBeNull());
-    expect(slot.getByText('All caught up.')).not.toBeNull();
+    expect(slot.getAllByText('All caught up.')[0]).not.toBeNull();
   });
 
   it('advances to the next inbox task after completion', async () => {
@@ -149,10 +147,10 @@ describe('Agents board interactions', () => {
     const slot = mount({ board: () => current, completeTask: () => { current = { ...current, tasks: [nextTask] }; return null; } });
     await selectReview(slot);
     await slot.findByRole('button', { name: /Approve direction.*Review campaign/ });
-    fireEvent.click(within(slot.getByRole('region', { name: 'Task list' })).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Inbox' })).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
-    expect(slot.getByRole('button', { name: 'Back to review' })).not.toBeNull();
+    expect(slot.getByRole('button', { name: 'Back to board' })).not.toBeNull();
   });
 
   it('does not override newer task navigation when a prior completion resolves', async () => {
@@ -162,12 +160,35 @@ describe('Agents board interactions', () => {
     await selectReview(slot);
     fireEvent.click(await slot.findByRole('button', { name: /Approve direction.*Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
-    fireEvent.click(slot.getByRole('button', { name: 'Back to review' }));
-    fireEvent.click(slot.getByRole('button', { name: 'Review' }));
-    fireEvent.click(slot.getByRole('menuitemradio', { name: /Running/ }));
-    fireEvent.click(slot.getByRole('button', { name: /Prepare creatives/ }));
+    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Running' })).getByRole('button', { name: /Prepare creatives/ }));
     await act(async () => { finish(); await completed; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('running-thread');
+  });
+
+  it('does not send worker voice to a coordinator before the task thread exists', async () => {
+    const slot = mount({ board: () => ({ ...boardData, tasks: [{ ...reviewTask, threadId: null }] }) });
+    await slot.findByTestId('agents-chat');
+    fireEvent.contextMenu(slot.getByRole('button', { name: 'Record voice message' }));
+    fireEvent.click(slot.getByRole('menuitem', { name: 'Voice input' }));
+    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(slot.getByRole('button', { name: 'Chat with task worker' }).getAttribute('aria-pressed')).toBe('true');
+    expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(0);
+  });
+
+  it('preserves a coordinator chosen while task completion is pending', async () => {
+    let finish!: () => void;
+    const pending = new Promise<null>(resolve => { finish = () => resolve(null); });
+    const slot = mount({ completeTask: () => pending });
+    await selectReview(slot);
+    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
+    await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
+    await act(async () => { finish(); await pending; });
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
+    expect(slot.getByText('Task')).not.toBeNull();
   });
 
   it('shows the saved coordinator by default and never closes it from its controls', async () => {
@@ -200,7 +221,7 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
     await act(async () => { finish({ threadId: 'created-thread' }); await pending; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    fireEvent.click(slot.getByRole('button', { name: 'Back to review' }));
+    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('created-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
@@ -234,27 +255,35 @@ describe('Agents board interactions', () => {
     expect(Number(chat.getAttribute('data-voice-request'))).toBeGreaterThan(0);
     await selectReview(slot);
     fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
-    expect(slot.queryByRole('button', { name: 'Chat with Ads' })).toBeNull();
+    expect(slot.getByRole('button', { name: 'Chat with Ads' })).not.toBeNull();
     expect(slot.getByRole('button', { name: 'Record voice message' })).not.toBeNull();
   });
 
-  it('filters the status list and uses the picker inside a task without a second list', async () => {
+  it('keeps both lists and the selected task while switching conversation targets', async () => {
     const slot = mount(); await slot.findByTestId('agents-chat');
-    expect(slot.queryByText('Approve direction')).toBeNull();
-    fireEvent.click(slot.getByRole('button', { name: /Prepare creatives/ }));
-    expect(slot.queryByRole('region', { name: 'Task list' })).toBeNull();
-    fireEvent.click(slot.getByRole('button', { name: 'Switch task' }));
-    fireEvent.click(slot.getByRole('menuitemradio', { name: 'Review campaign' }));
-    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    expect(slot.queryByRole('region', { name: 'Task list' })).toBeNull();
-    fireEvent.click(slot.getByRole('button', { name: 'Back to review' }));
-    const list = slot.getByRole('region', { name: 'Task list' });
-    expect(within(list).getByText('Approve direction')).not.toBeNull();
-    expect(within(list).queryByText('Prepare creatives')).toBeNull();
-    const chat = slot.getByTestId('agents-chat');
-    fireEvent.click(within(list).getByRole('button', { name: /Review\s*1/ }));
-    expect(slot.getByTestId('agents-chat')).toBe(chat);
-    expect(within(list).queryByRole('button', { name: /Approve direction/ })).toBeNull();
+    const lists = () => Array.from(slot.container.querySelectorAll('.fa-communications > section')).map(el => el.getAttribute('aria-label'));
+    expect(lists()).toEqual(['Running', 'Inbox', 'Chat']);
+    fireEvent.click(within(slot.getByRole('region', { name: 'Running' })).getByRole('button', { name: /Prepare creatives/ }));
+    expect(lists()).toEqual(['Running', 'Inbox', 'Chat']);
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
+    await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
+    expect(slot.getByText('Task')).not.toBeNull();
+    fireEvent.click(slot.getByRole('button', { name: 'Chat with task worker' }));
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('running-thread');
+    fireEvent.click(slot.getByRole('button', { name: 'Board' }));
+    expect(slot.queryByText('Task')).toBeNull();
+    expect(slot.container.querySelectorAll('.fa-board-card')).toHaveLength(2);
+    expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
   });
-
+  it('persists a bounded keyboard-resizable sidebar', async () => {
+    const slot = mount(); await slot.findByTestId('agents-chat');
+    const handle = slot.getByRole('separator', { name: 'Sidebar width' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    expect(handle.getAttribute('aria-valuenow')).toBe('456');
+    expect(localStorage.getItem('fluently-agents.sidebar-width')).toBe('456');
+    fireEvent.keyDown(handle, { key: 'Home' });
+    expect(handle.getAttribute('aria-valuenow')).toBe('280');
+    fireEvent.keyDown(handle, { key: 'End' });
+    expect(Number(handle.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(window.innerWidth - 300);
+  });
 });

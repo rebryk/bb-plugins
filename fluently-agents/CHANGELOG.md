@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.20
+
+- Preserve a concurrent avatar or agent edit while remembering its thread.
+
+- Keep Running and Inbox above chat in both views, with fixed Board / Task
+  navigation and board cards beside a persistent resizable sidebar.
+- Select any coordinator or the task worker without losing task context or
+  conversation drafts.
+
+## 0.1.19
+
+- Assign new agents a least-used avatar from a private local pool, preserving
+  custom and existing avatars. No image assets ship with the plugin.
+
 ## 0.1.18
 
 - Match the approved v73 status-list layout on laptops and phones, with

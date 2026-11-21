@@ -540,3 +540,53 @@ describe('existing BB conversations', () => {
     expect(h.threadApi.delete).not.toHaveBeenCalled();
   });
 });
+
+
+describe('private avatar pool', () => {
+  const pool = ['data:image/webp;base64,YQ==', 'data:image/png;base64,Yg=='];
+  it('assigns unused portraits concurrently, balances reuse, and persists through reload', async () => {
+    const h = await harness(2, new Map([['avatar-pool', pool]]));
+    const [a, b] = await Promise.all(['One', 'Two'].map(name => h.call('saveAgent', { name })));
+    expect([a.avatar, b.avatar]).toEqual(pool);
+    const restarted = await harness(2, h.storage, h.threads);
+    expect((await restarted.call('saveAgent', { name: 'Three', avatar: '' })).avatar).toBe(pool[0]);
+    expect((await restarted.call('board')).agents.find((agent: any) => agent.id === a.id).avatar).toBe(a.avatar);
+  });
+  it('preserves custom and existing avatars, including omitted avatars on edits and explicit clearing', async () => {
+    const h = await harness(2, new Map([['avatar-pool', pool]]));
+    const custom = await h.call('saveAgent', { name: 'Custom', avatar: '🐱' });
+    expect(custom.avatar).toBe('🐱');
+    expect((await h.call('saveAgent', { id: custom.id, name: 'Renamed' })).avatar).toBe('🐱');
+    expect((await h.call('saveAgent', { id: custom.id, name: 'Cleared', avatar: '' })).avatar).toBe('');
+    expect((await h.call('saveAgent', { id: 'general', name: 'General' })).avatar).toBe('');
+  });
+  it('keeps initials when the pool is absent or malformed', async () => {
+    for (const value of [undefined, ['https://example.test/avatar.png'], Array(17).fill(pool[0]), ['data:image/webp;base64,' + 'A'.repeat(150001)]]) {
+      const h = await harness(2, new Map([['avatar-pool', value]]));
+      expect((await h.call('saveAgent', { name: 'Fallback' })).avatar).toBe('');
+    }
+  });
+});
+
+describe('coordinator avatar persistence', () => {
+  it('keeps an avatar edit while the coordinator conversation is being remembered', async () => {
+    const h = await harness();
+    const agent = await h.call('saveAgent', { name: 'Review', avatar: 'old' });
+    const originalSet = h.bb.storage.kv.set;
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const waiting = new Promise<void>(resolve => { entered = resolve; });
+    h.bb.storage.kv.set = async (key, value: any) => {
+      if (key === `agent:${agent.id}` && value.threadId) { entered(); await blocked; }
+      return originalSet(key, value);
+    };
+    const opening = h.call('openAgent', { agentId: agent.id });
+    await waiting;
+    const editing = h.call('saveAgent', { id: agent.id, name: 'Review', avatar: 'new' });
+    await new Promise(resolve => setImmediate(resolve));
+    release();
+    await Promise.all([opening, editing]);
+    expect((h.storage.get(`agent:${agent.id}`) as any).avatar).toBe('new');
+  });
+});

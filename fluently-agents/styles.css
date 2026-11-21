@@ -32,7 +32,7 @@
 .fa-app .fa-agent-count { padding: 0 12px; gap: 6px; white-space: nowrap; font-size: 12px; }
 .fa-app .fa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fa-blue); flex-shrink: 0; }
 .fa-app .fa-amber { background: var(--fa-amber); }
-.fa-app .fa-canvas { position: absolute; inset: 56px 12px 12px 476px; overflow: auto; }
+.fa-app .fa-canvas { border: 0; border-radius: 0; box-shadow: none; background: transparent; position: absolute; inset: 56px 12px 12px calc(var(--fa-sidebar-width) + 36px); overflow: auto; }
 .fa-app .fa-ask .fa-dot { margin-right: 7px; vertical-align: 1px; }
 .fa-app .fa-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; color: var(--fa-faint); text-align: center; pointer-events: none; }
 .fa-app .fa-task-canvas { min-height: 100%; padding: 24px; }
@@ -41,9 +41,9 @@
 .fa-app .fa-artifact strong { flex: 1; font-weight: 500; overflow-wrap: anywhere; }
 .fa-app .fa-artifact svg { color: var(--fa-muted); }
 .fa-app .fa-reopen { position: relative; display: block; margin: 24px auto; border: 1px solid var(--fa-line); background: var(--fa-raised); padding: 8px 16px; border-radius: 18px; }
-.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 12px; width: 440px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 12px; width: var(--fa-sidebar-width); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; box-shadow: 0 2px 3px -3px rgba(0,0,0,.2); pointer-events: auto; }
-.fa-app .fa-inbox { max-height: 30%; min-height: 36px; overflow: hidden; flex: 0 1 auto; display: flex; flex-direction: column; }
+.fa-app .fa-inbox { max-height: 23%; min-height: 36px; overflow: hidden; flex: 0 1 auto; display: flex; flex-direction: column; }
 .fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 36px; }
 .fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 15px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
 .fa-app .fa-inbox-header span { flex: 1; }
@@ -108,7 +108,7 @@
   .fa-app .fa-canvas { display: none; }
   .fa-app .fa-topbar { left: 8px; right: 8px; }
   .fa-app .fa-communications { left: 8px; right: 8px; top: 56px; bottom: 8px; width: auto; }
-  .fa-app .fa-inbox { max-height: 27%; }
+  .fa-app .fa-inbox { max-height: 22%; }
   .fa-app .fa-inbox-item { height: 32px; }
   .fa-app .fa-inbox-task-title { max-width: 29%; }
   .fa-app .fa-running-count { display: none; }
@@ -124,3 +124,11 @@
 }
 
 .fa-app .fa-status-menu { top: 56px; left: 46px; width: 160px; }
+
+.fa-app .fa-board-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 12px; align-content: start; }
+.fa-app .fa-board-card { padding: 16px; display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0; }
+.fa-app .fa-board-card strong { font-weight: 500; overflow-wrap: anywhere; }
+.fa-app .fa-board-card > span, .fa-app .fa-board-card small { color: var(--fa-muted); font-size: 11px; }
+.fa-app .fa-board-card small { display: flex; align-items: center; gap: 6px; }
+.fa-app .fa-sidebar-resizer { position: absolute; top: 56px; bottom: 12px; left: calc(var(--fa-sidebar-width) + 16px); width: 16px; z-index: 25; cursor: col-resize; touch-action: none; }
+@container (max-width: 650px) { .fa-app .fa-sidebar-resizer { display: none; } }

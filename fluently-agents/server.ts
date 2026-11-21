@@ -23,6 +23,11 @@ export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({ maxWorkers: { type: 'number', label: 'Concurrent workers per task', default: 8 } });
   const config = await settings.get();
   const maxWorkers = Math.max(1, Math.min(32, Math.trunc(config.maxWorkers)));
+  // Private, locally provisioned images; never ship licensed packs in the bundle.
+  const pool = z.array(z.string().max(150000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/)).max(16)
+    .refine(value => JSON.stringify(value).length <= 240000)
+    .safeParse(await bb.storage.kv.get('avatar-pool') ?? []);
+  const avatarPool = pool.success ? [...new Set(pool.data)] : [];
   const agents = new Map<string, Agent>();
   const tasks = new Map<string, StoredTask>();
   const launches = new Map<string, Launch>();
@@ -87,7 +92,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
   async function remember(thread: Thread, launch: Launch) {
     await saveLaunch({ ...launch, threadId: thread.id });
-    if (launch.role === 'coordinator') await saveAgent({ ...agentById(launch.agentId), threadId: thread.id });
+    if (launch.role === 'coordinator') await locked('agent-save', () => saveAgent({ ...agentById(launch.agentId), threadId: thread.id }));
     else if (launch.role === 'task' && launch.taskId) await saveTask({ ...taskById(launch.taskId), threadId: thread.id });
   }
   // A lost response must not create duplicate work on retry.
@@ -415,10 +420,16 @@ export default async function plugin(bb: BbPluginApi) {
     });
   }
   async function updateAgent(input: z.infer<typeof agentInputSchema>) {
-    const previous = input.id ? agentById(input.id) : null;
-    if (input.projectId) await project(input.projectId);
-    if (previous?.threadId && (previous.projectId !== input.projectId || JSON.stringify(previous.execution) !== JSON.stringify(input.execution))) throw new Error('Use the existing chat model picker, or create a new agent for another project.');
-    return saveAgent({ ...input, id: previous?.id ?? randomUUID(), threadId: previous?.threadId ?? null });
+    return locked('agent-save', async () => {
+      const previous = input.id ? agentById(input.id) : null;
+      if (input.projectId) await project(input.projectId);
+      if (previous?.threadId && (previous.projectId !== input.projectId || JSON.stringify(previous.execution) !== JSON.stringify(input.execution))) throw new Error('Use the existing chat model picker, or create a new agent for another project.');
+      const usage = new Map(avatarPool.map(avatar => [avatar, 0]));
+      for (const agent of agents.values()) if (usage.has(agent.avatar)) usage.set(agent.avatar, usage.get(agent.avatar)! + 1);
+      const fallback = avatarPool.reduce((best, avatar) => !best || usage.get(avatar)! < usage.get(best)! ? avatar : best, '');
+      const avatar = previous ? input.avatar ?? previous.avatar : input.avatar || fallback;
+      return saveAgent({ ...input, avatar, id: previous?.id ?? randomUUID(), threadId: previous?.threadId ?? null });
+    });
   }
   bb.rpc.register(rpcContract, {
     board: async () => {

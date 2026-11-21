@@ -10,7 +10,8 @@ const css = `
 [${marker}="shell"] > [data-sidebar-mobile-backdrop],
 [${marker}="panels"] > :not([${marker}="main"]) { display: none !important; }
 [${marker}="shell"] > main[data-sidebar="inset"] {
-  margin: 0 !important; border-radius: 0 !important; translate: none !important;
+  margin: 0 !important; border: 0 !important; border-radius: 0 !important;
+  box-shadow: none !important; translate: none !important;
 }
 [${marker}="main"] { flex: 1 1 0% !important; min-width: 0 !important; }
 `;

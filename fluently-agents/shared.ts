@@ -23,7 +23,7 @@ export const taskSchema = z.object({
 export type Task = z.infer<typeof taskSchema>;
 export const agentInputSchema = z.object({
   id: z.string().optional(), name: z.string().trim().min(1).max(60),
-  avatar: z.string().max(150000).default(''), instructions: z.string().max(12000).default(''),
+  avatar: z.string().max(150000).optional(), instructions: z.string().max(12000).default(''),
   projectId: z.string().nullable().default(null), execution: executionSchema.nullable().default(null),
 });
 export const rpcContract = defineRpcContract({

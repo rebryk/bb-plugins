@@ -13,6 +13,18 @@ automatically. Choose an avatar in the composer to switch agents.
 Ask it to execute work; it creates a task with its own conversation. Ask it to
 create another agent, set its default BB project or change its instructions.
 Right-click an avatar to rename it or upload an image.
+New agents without an uploaded avatar use the least-used image from the local
+`avatar-pool` key in this plugin's persistent key-value storage. Existing
+agents keep their avatars; editing an agent without an avatar field preserves
+its image, and an explicit empty string clears it. Without a valid pool, new
+agents use initials.
+
+The optional pool is a JSON array of at most 16 PNG, JPEG, or WebP base64 data
+URLs, each at most 150,000 characters and together at most 240,000 characters
+as JSON. Provision it privately in local plugin storage, then reload the
+plugin. No image pack is included or downloaded. Keep licensed assets out of
+source control and distribution bundles.
+
 
 ## Layout
 
@@ -20,15 +32,19 @@ The board hides BB's surrounding panels while open alone. Back to BB restores
 the ordinary view; saved panel widths, tabs and sidebar state stay unchanged.
 Split views retain BB's navigation.
 
-Running and Review in the top navigation select a compact task list above the
-conversation. Collapse the list with its header. Running rows show the task,
-project, active agents and ETA; Review rows lead with the requested action.
+The sidebar always shows Running, Inbox, then chat, on the board and inside a
+task. Each list collapses independently. Running rows show the task, project,
+active agents and ETA; Inbox rows lead with the requested action.
 
-Open a task to give its transcript the full column height. The task picker in
-the navigation switches between tasks; the back arrow returns to the selected
-status list. The conversation and separate composer stay visible. On laptops,
-results use the space to the right; phones show the conversation alone, with
-results available through the native transcript's links and embeds.
+Board returns to the task cards without moving the navigation. A selected task
+adds the Task breadcrumb and shows its results to the right. Resize the sidebar
+by dragging its right edge or using the focused separator's arrow keys. Its
+width persists and stays within the available desktop space.
+
+Choose any coordinator from the composer avatars in either view. Inside a task,
+the separate task worker target returns to that task's conversation. Each target
+keeps its own draft and attachments. Phones use a single column, with results
+available through the native transcript's links and embeds.
 
 ## Existing BB threads
 
@@ -129,10 +145,10 @@ Model choice happens at launch; an existing conversation keeps its model.
 ## Board controls
 
 - Running includes queued work and shows the active-agent count and ETA.
-- Review shows the requested decision. Finishing an assistant turn does not
+- Inbox shows the requested decision. Finishing an assistant turn does not
   mark a task done.
-- The task list appears above the coordinator conversation and hides inside
-  tasks. Use the top picker to switch tasks.
+- Running and Inbox remain above chat in both views. Select a row to switch
+  tasks; select Board to return to the cards.
 - Mark done archives settled work. Let active work finish and resolve queued
   messages before closing the task.
 - Snooze hides a card for three hours, until tomorrow at 09:00, or indefinitely.
