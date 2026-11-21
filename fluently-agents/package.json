@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-fluently-agents",
-  "version": "0.1.22",
+  "version": "0.1.25",
   "type": "module",
   "engines": {
     "bb": ">=0.50",
@@ -16,6 +16,7 @@
     "app": "./app.tsx"
   },
   "dependencies": {
+    "voice-ring": "0.2.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadPluginApp, renderSlot } from '@get-bb/plugin-sdk/testing/app';
+import { loadPluginApp, mountPluginContentScripts, renderSlot } from '@get-bb/plugin-sdk/testing/app';
+import { avatarColors } from './avatar-colors';
 import { CHANGED, rpcContract, type Agent, type Task } from './shared';
 
 vi.mock('./chat', () => ({ Chat: ({ threadId, focusRequest, voiceRequest, composerAgents, onVoiceContextMenu }: import('./chat').ChatProps) => <div data-testid="agents-chat" data-thread-id={threadId} data-focus-request={focusRequest} data-voice-request={voiceRequest}>{composerAgents}<button aria-label="Record voice message" onContextMenu={onVoiceContextMenu} /></div> }));
@@ -16,7 +17,7 @@ const reviewTask: Task = {
   pendingWorkers: [{ threadId: 'worker-thread', title: 'Permission needed' }], artifacts: [],
 };
 const runningTask: Task = { ...reviewTask, id: 'running', title: 'Prepare creatives', state: 'running', threadId: 'running-thread', ask: null, runningAgents: 3, pendingWorkers: [] };
-const boardData = { agents: [general, ads], tasks: [reviewTask, runningTask], runningAgents: 3 };
+const boardData = { agents: [general, ads], tasks: [reviewTask, runningTask], runningAgents: 3 as number | null };
 let app: Awaited<ReturnType<typeof loadPluginApp>>;
 beforeAll(async () => { app = await loadPluginApp(() => import('./app')); });
 beforeEach(() => {
@@ -48,6 +49,109 @@ async function selectReview(slot: ReturnType<typeof mount>) {
 }
 
 describe('Agents board interactions', () => {
+  it('keeps native chrome unchanged through mount, task navigation and unmount', async () => {
+    const shell = document.createElement('div');
+    shell.innerHTML = '<aside data-side="left" data-state="expanded">Native sidebar</aside><header>Native menu</header><aside data-testid="right-panel" style="width: 300px">Native panel</aside>';
+    document.body.append(shell);
+    const before = shell.outerHTML;
+    const styles = document.head.innerHTML;
+    const scripts = await mountPluginContentScripts(app, { pluginId: 'fluently-agents', generation: 1 });
+    const slot = mount();
+    fireEvent.click(await slot.findByTitle('Marketing / Review campaign / Approve direction'));
+    expect(slot.queryByRole('button', { name: 'Back to BB' })).toBeNull();
+    expect(slot.queryByRole('button', { name: 'Back to board' })).toBeNull();
+    fireEvent.click(slot.getByRole('button', { name: /^Board$/ }));
+    expect(slot.queryByText('Task', { exact: true })).toBeNull();
+    expect(shell.outerHTML).toBe(before);
+    slot.lifecycle.unmount();
+    await scripts.lifecycle.dispose();
+    expect(shell.outerHTML).toBe(before);
+    expect(document.head.innerHTML).toBe(styles);
+    shell.remove();
+  });
+
+  it('shows task title then action then timing and omits unknown worker counts', async () => {
+    const slot = mount({ board: () => ({ ...boardData, runningAgents: null, tasks: [{ ...runningTask, runningAgents: null }, { ...reviewTask, ask: null }] }) });
+    const row = await slot.findByTitle('Marketing / Review campaign');
+    expect(row.querySelector('strong')?.textContent).toBe('Review campaign');
+    expect(row.querySelector('.fa-inbox-task-title')?.textContent).toBe('Review task');
+    expect(row.lastElementChild?.textContent).toBe('1m');
+    expect(slot.container.querySelector('.fa-agent-count')?.textContent).toBe('Agents');
+    fireEvent.click(slot.getByRole('button', { name: 'Running 1' }));
+    const running = slot.getByTitle('Marketing / Prepare creatives');
+    expect(running.querySelector('strong')?.textContent).toBe('Prepare creatives');
+    expect(running.querySelector('.fa-inbox-task-title')).toBeNull();
+    expect(running.querySelector('.fa-running-count')).toBeNull();
+  });
+
+  it('opens task artifact UrlLinks externally once', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const slot = mount({ board: () => ({ ...boardData, tasks: [{ ...reviewTask, artifacts: [{ title: 'Report', url: 'https://example.com/report' }] }] }) });
+    fireEvent.click(await slot.findByTitle('Marketing / Review campaign / Approve direction'));
+    fireEvent.click(slot.getByRole('link', { name: 'Report' }));
+    expect(open).toHaveBeenCalledExactlyOnceWith('https://example.com/report', '_blank', 'noopener,noreferrer');
+    expect(slot.inspection.navigateCalls.filter(call => call.method === 'openUrl')).toHaveLength(0);
+  });
+
+  it('labels retained counts while refreshing and after a failed read', async () => {
+    let reject: (reason: Error) => void = () => {};
+    let reads = 0;
+    const slot = mount({ board: () => ++reads === 1 ? boardData : new Promise((_, fail) => { reject = fail; }) });
+    await slot.findByTitle('Marketing / Review campaign / Approve direction');
+    await slot.behavior.emitRealtime(CHANGED, null);
+    expect(slot.container.querySelector('.fa-agent-count')?.getAttribute('title')).toContain('Refreshing');
+    expect(slot.container.querySelector('.fa-agent-count')?.textContent).toBe('3 agents');
+    await act(async () => reject(new Error('Read failed')));
+    expect(slot.container.querySelector('.fa-agent-count')?.getAttribute('title')).toContain('Count unavailable');
+  });
+
+  it('renders an in-flight read during a signal burst and coalesces the follow-up', async () => {
+    const finishes: Array<(value: typeof boardData) => void> = [];
+    const read = vi.fn(() => new Promise<typeof boardData>(resolve => finishes.push(resolve)));
+    const slot = mount({ board: read });
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    for (let i = 0; i < 20; i++) await slot.behavior.emitRealtime(CHANGED, null);
+    expect(read).toHaveBeenCalledOnce();
+    await act(async () => finishes[0]!(boardData));
+    expect(await slot.findByTitle('Marketing / Review campaign / Approve direction')).toBeTruthy();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(slot.container.querySelector('.fa-agent-count')?.getAttribute('title')).toContain('Refreshing');
+    await slot.behavior.emitRealtime(CHANGED, null);
+    slot.lifecycle.unmount();
+    await act(async () => finishes[1]!(boardData));
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it('seeds worker colors by task title and preserves selected coordinator portraits', async () => {
+    const css = (name: string) => Object.assign(document.createElement('span').style, avatarColors(name));
+    const portrait = 'https://example.com/selected-animoji.png';
+    const slot = mount({ board: () => ({ ...boardData, agents: [{ ...general, avatar: portrait }, ads] }) });
+    const coordinator = await slot.findByRole('button', { name: 'Chat with General' });
+    expect(coordinator.style.backgroundColor).toBe(css('General').backgroundColor);
+    expect(coordinator.querySelector('img')?.getAttribute('src')).toBe(portrait);
+    const fallback = slot.getByRole('button', { name: 'Chat with Ads' });
+    expect(fallback.textContent).toBe('AD');
+    expect(fallback.style.color).toBe(css('Ads').color);
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
+    const worker = slot.getByRole('button', { name: 'Chat with task worker' });
+    expect(worker.style.backgroundColor).toBe(css(reviewTask.title).backgroundColor);
+    fireEvent.click(coordinator);
+    expect(worker.style.color).toBe(css(reviewTask.title).color);
+    expect(coordinator.querySelector('img')?.getAttribute('src')).toBe(portrait);
+  });
+
+  it('groups Board into Running then Inbox independently of the sidebar filter', async () => {
+    const slot = mount();
+    const running = await slot.findByRole('region', { name: 'Running tasks' });
+    const inbox = slot.getByRole('region', { name: 'Inbox tasks' });
+    expect(running.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(running).getByText('Prepare creatives')).toBeTruthy();
+    expect(within(inbox).getByText('Review campaign')).toBeTruthy();
+    const chat = slot.getByTestId('agents-chat');
+    fireEvent.click(slot.getByRole('button', { name: 'Running 1' }));
+    expect(slot.getByRole('region', { name: 'Inbox tasks' })).toBe(inbox);
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+  });
   it('does not activate composer shortcuts behind an open image dialog', async () => {
     const slot = mount(); await slot.findByRole('button', { name: 'Chat with General' });
     const chat = slot.getByTestId('agents-chat');
@@ -65,7 +169,7 @@ describe('Agents board interactions', () => {
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
     await selectReview(slot);
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     expect(slot.getByRole('button', { name: 'Chat with Ads' })).not.toBeNull();
     fireEvent.click(slot.getByRole('button', { name: 'Permission needed' }));
@@ -74,7 +178,7 @@ describe('Agents board interactions', () => {
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
     fireEvent.click(slot.getByRole('button', { name: 'Back to task' }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
+    fireEvent.click(slot.getByRole('button', { name: /^Board$/ }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
@@ -114,7 +218,7 @@ describe('Agents board interactions', () => {
   it('shows failed task actions without navigating away or pretending completion', async () => {
     const slot = mount({ completeTask: () => { throw new Error('Could not archive this thread'); } });
     await selectReview(slot);
-    fireEvent.click(await slot.findByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(await slot.findByTitle('Marketing / Review campaign / Approve direction'));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     expect((await slot.findByRole('alert')).textContent).toContain('Could not archive this thread');
     expect(slot.getByRole('button', { name: 'Mark task done' })).not.toBeNull();
@@ -137,7 +241,7 @@ describe('Agents board interactions', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     current = { ...current, tasks: [] };
     await slot.behavior.emitRealtime(CHANGED, null);
-    await waitFor(() => expect(slot.queryByRole('button', { name: /Approve direction.*Review campaign/ })).toBeNull());
+    await waitFor(() => expect(slot.queryByRole('button', { name: /^Review campaign.*Approve direction/ })).toBeNull());
     expect(slot.getAllByText('All caught up.')[0]).not.toBeNull();
   });
 
@@ -146,11 +250,10 @@ describe('Agents board interactions', () => {
     let current = { ...boardData, tasks: [reviewTask, nextTask] };
     const slot = mount({ board: () => current, completeTask: () => { current = { ...current, tasks: [nextTask] }; return null; } });
     await selectReview(slot);
-    await slot.findByRole('button', { name: /Approve direction.*Review campaign/ });
-    fireEvent.click(within(slot.getByRole('region', { name: 'Tasks' })).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(await slot.findByTitle('Marketing / Review campaign / Approve direction'));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
-    expect(slot.getByRole('button', { name: 'Back to board' })).not.toBeNull();
+    expect(slot.getByRole('button', { name: /^Board$/ })).not.toBeNull();
   });
 
   it('does not override newer task navigation when a prior completion resolves', async () => {
@@ -158,9 +261,9 @@ describe('Agents board interactions', () => {
     const completed = new Promise<null>(resolve => { finish = () => resolve(null); });
     const slot = mount({ completeTask: () => completed });
     await selectReview(slot);
-    fireEvent.click(await slot.findByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(await slot.findByTitle('Marketing / Review campaign / Approve direction'));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
-    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
+    fireEvent.click(slot.getByRole('button', { name: /^Board$/ }));
     fireEvent.click(slot.getByRole('button', { name: /Running/ }));
     fireEvent.click(within(slot.getByRole('region', { name: 'Tasks' })).getByRole('button', { name: /Prepare creatives/ }));
     await act(async () => { finish(); await completed; });
@@ -172,7 +275,7 @@ describe('Agents board interactions', () => {
     await slot.findByTestId('agents-chat');
     fireEvent.contextMenu(slot.getByRole('button', { name: 'Record voice message' }));
     fireEvent.click(slot.getByRole('menuitem', { name: 'Voice input' }));
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     fireEvent.keyDown(window, { key: 'n' });
     expect(slot.getByRole('button', { name: 'Chat with task worker' }).getAttribute('aria-pressed')).toBe('true');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(0);
@@ -183,7 +286,7 @@ describe('Agents board interactions', () => {
     const pending = new Promise<null>(resolve => { finish = () => resolve(null); });
     const slot = mount({ completeTask: () => pending });
     await selectReview(slot);
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
@@ -219,10 +322,10 @@ describe('Agents board interactions', () => {
     fireEvent.click(await slot.findByRole('button', { name: 'Chat with General' }));
     fireEvent.click(slot.getByRole('button', { name: 'Chat with General' }));
     await selectReview(slot);
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     await act(async () => { finish({ threadId: 'created-thread' }); await pending; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
-    fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
+    fireEvent.click(slot.getByRole('button', { name: /^Board$/ }));
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('created-thread');
     expect(slot.inspection.rpcCalls.filter(call => call.method === 'openAgent')).toHaveLength(1);
   });
@@ -238,7 +341,7 @@ describe('Agents board interactions', () => {
     expect(slot.getByTestId('agents-chat')).toBe(chat);
     expect(Number(chat.getAttribute('data-focus-request'))).toBe(2);
     await selectReview(slot);
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     await act(async () => { finish({ threadId: 'general-thread' }); await pending; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('task-thread');
   });
@@ -255,7 +358,7 @@ describe('Agents board interactions', () => {
     fireEvent.keyDown(window, { key: 'n' });
     expect(Number(chat.getAttribute('data-voice-request'))).toBeGreaterThan(0);
     await selectReview(slot);
-    fireEvent.click(slot.getByRole('button', { name: /Approve direction.*Review campaign/ }));
+    fireEvent.click(slot.getByTitle('Marketing / Review campaign / Approve direction'));
     expect(slot.getByRole('button', { name: 'Chat with Ads' })).not.toBeNull();
     expect(slot.getByRole('button', { name: 'Record voice message' })).not.toBeNull();
   });

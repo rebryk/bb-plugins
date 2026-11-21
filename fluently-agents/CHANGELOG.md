@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.1.25
+
+- Use the selected VoiceRing for recording and transcription in the mic button.
+- Drive it from the existing recorder and pause for hidden or reduced-motion views.
+
+- Keep Agents inside BB's normal central area with native sidebars and menus.
+- Remove the focus shell and back arrow; keep clickable Board navigation.
+- Open ordinary external HTTP(S) anchor clicks from native chat and task
+  artifacts in a separate browser tab. Keep internal BB links and previews.
+- Show attachment images at natural proportions without gray letterboxing.
+- Tighten native message and processing spacing while keeping action controls.
+- Put task titles first in compact rows, followed by the requested action.
+- Omit unknown agent totals and label retained counts during refresh.
+- Coalesce board refresh signals so census updates cannot starve rendering.
+
+## 0.1.24
+
+- Restore native worker lifecycle counts, including tool waits, with an
+  unknown indicator until the event census is complete. Keep archived leads
+  with active or unknown native workers refreshing until their work ends.
+
+- Put project names first in compact task rows, followed by muted actions
+  and right-aligned timing. Keep full context in the row tooltip.
+
+- Color worker avatars by task title and coordinator avatars by agent name.
+- Keep light/dark colors readable and selected rings visible without fading
+  unselected portraits. Preserve custom images and Animoji with colored backing.
+
+## 0.1.23
+
+- Group Board cards into Running and Inbox columns; keep the sidebar switch.
+- Count unique active BB turns, excluding queued, archived and input-blocked
+  threads. Stop adding unresolved native background tasks to running totals.
+- Explain that native subagents and instantaneous inference are outside the
+  count's scope. Preserve shared Sidebar phase and ETA resolution.
+
+
 ## 0.1.22
 
 - Keep Board aligned with the panels when the native title bar is hidden.

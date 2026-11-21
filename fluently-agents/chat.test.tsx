@@ -5,6 +5,7 @@ import { renderSlot } from '@get-bb/plugin-sdk/testing/app';
 import type { PluginBrowserBbSdk } from '@get-bb/plugin-sdk/app';
 import { Chat, removeSubmittedDraft, type ChatProps } from './chat';
 const voice = vi.hoisted(() => ({ state: 'idle' as import('./voice').VoiceState, level: 0, failedRecording: null as Blob | null, toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), onTranscript: null as ((value: string) => void) | null, onError: null as ((value: string) => void) | null }));
+vi.mock('voice-ring', () => ({ VoiceRing: (props: { state: string; level: number; paused: boolean }) => <canvas data-testid="voice-ring" data-state={props.state} data-level={props.level} data-paused={String(props.paused)} /> }));
 vi.mock('./voice', () => ({ useVoiceTranscript: (options: { onTranscript(value: string): void; onError(value: string): void }) => { voice.onTranscript = options.onTranscript; voice.onError = options.onError; return voice; } }));
 beforeEach(() => { const values = new Map<string, string>(); vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) }); });
 beforeEach(() => {
@@ -78,14 +79,14 @@ describe('Custom conversation', () => {
     const recording = mount(); await ready(recording);
     expect(recording.queryByText('Cancel')).toBeNull();
     const finish = recording.getByRole('button', { name: 'Finish recording' });
-    expect(finish.querySelector('.fa-voice-orb')).toBeTruthy();
-    expect(finish.style.getPropertyValue('--voice-level')).toBe('0.7');
+    expect(finish.querySelector('canvas')?.dataset.state).toBe('listening');
+    expect(finish.querySelector('canvas')?.dataset.level).toBe('0.7');
     voice.toggle.mockClear(); fireEvent.click(finish); expect(voice.toggle).toHaveBeenCalledTimes(1); recording.unmount();
     voice.state = 'transcribing';
     const processing = mount(); await ready(processing);
     const spinner = processing.getByRole('button', { name: 'Transcribing voice message' });
     expect((spinner as HTMLButtonElement).disabled).toBe(true);
-    expect(spinner.querySelector('.fa-voice-spinner')).toBeTruthy();
+    expect(spinner.querySelector('canvas')?.dataset.state).toBe('processing');
     expect(processing.queryByText('Transcribing…')).toBeNull(); processing.unmount();
     voice.state = 'error'; voice.failedRecording = new Blob(['audio']); voice.retry.mockClear();
     const failed = mount(); await ready(failed);

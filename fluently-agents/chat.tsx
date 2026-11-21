@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type MouseEvent } from 'react';
 import { ThreadChat, experimental_Icon as Icon, useSdk } from '@get-bb/plugin-sdk/app';
 import { useVoiceTranscript, type VoiceState } from './voice';
+import { VoiceIndicator } from './voice-indicator';
 import './chat.css';
 type Sdk = ReturnType<typeof useSdk>;
 type Attachment = Awaited<ReturnType<Sdk['projects']['attachments']['upload']>>;
@@ -210,8 +211,8 @@ function ChatSession({ threadId, placeholder = 'Message…', focusRequest, voice
       if (event.repeat || event.altKey || ((event.metaKey || event.ctrlKey) && !alternate) || (alternate && !running)) return;
       send(draft, false, alternate);
     }} />
-      <div className="fa-compose-actions"><div className="fa-compose-left"><button className="fa-composer-tool" type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11-8 8a6 6 0 0 1-8.5-8.5L13 2a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8L15 6" /></svg></button>{composerAgents}</div><div className="fa-compose-right"><button type="button" aria-label={voiceLabel} title={voiceLabel} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={`fa-composer-tool fa-voice-button${voice.state === 'recording' ? ' fa-recording' : ''}`} style={{ '--voice-level': voice.level } as CSSProperties} onContextMenu={onVoiceContextMenu} onClick={() => { setVoiceError(undefined); if (voice.state === 'error' && voice.failedRecording) voice.retry(); else void voice.toggle(); }}>
-          {voice.state === 'recording' ? <span className="fa-voice-orb" aria-hidden="true" /> : voice.state === 'starting' || voice.state === 'transcribing' ? <span className="fa-voice-spinner" aria-hidden="true" /> : (voice.state === 'error' || voiceError) ? <RetryIcon /> : <Icon name="Mic" />}
+      <div className="fa-compose-actions"><div className="fa-compose-left"><button className="fa-composer-tool" type="button" aria-label="Attach files" disabled={uploading || !thread} onClick={() => files.current?.click()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11-8 8a6 6 0 0 1-8.5-8.5L13 2a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8L15 6" /></svg></button>{composerAgents}</div><div className="fa-compose-right"><button type="button" aria-label={voiceLabel} title={voiceLabel} disabled={voice.state === 'transcribing' || voice.state === 'starting'} className={`fa-composer-tool fa-voice-button${voice.state === 'recording' ? ' fa-recording' : ''}`} onContextMenu={onVoiceContextMenu} onClick={() => { setVoiceError(undefined); if (voice.state === 'error' && voice.failedRecording) voice.retry(); else void voice.toggle(); }}>
+          {voiceBusy ? <VoiceIndicator recording={voice.state === 'recording'} level={voice.level} /> : (voice.state === 'error' || voiceError) ? <RetryIcon /> : <Icon name="Mic" />}
         </button>
         <button type="submit" className="fa-composer-tool fa-send-message" aria-label="Send message" disabled={busy || uploading || !!failedFiles.length || !loaded || !!interactions.length || voiceBusy || (!draft.text.trim() && !draft.attachments.length)}><Icon name="ArrowUp" /></button>
       </div></div>

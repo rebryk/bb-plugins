@@ -28,15 +28,17 @@ source control and distribution bundles.
 
 ## Layout
 
-The board hides BB's surrounding panels while open alone. Back to BB restores
-the ordinary view; saved panel widths, tabs and sidebar state stay unchanged.
-Split views retain BB's navigation.
+Agents occupies BB's normal central plugin area. Native sidebars, the main
+menu, panels and window framing retain BB's behavior and saved preferences.
+The clickable Board breadcrumb returns from a task without a separate back
+arrow.
 
 The sidebar shows one task panel above chat on the board and inside a task.
 Its Inbox / Running switch defaults to Inbox and only filters the list;
 it keeps the selected task, conversation and draft. A separate icon collapses
-the list. Running rows show the task, project, active agents and ETA;
-Inbox rows lead with the requested action.
+the list. Rows show the task title first, then a muted action when present. Inbox uses
+Review task when no action is given. Running retains active agents and ETA;
+project metadata stays in the tooltip.
 
 Board returns to the task cards without moving the navigation. A selected task
 adds the Task breadcrumb and shows its results to the right. Resize the sidebar
@@ -147,6 +149,7 @@ Model choice happens at launch; an existing conversation keeps its model.
 ## Board controls
 
 - Running includes queued work and shows the active-agent count and ETA.
+- Compact rows show the task title first, then the requested action and time.
 - Inbox shows the requested decision. Finishing an assistant turn does not
   mark a task done.
 - The selected list remains above chat in both views. Select a row to switch
@@ -158,6 +161,10 @@ Model choice happens at launch; an existing conversation keeps its model.
 - Right-click the microphone button to choose text or voice mode. N focuses the
   composer in text mode. In voice mode, N starts recording; press it again to
   finish. The microphone button also records in either mode.
+- The 32px microphone button uses VoiceRing 0.2.0 while recording or
+  transcribing. It follows the existing recorder level and BB theme, and pauses
+  when hidden or reduced motion is enabled. Idle keeps the microphone icon.
+  [Third-party license](./THIRD_PARTY_NOTICES.md).
 - Voice uses BB's configured transcription service. An empty composer sends the
   transcript automatically; an existing draft keeps it for review. Failed
   transcription keeps the recording for retry. Leaving the conversation
@@ -198,3 +205,34 @@ storage. The board uses real thread state and additive plugin instructions.
 ## Releases
 
 See [CHANGELOG.md](./CHANGELOG.md).
+
+## Running counts
+
+Board shows Running on the left and Inbox on the right. The sidebar filter
+only changes its own list.
+
+Agent counts measure active worker lifecycles, including BB turns, native
+Codex and Claude agents, and time in tools and waits. BB turns exclude starting,
+queued, idle, archived, deleted and input-blocked threads. Native workers use
+normalized lifecycle events independently of their owner's idle state. Claude
+foreground and background aliases count once; pending and paused tasks do not
+count. Completion and interruption settle a worker; follow-up work can restart
+it. Archived managed leads keep counting their live descendants until settled.
+The total deduplicates overlapping task trees and coordinators.
+
+The census bootstraps filtered events in bounded pages, then reads only after
+its cursor. An omitted number means the census is incomplete or unavailable;
+it never means zero. Retained counts carry a refreshing title during reads.
+Reloading restores a versioned compact checkpoint and verifies the incremental
+tail. A cold replay is needed when no checkpoint exists; progress is saved once
+per slice. Counts stay withheld until verification finishes. This metric is a
+parallelism proxy, not a count of simultaneous model inference. Thread Sidebar
+still supplies each task's phase and ETA.
+
+### Web links
+
+Ordinary external HTTP(S) links in Agents chat and task artifacts open in a
+separate browser tab. Internal same-origin BB links, local files, previews,
+anchors, downloads and modified clicks keep their existing behavior.
+Cross-origin embedded pages handle their own links; their clicks do not bubble
+to Agents. Native app window-opening behavior requires platform verification.

@@ -1,3 +1,5 @@
+import { NativeCensus, runningThreadIds } from './counts';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import type { BbPluginApi, PluginAgentToolContext } from '@get-bb/plugin-sdk';
 import { z } from 'zod';
@@ -11,7 +13,7 @@ type ListedThread = Awaited<ReturnType<BbPluginApi['sdk']['threads']['list']>>[n
 type Launch = { id: string; role: AgentRole; agentId: string; taskId?: string; threadId: string | null; requestKey: string; callerId: string; ordinary?: boolean; title?: string; ready?: boolean };
 type StoredTask = Task & { declaredAsk: string | null; archivedProjection?: boolean; reopenedAt?: number };
 const working = (t: Pick<Thread, 'status'>) => ['active', 'starting', 'pending', 'stopping'].includes(t.status);
-const active = (t: Pick<Thread, 'status'>) => t.status === 'active' || t.status === 'starting';
+
 const result = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const taskInput = z.object({
   title: z.string().trim().min(1).max(180), prompt: z.string().trim().min(1).max(50000),
@@ -20,49 +22,226 @@ const taskInput = z.object({
 });
 
 export default async function plugin(bb: BbPluginApi) {
+  let disposed = false;
+  const lifetime = new AbortController();
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let censusNotification: ReturnType<typeof setTimeout> | undefined;
+  bb.onDispose(() => { disposed = true; lifetime.abort(); if (timer) clearInterval(timer); if (censusNotification) clearTimeout(censusNotification); });
+  const signalUntil = (deadline: number) => AbortSignal.any([lifetime.signal, AbortSignal.timeout(Math.max(1, deadline - Date.now()))]);
+  let inventoryRevision = 0;
+  let scanRevision = 0;
+  const ownerRevisions = new Map<string, number>();
+
   const settings = bb.settings.define({ maxWorkers: { type: 'number', label: 'Concurrent workers per task', default: 8 } });
   const config = await settings.get();
+  if (disposed) return;
   const maxWorkers = Math.max(1, Math.min(32, Math.trunc(config.maxWorkers)));
   // Private, locally provisioned images; never ship licensed packs in the bundle.
   const pool = z.array(z.string().max(150000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/)).max(16)
     .refine(value => JSON.stringify(value).length <= 240000)
     .safeParse(await bb.storage.kv.get('avatar-pool') ?? []);
+  if (disposed) return;
   const avatarPool = pool.success ? [...new Set(pool.data)] : [];
   const agents = new Map<string, Agent>();
   const tasks = new Map<string, StoredTask>();
   const launches = new Map<string, Launch>();
   const locks = new Map<string, Promise<unknown>>();
-  let disposed = false;
   let reconciliation: Promise<void> | undefined;
-  let recoverArchived = true;
   let dirty = true;
   let lastReconciled = 0;
   let pendingPublish = false;
-  const invalidatedThreads = new Set<string>();
   const transitions = new Map<string, number>();
+  const native = new Map<string, NativeCensus>();
+  // KV manifests atomically select immutable chunks (each below 256 KiB).
+  const checkpointManifest = z.object({ version: z.literal(1), generation: z.string(), chunks: z.number().int().min(0).max(10000), parent: z.string().nullable().optional() });
+  const manifests = new Map<string, z.infer<typeof checkpointManifest>>();
+  let eligible = new Map<string, ListedThread>();
+  const retainedParents = new Map<string, string | null>();
+  const fingerprints = new Map<string, string>();
+  const requested = new Set<string>();
+  let inventory = new Map<string, ListedThread>();
+  let scanRows = new Map<string, ListedThread>();
+  let scanArchived = false;
+  let scanOffset = 0;
+  let inventoryComplete = false;
+  let scanPending = false;
+  const serviced = new Map<string, number>();
+  let serviceSequence = 0;
+  let inventoryDirty = true;
+  let inventoryAt = 0;
+  async function persist(id: string, state: NativeCensus) {
+    const key = `census:${id}`;
+    const previous = checkpointManifest.safeParse(await bb.storage.kv.get(key));
+    if (disposed) return;
+    const generation = randomUUID();
+    const encoded = gzipSync(JSON.stringify({ state: state.snapshot(), parent: retainedParents.get(id) ?? null, fingerprint: fingerprints.get(id) })).toString('base64');
+    const chunks = Math.ceil(encoded.length / 180000);
+    try {
+    for (let i = 0; i < chunks; i++) {
+      if (disposed) return;
+      await bb.storage.kv.set(`census-chunk:${id}:${generation}:${i}`, encoded.slice(i * 180000, (i + 1) * 180000));
+    }
+    if (disposed) return;
+    const manifest = { version: 1 as const, generation, chunks, parent: retainedParents.get(id) ?? null };
+    await bb.storage.kv.set(key, manifest); manifests.set(id, manifest);
+    } catch (error) {
+      if (!disposed) {
+        const committed = checkpointManifest.safeParse(await bb.storage.kv.get(key));
+        if (!committed.success || committed.data.generation !== generation) {
+          for (let i = 0; i < chunks && !disposed; i++) await bb.storage.kv.delete(`census-chunk:${id}:${generation}:${i}`);
+        }
+      }
+      throw error;
+    }
+    if (previous.success) for (let i = 0; i < previous.data.chunks && !disposed; i++) await bb.storage.kv.delete(`census-chunk:${id}:${previous.data.generation}:${i}`);
+  }
+  for (const key of await bb.storage.kv.list('census:')) {
+    if (disposed) return;
+    const manifest = checkpointManifest.safeParse(await bb.storage.kv.get(key));
+    if (disposed) return;
+    if (!manifest.success) continue;
+    const id = key.slice(7); manifests.set(id, manifest.data);
+    if (manifest.data.parent !== undefined) retainedParents.set(id, manifest.data.parent);
+  }
+  if (disposed) return;
+  const committedChunks = new Set<string>();
+  for (const [id, manifest] of manifests) for (let i = 0; i < manifest.chunks; i++) committedChunks.add(`census-chunk:${id}:${manifest.generation}:${i}`);
+  for (const key of await bb.storage.kv.list('census-chunk:')) {
+    if (disposed) return;
+    if (!committedChunks.has(key)) await bb.storage.kv.delete(key);
+  }
+  if (disposed) return;
+  async function restoreOwner(id: string, ancestryOnly = false) {
+    const manifest = manifests.get(id);
+    if (!manifest?.chunks) return new NativeCensus();
+    try {
+      let encoded = '';
+      for (let i = 0; i < manifest.chunks; i++) {
+        if (disposed) return new NativeCensus();
+        const chunk = await bb.storage.kv.get(`census-chunk:${id}:${manifest.generation}:${i}`);
+        if (disposed) return new NativeCensus();
+        if (typeof chunk !== 'string') throw new Error('Missing census checkpoint chunk');
+        encoded += chunk;
+      }
+      const value = JSON.parse(gunzipSync(Buffer.from(encoded, 'base64')).toString());
+      if (value.parent === null || typeof value.parent === 'string') retainedParents.set(id, value.parent);
+      if (ancestryOnly) return new NativeCensus();
+      const state = NativeCensus.restore(value.state); state.complete = false; return state;
+    } catch (error) { if (!disposed) bb.log.warn(`Census checkpoint ${id}: ${String(error)}`); return new NativeCensus(); }
+  }
+  async function selectOwners() {
+    // Old checkpoints kept ancestry inside their payload. Read those only for
+    // missing links actually reached from surviving rows; new manifests carry it.
+    for (const row of inventory.values()) {
+      let parent = row.parentThreadId; const seen = new Set<string>();
+      while (parent && !seen.has(parent)) {
+        seen.add(parent);
+        if (!inventory.has(parent) && !retainedParents.has(parent) && manifests.get(parent)?.chunks) await restoreOwner(parent, true);
+        if (disposed) return;
+        parent = retainedParents.get(parent) ?? null;
+      }
+    }
+    const roots = new Set([...tasks.values()].flatMap(task => task.threadId ? [task.threadId] : []));
+    for (const agent of agents.values()) if (agent.threadId) roots.add(agent.threadId);
+    const managed = new Set([...launches.values()].flatMap(row => row.threadId ? [row.threadId] : []));
+    for (const row of inventory.values()) if (!row.archivedAt) {
+      let current: ListedThread | undefined = row; let root: string | undefined;
+      const seen = new Set<string>();
+      while (current && !seen.has(current.id)) {
+        if (managed.has(current.id)) { root = undefined; break; }
+        seen.add(current.id);
+        if (current.visibility !== 'hidden') root = current.id;
+        current = current.parentThreadId ? inventory.get(current.parentThreadId) : undefined;
+      }
+      if (root) roots.add(root);
+    }
+    eligible = new Map([...roots].flatMap(root => tree(root)).map(row => [row.id, row]));
+    for (const id of native.keys()) if (!eligible.has(id)) { native.delete(id); fingerprints.delete(id); serviced.delete(id); }
+  }
+  async function retireCheckpoints(deadline: number) {
+    // Preserve only ancestry for unrelated/deleted owners. Never evict ordering
+    // metadata from an eligible lifecycle, including settled archived tasks.
+    let retired = 0;
+    for (const [id, manifest] of manifests) {
+      if (disposed || Date.now() >= deadline || retired >= 4) break;
+      if (eligible.has(id) || !manifest.chunks) continue;
+      const parent = retainedParents.get(id) ?? manifest.parent ?? null;
+      const ancestry = { version: 1 as const, generation: '', chunks: 0, parent };
+      await bb.storage.kv.set(`census:${id}`, ancestry);
+      if (disposed) return;
+      manifests.set(id, ancestry);
+      for (let i = 0; i < manifest.chunks && !disposed; i++) await bb.storage.kv.delete(`census-chunk:${id}:${manifest.generation}:${i}`);
+      retired++;
+    }
+  }
+  async function scanInventory(deadline: number) {
+    if (!scanPending) scanRevision = inventoryRevision;
+    scanPending = true;
+    for (let calls = 0; calls < 8 && Date.now() < deadline && !disposed; calls++) {
+      const page = await bb.sdk.threads.list({ archived: scanArchived, includeHidden: true, limit: 100, offset: scanOffset, signal: signalUntil(deadline) });
+      if (disposed) return;
+      for (const row of page) if (!row.deletedAt) {
+        scanRows.set(row.id, row); retainedParents.set(row.id, row.parentThreadId ?? null);
+      }
+      if (page.length === 100) { scanOffset += 100; continue; }
+      if (!scanArchived) { scanArchived = true; scanOffset = 0; continue; }
+      if (scanRevision !== inventoryRevision) {
+        scanRows = new Map(); scanArchived = false; scanOffset = 0; scanRevision = inventoryRevision; return;
+      }
+      inventory = scanRows; scanRows = new Map(); scanArchived = false; scanOffset = 0;
+      inventoryComplete = true; scanPending = false; inventoryDirty = false; inventoryAt = Date.now(); return;
+    }
+  }
+  function tree(root: string) {
+    return [...inventory.values()].filter(row => {
+      let id: string | null = row.id; const seen = new Set<string>();
+      while (id && !seen.has(id)) {
+        if (id === root) return true;
+        seen.add(id); id = retainedParents.get(id) ?? null;
+      }
+      return false;
+    });
+  }
+
+  function census(rows: ListedThread[]) {
+    const ids = runningThreadIds(rows);
+    let complete = true;
+    for (const row of rows) {
+      if (row.deletedAt) continue;
+      const state = native.get(row.id);
+      if (!state?.complete) complete = false;
+      for (const id of state?.identities(row.id) ?? []) ids.add(id);
+    }
+    return { ids, complete };
+  }
   let phases: Record<string, SidebarPhase> = {};
   const trackedLegacy = new Set<string>();
   async function load<T extends { id: string }>(prefix: string, map: Map<string, T>) {
+    if (disposed) return;
     for (const key of await bb.storage.kv.list(prefix)) {
+      if (disposed) return;
       const item = await bb.storage.kv.get<T>(key);
+      if (disposed) return;
       if (item) map.set(item.id, item);
     }
   }
   await Promise.all([load('agent:', agents), load('task:', tasks), load('launch:', launches)]);
+  if (disposed) return;
   if (!agents.size) {
     const general: Agent = { id: 'general', name: 'General', avatar: '', instructions: '', projectId: null, threadId: null, execution: null };
-    await bb.storage.kv.set('agent:general', general); agents.set(general.id, general);
+    await bb.storage.kv.set('agent:general', general); if (disposed) return; agents.set(general.id, general);
   }
   const changed = () => {
     if (disposed) return;
     if (reconciliation) pendingPublish = true;
     else bb.realtime.publish(CHANGED, null);
   };
-  const invalidate = (threadId?: string) => { dirty = true; if (threadId && tasks.get(`existing:${threadId}`)?.archivedProjection) invalidatedThreads.add(threadId); };
+  const invalidate = (threadId?: string) => { dirty = true; inventoryDirty = true; inventoryRevision++; if (threadId) ownerRevisions.set(threadId, (ownerRevisions.get(threadId) ?? 0) + 1); if (threadId) { requested.add(threadId); const state = native.get(threadId); if (state) state.complete = false; } };
   async function saveAgent(agent: Agent) {
     await bb.storage.kv.set(`agent:${agent.id}`, agent); agents.set(agent.id, agent); changed(); return agent;
   }
   async function saveTask(task: StoredTask) {
+    if (disposed) return task;
     if (!reconciliation) invalidate();
     await bb.storage.kv.set(`task:${task.id}`, task); tasks.set(task.id, task); changed(); return task;
   }
@@ -249,12 +428,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Existing conversations stay ordinary BB threads. Only the board projection
   // is stored here: no launch metadata, prompts, model or history is changed.
   async function discoverExisting() {
-    const rows: ListedThread[] = [];
-    for (let offset = 0; ; offset += 100) {
-      const page = await bb.sdk.threads.list({ archived: false, includeHidden: true, limit: 100, offset });
-      rows.push(...page.filter(row => !row.deletedAt));
-      if (page.length < 100) break;
-    }
+    const rows = [...inventory.values()].filter(row => !row.archivedAt);
     const byId = new Map(rows.map(row => [row.id, row]));
     const managed = new Set([...launches.values()].flatMap(launch => launch.threadId ? [launch.threadId] : []));
     // Creation events may arrive before spawn returns its ID.
@@ -270,7 +444,15 @@ export default async function plugin(bb: BbPluginApi) {
         if (managed.has(current.id)) return null;
         visited.add(current.id);
         if (current.visibility !== 'hidden') root = current.id;
-        current = current.parentThreadId ? byId.get(current.parentThreadId) : undefined;
+        current = current.parentThreadId ? inventory.get(current.parentThreadId) : undefined;
+      }
+      if (!root && row.parentThreadId) {
+        let parent: string | null = row.parentThreadId; const seen = new Set<string>();
+        while (parent && !seen.has(parent)) {
+          if (managed.has(parent)) return null;
+          if (tasks.has(`existing:${parent}`)) root = parent;
+          seen.add(parent); parent = retainedParents.get(parent) ?? null;
+        }
       }
       return root;
     };
@@ -281,7 +463,8 @@ export default async function plugin(bb: BbPluginApi) {
     }
     const projects = new Map((await bb.sdk.projects.list({ includePersonal: true })).map(project => [project.id, project.name]));
     for (const [threadId] of groups) {
-      const row = byId.get(threadId)!; const id = `existing:${threadId}`;
+      if (disposed) return groups;
+      const row = inventory.get(threadId); if (!row) continue; const id = `existing:${threadId}`;
       await locked(`task:${id}`, async () => {
       const previous = tasks.get(id);
       const task: StoredTask = previous ? { ...previous, title: row.title ?? row.titleFallback ?? 'Untitled task', projectId: row.projectId, projectName: projects.get(row.projectId) ?? row.projectId, updatedAt: row.updatedAt ?? previous.updatedAt }
@@ -291,34 +474,32 @@ export default async function plugin(bb: BbPluginApi) {
     }
     const missing = [...tasks.values()].filter(task => task.source === 'existing' && task.threadId && !groups.has(task.threadId));
     for (const task of missing) {
+      if (disposed) return groups;
       if (byId.has(task.threadId!)) {
         // Reparented conversations now belong to their visible root card.
         await locked(`task:${task.id}`, async () => { await bb.storage.kv.delete(`task:${task.id}`); tasks.delete(task.id); changed(); });
       }
     }
-    const closed = missing.filter(task => !byId.has(task.threadId!) && (!task.archivedProjection || invalidatedThreads.has(task.threadId!)));
-    for (const task of closed) invalidatedThreads.delete(task.threadId!);
-    for (let start = 0; start < closed.length; start += 100) {
-      const batch = closed.slice(start, start + 100);
-      const archived = await bb.sdk.threads.list({ threadIds: batch.map(task => task.threadId!), archived: true, includeHidden: true, limit: 100 });
-      for (const task of batch) groups.set(task.threadId!, archived.filter(row => row.id === task.threadId));
-    }
+    const claimed = new Set([...groups.values()].flatMap(rows => rows.map(row => row.id)));
+    for (const [root] of groups) groups.set(root, tree(root));
+    for (const task of missing) if (!byId.has(task.threadId!)) groups.set(task.threadId!, tree(task.threadId!).filter(row => !claimed.has(row.id)));
     return groups;
   }
   async function reconcileTask(id: string, snapshot?: ListedThread[], transition?: number) {
     return locked(`task:${id}`, async () => {
-      if (transition !== undefined && transition !== (transitions.get(id) ?? 0)) { dirty = true; return; }
+      if (transition !== undefined && transition !== (transitions.get(id) ?? 0)) { dirty = true; inventoryDirty = true; return; }
+      if (disposed) return;
       const old = taskById(id); if (!old.threadId) return;
       const rows = snapshot ?? await relatedThreads(old);
+      const current = census(rows);
+      const count = current.complete ? current.ids.size : null;
       const lead = rows.find(row => row.id === old.threadId);
-      if (!lead && old.source === 'existing') {
+      if (!lead && old.source === 'existing' && !rows.length) {
         await bb.storage.kv.delete(`task:${old.id}`); tasks.delete(old.id); changed(); return;
       }
       if (!lead) {
-        if (old.state !== 'done') {
-          const next = { ...old, state: 'needs-you' as const, ask: 'Task conversation was deleted', needsSince: old.needsSince ?? Date.now(), runningAgents: 0, pendingWorkers: [] };
-          if (JSON.stringify(next) !== JSON.stringify(old)) await saveTask(next);
-        }
+        const next = { ...old, runningAgents: count, pendingWorkers: [], ...(old.state === 'done' ? {} : { state: 'needs-you' as const, ask: 'Task conversation was deleted', needsSince: old.needsSince ?? Date.now() }) };
+        if (JSON.stringify(next) !== JSON.stringify(old)) await saveTask(next);
         return;
       }
       const live = rows.filter(row => !row.archivedAt);
@@ -326,7 +507,6 @@ export default async function plugin(bb: BbPluginApi) {
       for (const row of live) {
         if (row.hasPendingInteraction) pendingWorkers.push({ threadId: row.id, title: row.title ?? old.title });
       }
-      const count = live.reduce((sum, row) => sum + (active(row) ? 1 : 0) + row.activity.activeBackgroundAgentCount, 0);
       let state = old.state; let ask = old.ask; const now = Date.now();
       const leadPhase = phases[lead.id];
       const runningPhases = rows.flatMap(row => {
@@ -356,42 +536,106 @@ export default async function plugin(bb: BbPluginApi) {
       if (JSON.stringify(next) !== JSON.stringify(old)) await saveTask(next);
     });
   }
+  let censusRun: Promise<void> | undefined;
+  let lastCensus = 0;
+  async function refreshCensus() {
+    if (disposed) return;
+    if (censusRun) return censusRun;
+    censusRun = (async () => {
+      const deadline = Date.now() + 250;
+      if (inventoryDirty || scanPending || Date.now() - inventoryAt >= 15000) await scanInventory(deadline);
+      if (disposed || scanPending) return;
+      await selectOwners();
+      if (disposed) return;
+      const owners = eligible;
+      const coordinatorIds = [...agents.values()].flatMap(agent => agent.threadId ? [agent.threadId] : []);
+      for (const id of coordinatorIds) { const row = inventory.get(id); if (row) owners.set(id, row); }
+      for (const id of requested) if (!owners.has(id) || native.get(id)?.unavailable) requested.delete(id);
+
+      const candidates = [...owners.values()].sort((a, b) => (serviced.get(a.id) ?? 0) - (serviced.get(b.id) ?? 0) || Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt)) || Number(b.status === 'active') - Number(a.status === 'active')).filter(row => {
+        const state = native.get(row.id);
+        const fingerprint = JSON.stringify([row.updatedAt, row.status, row.archivedAt, row.hasPendingInteraction, row.parentThreadId]);
+        return !state?.unavailable && (!state?.complete || state.watching || requested.has(row.id) || fingerprints.get(row.id) !== fingerprint);
+      });
+      // Serve least-recently serviced owners first, then use spare budget
+      // on unfinished pages. This pump runs independently of board projection.
+      const count = candidates.length ? 8 : 0;
+      const visited = new Set<string>();
+      const checkpoints = new Map<string, NativeCensus>();
+      const current = candidates.filter(row => !row.archivedAt);
+      const historical = candidates.filter(row => row.archivedAt);
+      const take = (queue: ListedThread[]) => {
+        for (let attempts = 0; attempts < queue.length; attempts++) {
+          const row = queue.shift()!; queue.push(row);
+          const state = native.get(row.id);
+          if (!state?.unavailable && (!visited.has(row.id) || !state?.complete && !state?.retryLater)) return row;
+        }
+      };
+      for (let i = 0; i < count && Date.now() < deadline && !disposed; i++) {
+        const useHistory = historical.length > 0 && (current.length === 0 || i % 4 === 3);
+        const row = useHistory ? take(historical) ?? take(current) : take(current) ?? take(historical);
+        if (!row) break;
+        visited.add(row.id);
+        serviced.set(row.id, ++serviceSequence);
+        const state = native.get(row.id) ?? await restoreOwner(row.id);
+        if (disposed) return;
+        native.set(row.id, state);
+        if (state.unavailable) { requested.delete(row.id); continue; }
+        const revision = ownerRevisions.get(row.id) ?? 0;
+        const previousFingerprint = fingerprints.get(row.id);
+        const cursor = state.cursor; const complete = state.complete; const size = state.pageSize; const unavailable = state.unavailable;
+        await state.refresh(bb.sdk.threads.events, row.id, 1, signalUntil(deadline));
+        if (disposed) return;
+        if (revision !== (ownerRevisions.get(row.id) ?? 0)) state.complete = false;
+        if (state.unavailable) { requested.delete(row.id); bb.log.warn(`event_data_too_large: ${state.unavailable}`); }
+        if (state.complete) {
+          fingerprints.set(row.id, JSON.stringify([row.updatedAt, row.status, row.archivedAt, row.hasPendingInteraction, row.parentThreadId]));
+          requested.delete(row.id);
+        }
+        if (cursor !== state.cursor || complete !== state.complete || size !== state.pageSize || unavailable !== state.unavailable || previousFingerprint !== fingerprints.get(row.id)) {
+          checkpoints.set(row.id, state);
+        }
+      }
+      // One atomic checkpoint per changed owner per bounded slice. Generic
+      // pages can advance the cursor without rewriting the same state eight times.
+      for (const [id, state] of checkpoints) { if (disposed) return; await persist(id, state); }
+      await retireCheckpoints(deadline);
+      lastCensus = Date.now();
+    })().finally(() => { censusRun = undefined; if (!reconciliation) dirty = true; });
+    return censusRun;
+  }
   async function reconcile() {
     if (reconciliation) return reconciliation;
     if (!dirty && Date.now() - lastReconciled < 1000) return;
     dirty = false;
     reconciliation = (async () => {
       const before = new Map(transitions);
+      await refreshCensus();
+      if (disposed || scanPending) { dirty = true; return; }
       const existing = await discoverExisting();
+      if (disposed) return;
       const snapshots = new Map<string, ListedThread[]>();
       for (const task of tasks.values()) {
-        if (task.source !== 'existing' && task.threadId && task.state !== 'done') snapshots.set(task.id, await relatedThreads(task));
+        if (task.source !== 'existing' && task.threadId) snapshots.set(task.id, tree(task.threadId));
       }
       for (const launch of launches.values()) {
+        if (disposed) return;
         if (launch.role !== 'task' || launch.ordinary || !launch.threadId || trackedLegacy.has(launch.threadId)) continue;
         const lead = snapshots.get(launch.taskId!)?.find(row => row.id === launch.threadId && !row.archivedAt && !row.deletedAt);
         if (!lead) continue;
         await trackLegacyOutline(bb, launch.threadId);
         trackedLegacy.add(launch.threadId);
       }
-      phases = await readSidebarPhases(bb, [...existing.values(), ...snapshots.values()].flatMap(rows => rows.map(row => row.id)));
-      for (const task of [...tasks.values()]) if (task.source === 'existing' && existing.has(task.threadId!)) await reconcileTask(task.id, existing.get(task.threadId!)!, before.get(task.id) ?? 0);
-      // Recover automation wakes missed while the plugin was stopped. Later
-      // wakes arrive through thread events, without rescanning the archive.
-      if (recoverArchived) {
-        const archived = [...tasks.values()].filter(task => task.source !== 'existing' && task.state === 'done' && task.threadId);
-        for (let start = 0; start < archived.length; start += 100) {
-          const batch = archived.slice(start, start + 100);
-          const live = await bb.sdk.threads.list({ threadIds: batch.map(task => task.threadId!), archived: false, includeHidden: true, limit: 100 });
-          for (const task of batch) if (live.some(thread => thread.id === task.threadId && !thread.deletedAt)) {
-            const rows = await relatedThreads(task);
-            Object.assign(phases, await readSidebarPhases(bb, rows.map(row => row.id)));
-            await reconcileTask(task.id, rows, before.get(task.id) ?? 0);
-          }
-        }
-        recoverArchived = false;
+      const phaseIds = [...new Set([...existing.values(), ...snapshots.values()].flatMap(rows => rows.map(row => row.id)))];
+      const nextPhases: Record<string, SidebarPhase> = {};
+      for (let start = 0; start < phaseIds.length; start += 200) {
+        if (disposed) return;
+        Object.assign(nextPhases, await readSidebarPhases(bb, phaseIds.slice(start, start + 200)));
       }
-      for (const task of tasks.values()) if (task.source !== 'existing' && task.state !== 'done') await reconcileTask(task.id, snapshots.get(task.id), before.get(task.id) ?? 0);
+      if (disposed) return;
+      phases = nextPhases;
+      for (const task of [...tasks.values()]) if (task.source === 'existing' && existing.has(task.threadId!)) await reconcileTask(task.id, existing.get(task.threadId!)!, before.get(task.id) ?? 0);
+      for (const task of tasks.values()) if (task.source !== 'existing') await reconcileTask(task.id, snapshots.get(task.id), before.get(task.id) ?? 0);
       lastReconciled = Date.now();
     })().catch(error => { dirty = true; throw error; }).finally(() => {
       reconciliation = undefined;
@@ -405,7 +649,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (rows.some(row => !row.archivedAt && (working(row) || row.queuedWork !== 'none' || row.activity.activeBackgroundAgentCount > 0 || row.hasPendingInteraction))) throw new Error('Work is still running, queued, or awaiting a response. Resolve it in the chat before marking the task done.');
       for (const row of rows.filter(row => row.id !== task.threadId)) if (!row.archivedAt) await bb.sdk.threads.archive({ threadId: row.id });
       if (task.threadId) await bb.sdk.threads.archive({ threadId: task.threadId });
-      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true;
+      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true; inventoryDirty = true; inventoryRevision++;
       await saveTask({ ...task, state: 'done', ask: null, declaredAsk: null, needsSince: null, snoozeUntil: null, runningAgents: 0, pendingWorkers: [], updatedAt: Date.now() }); return null;
     });
   }
@@ -414,7 +658,7 @@ export default async function plugin(bb: BbPluginApi) {
       const task = taskById(id); if (!task.threadId) throw new Error('This task has no confirmed conversation to reopen.');
       const lead = await bb.sdk.threads.get({ threadId: task.threadId });
       if (lead.archivedAt) await bb.sdk.threads.unarchive({ threadId: lead.id });
-      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true;
+      transitions.set(id, (transitions.get(id) ?? 0) + 1); dirty = true; inventoryDirty = true; inventoryRevision++;
       await saveTask({ ...task, ...(task.source === 'existing' ? { reopenedAt: Date.now() } : {}), state: 'needs-you', ask: 'Continue task', declaredAsk: null, needsSince: Date.now(), snoozeUntil: null, updatedAt: Date.now() });
       if (prompt) await bb.sdk.threads.send({ threadId: lead.id, mode: 'auto', input: [{ type: 'text', text: prompt, mentions: [] }], ...(senderThreadId ? { senderThreadId } : {}) }); return null;
     });
@@ -431,16 +675,14 @@ export default async function plugin(bb: BbPluginApi) {
       return saveAgent({ ...input, avatar, id: previous?.id ?? randomUUID(), threadId: previous?.threadId ?? null });
     });
   }
+  if (disposed) return;
   bb.rpc.register(rpcContract, {
     board: async () => {
       await reconcile();
-      const coordinatorIds = [...agents.values()].flatMap(agent => agent.threadId ? [agent.threadId] : []);
-      let runningAgents = [...tasks.values()].reduce((sum, task) => sum + task.runningAgents, 0);
-      for (let start = 0; start < coordinatorIds.length; start += 100) {
-        const coordinators = await bb.sdk.threads.list({ threadIds: coordinatorIds.slice(start, start + 100), archived: false, includeHidden: true, limit: 100 });
-        for (const thread of coordinators) if (!thread.deletedAt) runningAgents += (active(thread) ? 1 : 0) + thread.activity.activeBackgroundAgentCount;
-      }
-      return { agents: [...agents.values()], tasks: [...tasks.values()].sort((a, b) => b.updatedAt - a.updatedAt), runningAgents };
+      const current = census([...eligible.values()]);
+      const complete = inventoryComplete && !inventoryDirty && !scanPending && current.complete;
+      const executions = current.ids;
+      return { agents: [...agents.values()], tasks: [...tasks.values()].map(task => scanPending || inventoryDirty ? { ...task, runningAgents: null } : task).sort((a, b) => b.updatedAt - a.updatedAt), runningAgents: complete ? executions.size : null };
     },
     openAgent: ({ agentId }) => openAgent(agentId), saveAgent: updateAgent,
     completeTask: ({ taskId }) => completeTask(taskId), reopenTask: ({ taskId }) => reopenTask(taskId),
@@ -509,8 +751,24 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on('thread.unarchived', ({ thread }) => onChange(thread));
   bb.events.on('thread.deleted', ({ thread }) => onChange(thread));
   bb.events.on('interaction.pending', ({ thread }) => onChange(thread));
-  const timer = setInterval(() => { void reconcile().catch(error => bb.log.warn(String(error))); }, 15000);
-  bb.onDispose(() => { disposed = true; clearInterval(timer); });
+  let censusPublishedAt = 0;
+  function publishCensus() {
+    if (disposed) return;
+    const delay = 1000 - (Date.now() - censusPublishedAt);
+    if (delay <= 0) {
+      if (censusNotification) clearTimeout(censusNotification);
+      censusNotification = undefined; censusPublishedAt = Date.now(); changed();
+    } else if (!censusNotification) censusNotification = setTimeout(() => {
+      censusNotification = undefined; publishCensus();
+    }, delay);
+  }
+  if (disposed) return;
+  timer = setInterval(() => {
+    const catchingUp = scanPending || [...eligible.keys()].some(id => { const state = native.get(id); return !state || !state.complete && !state.unavailable; }) || requested.size > 0 || [...manifests].some(([id, value]) => value.chunks > 0 && !eligible.has(id));
+    if (!inventoryComplete || inventoryDirty || catchingUp || Date.now() - lastCensus >= 15000) {
+      void refreshCensus().then(publishCensus).catch(error => { if (!disposed) bb.log.warn(String(error)); });
+    }
+  }, 100);
   bb.cli.register({ name: 'agents', summary: 'Inspect tasks and wake existing conversations', commands: [
     { name: 'list', summary: 'List agents, tasks and unresolved launches', usage: 'bb agents list' },
     { name: 'abandon-launch', summary: 'Explicitly release an unresolved launch after checking that no conversation exists', usage: 'bb agents abandon-launch <launch-id>' },

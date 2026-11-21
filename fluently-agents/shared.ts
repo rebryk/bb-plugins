@@ -14,7 +14,7 @@ export const taskSchema = z.object({
   projectId: z.string(), projectName: z.string(),
   state: z.enum(['queued', 'running', 'needs-you', 'done', 'snoozed']),
   ask: z.string().nullable(), needsSince: z.number().nullable(), etaAt: z.number().nullable(),
-  completed: z.number(), total: z.number(), runningAgents: z.number(),
+  completed: z.number(), total: z.number(), runningAgents: z.number().nullable(),
   snoozeUntil: z.number().nullable(), updatedAt: z.number(),
   pendingWorkers: z.array(z.object({ threadId: z.string(), title: z.string() })),
   execution: executionSchema.nullable(), routingReason: z.string().nullable(),
@@ -27,7 +27,7 @@ export const agentInputSchema = z.object({
   projectId: z.string().nullable().default(null), execution: executionSchema.nullable().default(null),
 });
 export const rpcContract = defineRpcContract({
-  board: { input: z.null(), output: z.object({ agents: z.array(agentSchema), tasks: z.array(taskSchema), runningAgents: z.number() }) },
+  board: { input: z.null(), output: z.object({ agents: z.array(agentSchema), tasks: z.array(taskSchema), runningAgents: z.number().nullable() }) },
   openAgent: { input: z.object({ agentId: z.string() }), output: z.object({ threadId: z.string() }) },
   saveAgent: { input: agentInputSchema, output: agentSchema },
   completeTask: { input: z.object({ taskId: z.string() }), output: z.null() },

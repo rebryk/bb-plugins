@@ -53,9 +53,10 @@
 .fa-app .fa-inbox-header svg { width: 12px; height: 12px; }
 .fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 6px 6px; border-radius: 0 0 18px 18px; }
 .fa-app .fa-inbox-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 9px; text-align: left; border: 0; background: none; border-radius: 14px; }
-.fa-app .fa-inbox-item strong { display: block; flex: 1; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fa-app .fa-inbox-task-title { max-width: 35%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fa-muted); font-size: 11px; }
+.fa-app .fa-inbox-item strong { display: block; flex: 0 1 auto; max-width: 32%; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-app .fa-inbox-task-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fa-muted); font-size: 11px; }
 .fa-app .fa-inbox-item small { flex-shrink: 0; white-space: nowrap; font-size: 10px; color: var(--fa-faint); }
+.fa-app .fa-inbox-item > small:last-child { margin-left: auto; }
 .fa-app .fa-inbox-item.fa-active { background: var(--fa-hover); }
 .fa-app .fa-inbox-empty { margin: 5px 12px 7px; color: var(--fa-faint); font-size: 12px; }
 .fa-app .fa-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; pointer-events: auto; }
@@ -68,9 +69,9 @@
 .fa-app .fa-voice-hint { display: flex; gap: 8px; font-size: 11px; color: var(--fa-muted); padding: 8px 12px; }
 .fa-app .fa-voice-hint button { align-self: start; background: none; border: 0; padding: 0; }
 .fa-app .fa-avatars { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; gap: 3px; padding: 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.fa-app .fa-avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--fa-control); color: var(--fa-text); border: 2px solid transparent; opacity: .55; overflow: hidden; font-size: 9px; }
+.fa-app .fa-avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--fa-control); color: var(--fa-text); border: 2px solid transparent; overflow: hidden; font-size: 9px; }
 .fa-app .fa-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.fa-app .fa-avatar.fa-selected { opacity: 1; border-color: var(--fa-blue); }
+.fa-app .fa-avatar.fa-selected { border-color: var(--fa-blue); box-shadow: 0 0 0 1px var(--fa-raised); }
 .fa-app .fa-avatar:focus-visible { outline-offset: -2px; }
 .fa-app .fa-menu { position: absolute; z-index: 50; width: 192px; padding: 5px; background: var(--fa-raised); border: 1px solid var(--fa-line); border-radius: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.09); }
 .fa-app .fa-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 10px; background: transparent; border: 0; border-radius: 14px; font-size: 13px; }
@@ -89,7 +90,7 @@
 @media (hover: hover) {
   .fa-app .fa-root-crumb:hover { background: var(--fa-hover); }
   .fa-app .fa-icon-button:hover, .fa-app .fa-menu button:hover, .fa-app .fa-inbox-item:hover { background: var(--fa-hover); }
-  .fa-app .fa-avatar:hover { opacity: 1; }
+  .fa-app .fa-avatar:hover { border-color: var(--fa-blue); }
 }
 .fa-app .fa-worker-dialog { width: min(600px, 100%); height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 8px 8px; }
 .fa-app .fa-worker-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; gap: 12px; }
@@ -112,7 +113,7 @@
   .fa-app .fa-communications { left: 8px; right: 8px; top: 56px; bottom: 8px; width: auto; }
   .fa-app .fa-inbox { max-height: 22%; }
   .fa-app .fa-inbox-item { height: 32px; }
-  .fa-app .fa-inbox-task-title { max-width: 29%; }
+  .fa-app .fa-inbox-item strong { max-width: 29%; }
   .fa-app .fa-running-count { display: none; }
   .fa-app .fa-breadcrumb { max-width: calc(100% - 76px); }
   .fa-app .fa-pill { padding: 1px; }
@@ -127,10 +128,15 @@
 
 .fa-app .fa-status-menu { top: 56px; left: 46px; width: 160px; }
 
-.fa-app .fa-board-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 12px; align-content: start; }
+.fa-app .fa-board-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
 .fa-app .fa-board-card { padding: 16px; display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0; }
 .fa-app .fa-board-card strong { font-weight: 500; overflow-wrap: anywhere; }
 .fa-app .fa-board-card > span, .fa-app .fa-board-card small { color: var(--fa-muted); font-size: 11px; }
 .fa-app .fa-board-card small { display: flex; align-items: center; gap: 6px; }
 .fa-app .fa-sidebar-resizer { position: absolute; top: 56px; bottom: 12px; left: calc(var(--fa-sidebar-width) + 16px); width: 16px; z-index: 25; cursor: col-resize; touch-action: none; }
 @container (max-width: 650px) { .fa-app .fa-sidebar-resizer { display: none; } }
+
+.fa-app .fa-board-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.fa-app .fa-board-column { min-width: 0; }
+.fa-app .fa-board-column h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12px; font-weight: 500; }
+.fa-app .fa-board-column h2 small { color: var(--fa-muted); font-size: 11px; }

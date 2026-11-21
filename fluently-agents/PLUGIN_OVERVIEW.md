@@ -2,9 +2,12 @@ Talk to a standing agent, then review its tasks on one board.
 
 ## Board and tasks
 
-Running cards show progress, active agents and an estimated finish time when
-available from Thread Sidebar. Needs you cards show the decision or review
-requested. One compact task panel switches between Inbox and Running
+Board groups cards into Running on the left and Inbox on the right.
+Thread Sidebar supplies task status and ETA. Counts show unique active worker
+lifecycles, including BB turns, native Codex and Claude agents, and tool waits.
+Paused or pending native tasks do not count. An omitted number marks an incomplete
+or unavailable lifecycle census. Inbox cards show the requested
+decision or review. One compact task panel switches between Inbox and Running
 above chat in both views. Inbox opens by default; switching lists preserves
 the selected task, conversation and draft. The board and task
 results use the remaining space beside the conversation.
@@ -13,9 +16,9 @@ results use the remaining space beside the conversation.
 
 Agent avatars open persistent coordinator conversations. New coordinators and
 tasks are ordinary BB threads; Thread Sidebar supplies their status and ETA.
-The board hides BB's surrounding panels while open alone, and restores them
-when you return to BB. A task opens its own
-BB conversation. Each task can delegate independent work to several workers;
+The board uses BB's central plugin area with native sidebars and menus intact.
+The Board breadcrumb returns from a task. A task opens its own BB conversation.
+Each task can delegate independent work to several workers;
 workers can delegate again within the same budget. The shared chat shows your
 messages, agent replies and tool activity, with attachments and a message
 queue. BB retains the history and permission decisions.

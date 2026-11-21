@@ -1,10 +1,12 @@
+import { openExternalWebLink } from './external-links';
+import { avatarColors } from './avatar-colors';
+import { countDescription } from './counts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
-import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useBbNavigate, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
+import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
 import { CHANGED, type Agent, type Task, type rpcContract } from './shared';
 import './styles.css';
 import { Chat } from './chat';
-import { mountFocusedShell } from './focus-shell';
 
 const WIDTH_KEY = 'fluently-agents.sidebar-width';
 const clampWidth = (width: number, viewport: number) => Math.max(280, Math.min(Number.isFinite(width) ? width : 440, 720, Math.max(280, viewport - 300)));
@@ -29,12 +31,14 @@ function Avatar({ agent }: { agent: Agent }) {
 }
 
 type Menu = { kind: 'agent'; agent: Agent; left: number; bottom: number } | { kind: 'mode'; left: number; bottom: number } | { kind: 'snooze' };
-type Board = { agents: Agent[]; tasks: Task[]; runningAgents: number };
+type Board = { agents: Agent[]; tasks: Task[]; runningAgents: number | null };
 function AgentsPage() {
-  const navigate = useBbNavigate();
   const rpc = useRpc<typeof rpcContract>();
   const root = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<Board | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [countStale, setCountStale] = useState(false);
+  const countTitle = `${countDescription}${refreshing ? ' Refreshing; showing previous count.' : countStale ? ' Count unavailable; showing previous count.' : ''}`;
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [taskStatus, setTaskStatus] = useState<'running' | 'review'>('review');
@@ -72,20 +76,32 @@ function AgentsPage() {
   const uploadAgent = useRef<Agent | null>(null);
   const openingSequence = useRef(0);
   const fetchSequence = useRef(0);
+  const fetching = useRef(false);
+  const refreshPending = useRef(false);
   const navigation = useRef({ taskId, status, taskTarget, selectedAgent });
   navigation.current = { taskId, status, taskTarget, selectedAgent };
   const report = useCallback((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)), []);
-  const refresh = useCallback(() => {
+  const refresh = useCallback(function refreshBoard() {
+    if (fetching.current) { refreshPending.current = true; return; }
+    fetching.current = true;
     const sequence = ++fetchSequence.current;
+    setRefreshing(true);
     void rpc.call('board', null).then(result => {
-      if (sequence === fetchSequence.current) { setBoard(result); setError(null); }
-    }, report);
+      if (sequence === fetchSequence.current) { setBoard(result); setError(null); setRefreshing(false); setCountStale(false); }
+    }, cause => {
+      if (sequence !== fetchSequence.current) return;
+      setRefreshing(false); setCountStale(true); report(cause);
+    }).finally(() => {
+      if (sequence !== fetchSequence.current) return;
+      fetching.current = false;
+      if (refreshPending.current) { refreshPending.current = false; refreshBoard(); }
+    });
   }, [rpc, report]);
   useRealtime(CHANGED, refresh);
   useEffect(() => {
     refresh();
     const interval = window.setInterval(() => { setNow(Date.now()); if (!document.hidden) refresh(); }, 30000);
-    return () => { window.clearInterval(interval); fetchSequence.current++; openingSequence.current++; };
+    return () => { window.clearInterval(interval); fetchSequence.current++; fetching.current = false; refreshPending.current = false; openingSequence.current++; };
   }, [refresh]);
   const agent = board?.agents.find(item => item.id === selectedAgent) ?? board?.agents[0] ?? null;
   const task = board?.tasks.find(item => item.id === taskId) ?? null;
@@ -181,14 +197,13 @@ function AgentsPage() {
     setRenaming(null);
   });
   const agentSelector = <div className="fa-avatars" aria-label="Conversation target">
-    {task && <button type="button" className={`fa-avatar${taskTarget ? ' fa-selected' : ''}`} title="Task worker" aria-label="Chat with task worker" aria-pressed={taskTarget} onClick={() => { openingSequence.current++; setOpening(false); setTaskTarget(true); setFocus(value => value + 1); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8M12 2v2M6 8h12a2 2 0 0 1 2 2v9H4v-9a2 2 0 0 1 2-2M8 12h.01M16 12h.01M9 16h6M2 12v4M22 12v4" /></svg></button>}
-    {board?.agents.map(item => <button type="button" className={`fa-avatar${(!task || !taskTarget) && agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={(!task || !taskTarget) && agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}
+    {task && <button type="button" className={`fa-avatar${taskTarget ? ' fa-selected' : ''}`} style={avatarColors(task.title)} title="Task worker" aria-label="Chat with task worker" aria-pressed={taskTarget} onClick={() => { openingSequence.current++; setOpening(false); setTaskTarget(true); setFocus(value => value + 1); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8M12 2v2M6 8h12a2 2 0 0 1 2 2v9H4v-9a2 2 0 0 1 2-2M8 12h.01M16 12h.01M9 16h6M2 12v4M22 12v4" /></svg></button>}
+    {board?.agents.map(item => <button type="button" className={`fa-avatar${(!task || !taskTarget) && agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} style={avatarColors(item.name)} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={(!task || !taskTarget) && agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}
   </div>;
 
-  return <div className="fa-app" ref={root} style={{ '--fa-sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
+  return <div className="fa-app" onClickCapture={openExternalWebLink} ref={root} style={{ '--fa-sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
     <header className="fa-topbar">
       <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
-        <button className="fa-icon-button" title={task ? 'Back to board' : 'Back to BB'} aria-label={task ? 'Back to board' : 'Back to BB'} onClick={() => task ? returnHome() : navigate.toCompose()}><Icon name="ArrowLeft" /></button>
         <button className="fa-root-crumb" onClick={returnHome}>Board</button>
         {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb" title={task.title}>Task</span></>}
 
@@ -197,7 +212,7 @@ function AgentsPage() {
         {task ? <div className="fa-pill">
           <button className="fa-icon-button" disabled={busy} title="Snooze" aria-label="Snooze task" onClick={() => setMenu(value => value?.kind === 'snooze' ? null : { kind: 'snooze' })}><Icon name="Clock" /></button>
           <button className="fa-icon-button" disabled={busy} title="Mark done" aria-label="Mark task done" onClick={() => void act(() => rpc.call('completeTask', { taskId: task.id }), true)}><Icon name="Check" /></button>
-        </div> : <span className="fa-pill fa-agent-count"><i className="fa-dot" />{board?.runningAgents ?? 0} {board?.runningAgents === 1 ? 'agent' : 'agents'}</span>}
+        </div> : <span className="fa-pill fa-agent-count" title={countTitle}><i className="fa-dot" />{board?.runningAgents == null ? 'Agents' : `${board.runningAgents} ${board.runningAgents === 1 ? 'agent' : 'agents'}`}</span>}
       </div>
     </header>
 
@@ -206,7 +221,7 @@ function AgentsPage() {
       {!board ? <div className="fa-empty" role="status">Loading agents…</div> : task ? <div className="fa-task-canvas">
         {task.artifacts.length > 0 ? <div className="fa-artifacts">{task.artifacts.map((artifact, index) => <UrlLink className="fa-artifact" key={`${artifact.url}-${index}`} href={artifact.url}><Icon name="FileText" /><strong>{artifact.title}</strong><Icon name="ArrowUpRight" /></UrlLink>)}</div> : <div className="fa-empty">Results will appear here.</div>}
         {(task.state === 'snoozed' || task.state === 'done') && <button className="fa-reopen" disabled={busy} onClick={() => void act(() => rpc.call('reopenTask', { taskId: task.id }))}>Reopen task</button>}
-      </div> : <div className="fa-board-cards">{[...running, ...needs].map(item => <button key={item.id} className="fa-board-card fa-panel" onClick={() => openTask(item)}><strong>{item.title}</strong><span>{item.projectName}</span><small><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} />{item.state === 'needs-you' ? item.ask || 'Needs you' : item.state === 'queued' ? 'Queued' : `${item.runningAgents} agents`}</small></button>)}</div>}
+      </div> : <div className="fa-board-columns">{([{ title: 'Running', items: running }, { title: 'Inbox', items: needs }]).map(column => <section className="fa-board-column" aria-label={`${column.title} tasks`} key={column.title}><h2>{column.title}<small>{column.items.length}</small></h2><div className="fa-board-cards">{column.items.map(item => <button key={item.id} className="fa-board-card fa-panel" onClick={() => openTask(item)}><strong>{item.title}</strong><span>{item.projectName}</span><small title={countTitle}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} />{item.state === 'needs-you' ? item.ask || 'Needs you' : item.state === 'queued' ? 'Queued' : item.runningAgents == null ? 'Running' : `${item.runningAgents} agents`}</small></button>)}</div>{column.items.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</section>)}</div>}
     </main>
 
     <aside className="fa-communications" aria-label="Conversations">
@@ -218,7 +233,7 @@ function AgentsPage() {
           </div>
           <button className="fa-icon-button" aria-label={collapsed ? 'Expand tasks' : 'Collapse tasks'} aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)}><Icon name={collapsed ? 'ChevronRight' : 'ChevronDown'} /></button>
         </div>
-        <div className="fa-inbox-list" hidden={collapsed}>{(taskStatus === 'running' ? running : needs).map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title}`} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><strong>{item.state === 'needs-you' ? item.ask || 'Review task' : item.title}</strong><span className="fa-inbox-task-title">{item.state === 'needs-you' ? item.title : item.projectName}</span>{item.state !== 'needs-you' && <small className="fa-running-count">{item.runningAgents} agents</small>}<small>{item.state === 'needs-you' ? elapsed(item.needsSince ?? item.updatedAt, now).replace(' ago', '') : item.etaAt !== null ? `~${eta(item.etaAt, now)}` : item.state === 'queued' ? 'Queued' : ''}</small></button>)}{(taskStatus === 'running' ? running : needs).length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
+        <div className="fa-inbox-list" hidden={collapsed}>{(taskStatus === 'running' ? running : needs).map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title}${item.ask ? ` / ${item.ask}` : ''}`} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><strong>{item.title}</strong>{(item.state === 'needs-you' || item.ask) && <span className="fa-inbox-task-title">{item.ask || 'Review task'}</span>}{item.state !== 'needs-you' && item.runningAgents !== null && <small className="fa-running-count" title={countTitle}>{item.runningAgents} agents</small>}<small>{item.state === 'needs-you' ? elapsed(item.needsSince ?? item.updatedAt, now).replace(' ago', '') : item.etaAt !== null ? `~${eta(item.etaAt, now)}` : item.state === 'queued' ? 'Queued' : ''}</small></button>)}{(taskStatus === 'running' ? running : needs).length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
       </section>
       <section className="fa-chat" aria-label="Chat">
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
@@ -258,6 +273,5 @@ function AgentsPage() {
 }
 
 export default definePluginApp(app => {
-  app.contentScripts.register({ id: 'focused-board', mount: mountFocusedShell });
   app.slots.navPanel({ id: 'board', title: 'Agents', icon: 'GridView', path: 'board', component: AgentsPage });
 });

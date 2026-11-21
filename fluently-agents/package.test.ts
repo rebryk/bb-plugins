@@ -5,7 +5,7 @@ import { experimental_scanPublicSdkOnly } from "@get-bb/plugin-sdk/testing";
 it("uses only the public SDK and package-local source", async () => {
   const result = await experimental_scanPublicSdkOnly(
     fileURLToPath(new URL(".", import.meta.url)),
-    { allow: [/^(react|react-dom|@testing-library\/react)$/] },
+    { allow: [/^(react|react-dom|voice-ring|@testing-library\/react)$/] },
   );
   expect(result.violations).toEqual([]);
   expect(result.privateDependencies).toEqual([]);

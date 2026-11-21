@@ -19,7 +19,7 @@ const cleanups: (() => void)[] = [];
 beforeEach(() => { vi.clearAllMocks(); });
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 
-async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), threads = new Map<string, FakeThread>()) {
+async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), threads = new Map<string, FakeThread>(), beforeStart?: (bb: any) => void) {
   const storage = seed;
   const queues = new Map<string, any[]>();
   const tools = new Map<string, { parameters: z.ZodType; execute: Handler }>();
@@ -30,6 +30,7 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
   let cli: Handler = () => ({});
   const project = { id: 'project', name: 'Project', kind: 'personal', gitRemoteUrl: 'git@example.test:repo.git' };
   const threadApi = {
+    events: { list: vi.fn(async (_args: any): Promise<any[]> => []) },
     get: vi.fn(async ({ threadId }: { threadId: string }) => {
       const thread = threads.get(threadId); if (!thread) throw new Error('Thread not found'); return thread;
     }),
@@ -94,6 +95,7 @@ async function harness(maxWorkers = 2, seed = new Map<string, unknown>(), thread
     events: { on: (name: string, callback: Handler) => events.set(name, callback) },
     onDispose: (callback: () => void) => cleanups.push(callback), cli: { register: vi.fn((registration: { run: Handler }) => { cli = registration.run; }) },
   };
+  beforeStart?.(bb);
   await plugin(bb as unknown as BbPluginApi);
   async function call(name: string, input: unknown = null) { return rpc[name]!(contract[name]!.input.parse(input)); }
   async function tool(name: string, threadId: string, input: unknown) {
@@ -305,18 +307,31 @@ describe('task state and durable conversations', () => {
     h.patch(task.threadId, { status: 'active' }); await h.event('thread.active', task.threadId);
     expect(await h.boardTask(task.taskId)).toMatchObject({ state: 'running', ask: null });
   });
-  it('counts native background work and descendants once in both card and board total', async () => {
+  it('excludes explicitly paused native workers and counts active BB descendants once', async () => {
     const h = await harness(); const task = await h.setupTask();
     h.patch(task.coordinatorId, { status: 'idle' });
     h.patch(task.threadId, { status: 'idle', activity: { activeBackgroundAgentCount: 2 } });
+    h.threadApi.events.list.mockImplementation(async ({ threadId, afterSeq }: any) => threadId === task.threadId ? [1, 2].filter(seq => seq > Number(afterSeq)).map(seq => ({ seq, type: 'item/backgroundTask/progress', data: { providerThreadId: 'session', item: { type: 'backgroundTask', id: `paused-${seq}`, familyId: `family-${seq}`, taskType: 'local_agent', taskStatus: 'paused', status: 'pending', foreground: false, skipTranscript: false } } })) : []);
     let board = await h.call('board');
-    expect(board.runningAgents).toBe(2); expect(board.tasks[0].runningAgents).toBe(2);
+    expect(board.runningAgents).toBe(0); expect(board.tasks[0].runningAgents).toBe(0);
     const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('first'));
     await h.tool('agents_spawn_worker', worker.threadId, workerInput('nested'));
     await h.call('snoozeTask', { taskId: task.taskId, until: null });
     h.patch(task.coordinatorId, { status: 'active' });
     board = await h.call('board');
-    expect(board.runningAgents).toBe(5); expect(board.tasks[0].runningAgents).toBe(4);
+    expect(board.runningAgents).toBe(3); expect(board.tasks[0].runningAgents).toBe(2);
+  });
+  it('deduplicates overlapping task roots and coordinator membership', async () => {
+    const h = await harness(); const task = await h.setupTask();
+    const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('first'));
+    const stored = h.storage.get(`task:${task.taskId}`) as any;
+    h.storage.set('task:overlap', { ...stored, id: 'overlap', threadId: worker.threadId });
+    const agent = h.storage.get('agent:general') as any;
+    h.storage.set('agent:general', { ...agent, threadId: worker.threadId });
+    h.patch(task.coordinatorId, { status: 'idle' }); // The previous coordinator is still a real BB owner.
+    const restarted = await harness(2, h.storage, h.threads);
+    const board = await restarted.call('board');
+    expect(board.runningAgents).toBe(2);
   });
   it('surfaces a worker approval while other work remains active', async () => {
     const h = await harness(); const task = await h.setupTask();
@@ -350,6 +365,7 @@ describe('task state and durable conversations', () => {
   it('blocks completion during native background work and pending approval', async () => {
     const h = await harness(); const task = await h.setupTask();
     h.patch(task.threadId, { status: 'idle', activity: { activeBackgroundAgentCount: 2 } });
+    h.threadApi.events.list.mockImplementation(async ({ threadId, afterSeq }: any) => threadId === task.threadId ? [1, 2].filter(seq => seq > Number(afterSeq)).map(seq => ({ seq, type: 'item/backgroundTask/progress', data: { providerThreadId: 'session', item: { type: 'backgroundTask', id: `paused-${seq}`, familyId: `family-${seq}`, taskType: 'local_agent', taskStatus: 'paused', status: 'pending', foreground: false, skipTranscript: false } } })) : []);
     await expect(h.call('completeTask', { taskId: task.taskId })).rejects.toThrow();
     h.patch(task.threadId, { activity: { activeBackgroundAgentCount: 0 }, hasPendingInteraction: true });
     await expect(h.call('completeTask', { taskId: task.taskId })).rejects.toThrow();
@@ -472,7 +488,7 @@ describe('existing BB conversations', () => {
     const h = await harness(); existing(h, 'root', { activity: { activeBackgroundAgentCount: 2 } });
     existing(h, 'child', { parentThreadId: 'root', status: 'active' });
     h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: { root: { kind: 'needs-you', reason: 'pick direction' } } });
-    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'pick direction', runningAgents: 3 });
+    expect(await h.boardTask('existing:root')).toMatchObject({ state: 'needs-you', ask: 'pick direction', runningAgents: 1 });
     h.bb.sdk.plugins.callRpc.mockResolvedValue({ phases: { root: { kind: 'running', reason: 'Working', etaAt: 999999, since: 1 } } });
     h.patch('root', { status: 'active' });
     expect(await h.boardTask('existing:root')).toMatchObject({ state: 'running', ask: null });
@@ -589,4 +605,297 @@ describe('coordinator avatar persistence', () => {
     await Promise.all([opening, editing]);
     expect((h.storage.get(`agent:${agent.id}`) as any).avatar).toBe('new');
   });
+});
+
+it('refreshes archived managed descendants through idle, restart, deletion and plugin restart', async () => {
+  const h = await harness(); const task = await h.setupTask();
+  const worker = await h.tool('agents_spawn_worker', task.threadId, workerInput('review-worker'));
+  h.patch(task.coordinatorId, { status: 'idle' });
+  h.patch(task.threadId, { status: 'idle', archivedAt: 1 });
+  expect((await h.call('board')).runningAgents).toBe(1);
+  h.patch(worker.threadId, { status: 'idle' }); await h.event('thread.idle', worker.threadId);
+  expect((await h.call('board')).runningAgents).toBe(0);
+  h.patch(worker.threadId, { status: 'active' }); await h.event('thread.active', worker.threadId);
+  expect((await h.call('board')).runningAgents).toBe(1);
+  const restarted = await harness(2, h.storage, h.threads);
+  expect((await restarted.call('board')).runningAgents).toBe(1);
+  restarted.patch(task.threadId, { deletedAt: 2 }); await restarted.event('thread.deleted', task.threadId);
+  expect((await restarted.call('board')).runningAgents).toBe(1);
+  restarted.patch(worker.threadId, { deletedAt: 3 }); await restarted.event('thread.deleted', worker.threadId);
+  expect((await restarted.call('board')).runningAgents).toBe(0);
+  expect((await restarted.boardTask(task.taskId)).runningAgents).toBe(0);
+});
+it('counts native work while its BB owner is idle, retains Sidebar phase/ETA and exposes read failures', async () => {
+  const h = await harness(); const task = await h.setupTask();
+  h.patch(task.coordinatorId, { status: 'idle' }); h.patch(task.threadId, { status: 'idle' });
+  const nativeEvent = { seq: 1, type: 'item/started', data: { providerThreadId: 'session', item: { type: 'delegation', id: 'call', childRef: 'child', status: 'pending' } } };
+  h.threadApi.events.list.mockImplementation(async ({ threadId, afterSeq }: any) => threadId === task.threadId && Number(afterSeq) < 1 ? [nativeEvent] : []);
+  expect((await h.call('board')).runningAgents).toBe(1);
+  const row = await h.boardTask(task.taskId); expect(row.state).toBe('needs-you'); expect(row.etaAt).toBeNull();
+  h.threadApi.events.list.mockRejectedValueOnce(new Error('offline')); await h.event('thread.idle', task.threadId);
+  expect((await h.call('board')).runningAgents).toBeNull();
+  await h.event('thread.idle', task.threadId); expect((await h.call('board')).runningAgents).toBe(1);
+});
+it('REVIEW settled managed history is queried on every refresh',async()=>{
+ const h=await harness(); const made=[];
+ for(let i=0;i<20;i++) { const task=await h.setupTask(`old-${i}`);made.push(task);h.patch(task.threadId,{status:'idle',archivedAt:1});h.patch(task.coordinatorId,{status:'idle'}); }
+ for (let i = 0; i < 4; i++) { await h.event('thread.idle',made[0].coordinatorId); await h.call('board'); }
+ h.threadApi.events.list.mockClear();h.threadApi.experimental_listDescendants.mockClear();h.threadApi.list.mockClear();
+ await h.event('thread.idle',made[0].coordinatorId);
+ const board=await h.call('board');
+ const counts={global:board.runningAgents,eventCalls:h.threadApi.events.list.mock.calls.length,descendantCalls:h.threadApi.experimental_listDescendants.mock.calls.length,listCalls:h.threadApi.list.mock.calls.length};
+ console.log('Settled managed census polling',JSON.stringify(counts));
+ expect(counts.eventCalls).toBe(1);expect(counts.descendantCalls).toBe(0);expect(counts.listCalls).toBe(2);
+});
+it('REVIEW archived ordinary root keeps a hidden active descendant counted',async()=>{
+ const h=await harness();
+ const base:any={title:'Existing',projectId:'project',environmentId:'environment',status:'idle',archivedAt:null,deletedAt:null,hasPendingInteraction:false,queuedWork:'none',activity:{activeBackgroundAgentCount:0},pluginMetadata:{},visibility:'visible',updatedAt:100};
+ h.threads.set('root',{...base,id:'root'});
+ h.threads.set('hidden',{...base,id:'hidden',parentThreadId:'root',visibility:'hidden',status:'active'});
+ expect((await h.call('board')).runningAgents).toBe(1);
+ h.patch('root',{archivedAt:1});await h.event('thread.archived','root');
+ expect((await h.call('board')).runningAgents).toBe(1);
+});
+
+it('retains ordinary hidden ownership after root deletion, restart and latent worker resume', async () => {
+ const h = await harness();
+ const base: any = { title: 'Existing', projectId: 'project', environmentId: 'environment', status: 'idle', archivedAt: null, deletedAt: null, hasPendingInteraction: false, queuedWork: 'none', activity: { activeBackgroundAgentCount: 0 }, pluginMetadata: {}, visibility: 'visible', updatedAt: 100 };
+ h.threads.set('root', { ...base, id: 'root' });
+ h.threads.set('hidden', { ...base, id: 'hidden', parentThreadId: 'root', visibility: 'hidden', status: 'active' });
+ expect((await h.call('board')).runningAgents).toBe(1);
+ h.patch('root', { deletedAt: 1 });
+ expect((await h.call('board')).runningAgents).toBe(1);
+ h.patch('hidden', { status: 'idle' }); expect((await h.call('board')).runningAgents).toBe(0);
+ const restarted = await harness(2, h.storage, h.threads);
+ restarted.patch('hidden', { status: 'active' });
+ expect((await restarted.call('board')).runningAgents).toBe(1);
+ expect(restarted.threadApi.experimental_listDescendants).not.toHaveBeenCalled();
+});
+it('continues fairly without board calls, bounds each slice and restores warm cursors', async () => {
+ vi.useFakeTimers();
+ try {
+  const h = await harness();
+  const base: any = { title: 'Existing', projectId: 'project', environmentId: 'environment', status: 'idle', archivedAt: null, deletedAt: null, hasPendingInteraction: false, queuedWork: 'none', activity: { activeBackgroundAgentCount: 0 }, pluginMetadata: {}, visibility: 'visible', updatedAt: 100 };
+  for (let i = 0; i < 20; i++) h.threads.set(`root${i}`, { ...base, id: `root${i}` });
+  h.threadApi.events.list.mockImplementation(async ({ afterSeq, limit }: any) => Array.from({ length: Math.min(Number(limit), 300 - Number(afterSeq)) }, (_, i) => ({ seq: Number(afterSeq) + i + 1, type: 'item/started', data: { item: { type: 'tool' }, providerThreadId: 's' } })));
+  expect((await h.call('board')).runningAgents).toBeNull();
+  expect(h.threadApi.events.list.mock.calls.length).toBeLessThanOrEqual(8);
+  const tickReads: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const before = h.threadApi.events.list.mock.calls.length + h.threadApi.list.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(100);
+    tickReads.push(h.threadApi.events.list.mock.calls.length + h.threadApi.list.mock.calls.length - before);
+  }
+  expect(Math.max(...tickReads)).toBeLessThanOrEqual(16);
+  console.log('Fair census tick SDK reads', JSON.stringify(tickReads));
+  const calls = h.threadApi.events.list.mock.calls;
+  expect(new Set(calls.map(([args]) => args.threadId)).size).toBe(20);
+  expect((await h.call('board')).runningAgents).toBe(0);
+  const restarted = await harness(2, h.storage, h.threads);
+  await restarted.call('board');
+  expect(restarted.threadApi.events.list.mock.calls.every(([args]) => args.afterSeq === '300')).toBe(true);
+ } finally { vi.useRealTimers(); }
+});
+
+it('does not retry or log singleton overflow repeatedly, including after checkpoint reload', async () => {
+ vi.useFakeTimers();
+ try {
+  const h = await harness(); const task = await h.setupTask();
+  h.threadApi.events.list.mockRejectedValue(Object.assign(new Error('oversized'), { code: 'event_data_too_large' }));
+  await h.call('board'); await vi.advanceTimersByTimeAsync(1000);
+  const calls = h.threadApi.events.list.mock.calls.length;
+  const warnings = h.bb.log.warn.mock.calls.length;
+  expect(warnings).toBe(2); expect(calls).toBe(14);
+  await vi.advanceTimersByTimeAsync(30000); await h.call('board');
+  expect(h.threadApi.events.list.mock.calls.length).toBe(calls);
+  expect(h.bb.log.warn.mock.calls.length).toBe(warnings);
+  const restarted = await harness(2, h.storage, h.threads);
+  expect((await restarted.call('board')).runningAgents).toBeNull();
+  expect(restarted.threadApi.events.list).not.toHaveBeenCalled();
+  expect((await restarted.boardTask(task.taskId)).runningAgents).toBeNull();
+ } finally { vi.useRealTimers(); }
+});
+
+it('excludes an unrelated archived singleton error but preserves known archived native ownership', async () => {
+ const h = await harness();
+ const base: any = { title: 'Existing', projectId: 'project', environmentId: 'environment', status: 'idle', archivedAt: null, deletedAt: null, hasPendingInteraction: false, queuedWork: 'none', activity: { activeBackgroundAgentCount: 0 }, pluginMetadata: {}, visibility: 'visible', updatedAt: 100 };
+ h.threads.set('known', { ...base, id: 'known' });
+ h.threads.set('unrelated', { ...base, id: 'unrelated', archivedAt: 1 });
+ const list = async ({threadId, afterSeq}: any) => {
+   if (threadId === 'unrelated') throw Object.assign(new Error('oversized'), {code:'event_data_too_large'});
+   return Number(afterSeq) ? [] : [{ seq: 1, type: 'item/started', data: { providerThreadId: 's', item: { type: 'delegation', id: 'call', childRef: 'native', status: 'pending' } } }];
+ };
+ h.threadApi.events.list.mockImplementation(list);
+ expect((await h.call('board')).runningAgents).toBe(1);
+ h.patch('known', { archivedAt: 1 }); expect((await h.call('board')).runningAgents).toBe(1);
+ const warm = await harness(2,h.storage,h.threads); warm.threadApi.events.list.mockImplementation(list);
+ expect((await warm.call('board')).runningAgents).toBe(1);
+ expect(warm.threadApi.events.list.mock.calls.some(([args])=>args.threadId==='unrelated')).toBe(false);
+});
+it('keeps the previous atomic checkpoint if publishing the replacement fails', async () => {
+ const h = await harness(); const task = await h.setupTask();
+ await h.call('board');
+ const before = structuredClone([...h.storage]);
+ const set = h.bb.storage.kv.set;
+ h.bb.storage.kv.set = async (key, value) => {
+   if (key === `census:${task.threadId}`) throw new Error('simulated interrupted manifest commit');
+   await set(key, value);
+ };
+ h.threadApi.events.list.mockImplementation(async ({threadId}: any) => threadId === task.threadId ? [{ seq: 5, type: 'item/started', data: { providerThreadId: 's', item: { type: 'delegation', id: 'call', childRef: 'native', status: 'pending' } } }] : []);
+ await h.event('thread.idle', task.threadId);
+ await expect(h.call('board')).rejects.toThrow('interrupted manifest');
+ expect(h.storage.get(`census:${task.threadId}`)).toEqual(new Map(before).get(`census:${task.threadId}`));
+ const restarted = await harness(2, h.storage, h.threads);
+ await restarted.call('board');
+ expect(restarted.threadApi.events.list.mock.calls.find(([args]) => args.threadId === task.threadId)?.[0].afterSeq).toBe('0');
+});
+it('stops admitting census reads at the global time budget', async () => {
+ vi.useFakeTimers();
+ try {
+  const h = await harness(); const task = await h.setupTask();
+  const started = Date.now();
+  h.threadApi.events.list.mockImplementation(async ({afterSeq}: any) => {
+    vi.setSystemTime(Date.now() + 90);
+    return Array.from({length:100}, (_, i) => ({seq:Number(afterSeq)+i+1,type:'item/started',data:{item:{type:'tool'},providerThreadId:'s'}}));
+  });
+  const board = await h.call('board');
+  expect(board.runningAgents).toBeNull();
+  expect(h.threadApi.events.list.mock.calls).toHaveLength(3);
+  expect(Date.now()-started).toBe(270); // No fourth read admitted after 250ms.
+  expect(h.threadApi.events.list.mock.calls.every(([args]) => args.signal instanceof AbortSignal)).toBe(true);
+  expect(h.threadApi.events.list.mock.calls.some(([args]) => args.threadId === task.threadId)).toBe(true);
+ } finally { vi.useRealTimers(); }
+});
+it('INDEPENDENT inventory must not discard an invalidation received during its scan',async()=>{
+ const h=await harness();
+ const list=h.threadApi.list.getMockImplementation()!;
+ h.threadApi.list.mockImplementation(async(args:any)=>{
+   if(args.archived && !h.threads.has('new-worker')) {
+     h.threads.set('new-worker',{id:'new-worker',title:'New',projectId:'project',environmentId:'environment',status:'active',archivedAt:null,deletedAt:null,hasPendingInteraction:false,queuedWork:'none',activity:{activeBackgroundAgentCount:0},pluginMetadata:{},visibility:'visible'});
+     await h.event('thread.created','new-worker');
+   }
+   return list(args);
+ });
+ const board=await h.call('board');
+ expect(board.runningAgents).not.toBe(0); // Either unknown, or fresh and counted.
+});
+it('INDEPENDENT disposal must stop continuation after an in-flight event read',async()=>{
+ const h=await harness();await h.setupTask();
+ let release!:()=>void;let entered!:()=>void;
+ const ready=new Promise<void>(r=>entered=r);const wait=new Promise<void>(r=>release=r);
+ h.threadApi.events.list.mockImplementationOnce(async()=>{entered();await wait;return [];});
+ const board=h.call('board');await ready;
+ for(const dispose of cleanups.splice(0))dispose();
+ const writes=vi.spyOn(h.bb.storage.kv,'set');release();await board;
+ expect(writes).not.toHaveBeenCalled();
+});
+it('INDEPENDENT deleted incomplete census must not keep the 100ms pump hot',async()=>{
+ vi.useFakeTimers();try{
+ const h=await harness();const task=await h.setupTask();
+ h.threadApi.events.list.mockImplementation(async({threadId}:any)=>{if(threadId===task.threadId)throw new Error('offline');return [];});
+ await h.call('board');h.patch(task.threadId,{deletedAt:1});await h.event('thread.deleted',task.threadId);await h.call('board');
+ h.bb.realtime.publish.mockClear();
+ await vi.advanceTimersByTimeAsync(1000);
+ console.log('Deleted incomplete owner publishes in 1 second',h.bb.realtime.publish.mock.calls.length);
+ expect(h.bb.realtime.publish.mock.calls.length).toBeLessThan(3);
+ }finally{vi.useRealTimers();}
+});
+it('INDEPENDENT failed checkpoint publications must not leak generations',async()=>{
+ const h=await harness();const task=await h.setupTask();await h.call('board');
+ const set=h.bb.storage.kv.set;let seq=0;
+ h.bb.storage.kv.set=async(key,value)=>{if(key===`census:${task.threadId}`)throw new Error('manifest fail');await set(key,value);};
+ h.threadApi.events.list.mockImplementation(async({threadId}:any)=>threadId===task.threadId?[{seq:++seq,type:'item/started',data:{providerThreadId:'s',item:{type:'delegation',id:`call${seq}`,childRef:`child${seq}`,status:'completed'}}}]:[]);
+ for(let i=0;i<3;i++){await h.event('thread.idle',task.threadId);await expect(h.call('board')).rejects.toThrow('manifest fail');}
+ const chunkKeys=[...h.storage.keys()].filter(key=>key.startsWith(`census-chunk:${task.threadId}:`));
+ console.log('Retained chunk generations after three manifest failures',chunkKeys.length);
+ expect(chunkKeys.length).toBe(1);
+});
+it('INDEPENDENT warm restart must verify every checkpoint tail before asserting global count',async()=>{
+ const h=await harness();
+ const base:any={title:'Existing',projectId:'project',environmentId:'environment',status:'idle',archivedAt:null,deletedAt:null,hasPendingInteraction:false,queuedWork:'none',activity:{activeBackgroundAgentCount:0},pluginMetadata:{},visibility:'visible',updatedAt:100};
+ for(let i=0;i<20;i++)h.threads.set(`root${i}`,{...base,id:`root${i}`});
+ for(let i=0;i<4;i++){await h.event('thread.idle','root0');await h.call('board');}
+ const warm=await harness(2,h.storage,h.threads);
+ warm.threadApi.events.list.mockImplementation(async({threadId}:any)=>threadId==='root19'?[{seq:1,type:'item/started',data:{providerThreadId:'s',item:{type:'delegation',id:'call',childRef:'child',status:'pending'}}}]:[]);
+ const board=await warm.call('board');
+ expect(warm.threadApi.events.list.mock.calls.some(([args])=>args.threadId==='root19')).toBe(false);
+ expect(board.runningAgents).not.toBe(0);
+});
+it('FINAL independent coalescing must deliver the final caught-up change within one second',async()=>{
+ vi.useFakeTimers();try{
+ const h=await harness();const task=await h.setupTask();
+ h.threadApi.events.list.mockImplementation(async({threadId,afterSeq,limit}:any)=>threadId===task.threadId?Array.from({length:Math.min(Number(limit),2400-Number(afterSeq))},(_,i)=>({seq:Number(afterSeq)+i+1,type:'item/started',data:{providerThreadId:'s',item:{type:'tool'}}})):[]);
+ await h.call('board');h.bb.realtime.publish.mockClear();
+ await vi.advanceTimersByTimeAsync(1100);
+ // The first notice occurred during catch-up; a second must expose completion.
+ expect(h.bb.realtime.publish.mock.calls.length).toBe(2);
+ expect((await h.call('board')).runningAgents).not.toBeNull();
+ }finally{vi.useRealTimers();}
+});
+it('FINAL independent invalidation during projection must withhold stale global certainty',async()=>{
+ const h=await harness();
+ h.bb.sdk.projects.list.mockImplementationOnce(async()=>{
+ h.threads.set('new',{id:'new',title:'New',projectId:'project',environmentId:'environment',status:'active',archivedAt:null,deletedAt:null,hasPendingInteraction:false,queuedWork:'none',activity:{activeBackgroundAgentCount:0},pluginMetadata:{},visibility:'visible'});
+ await h.event('thread.created','new');return [];
+ });
+ expect((await h.call('board')).runningAgents).not.toBe(0);
+});
+it('STARTUP independent disposal during checkpoint enumeration must stop initialization',async()=>{
+ vi.useFakeTimers();try{
+ let release!:()=>void;let entered!:()=>void;let bb:any;
+ const ready=new Promise<void>(r=>entered=r);const wait=new Promise<void>(r=>release=r);
+ const storage=new Map<string,unknown>([['census-chunk:deleted:orphan:0','unused']]);
+ const starting=harness(2,storage,new Map(),value=>{
+ bb=value;const list=bb.storage.kv.list;let blocked=false;
+ bb.storage.kv.list=async(prefix:string)=>{if(prefix==='census:'&&!blocked){blocked=true;entered();await wait;}return list(prefix);};
+ vi.spyOn(bb.storage.kv,'set');vi.spyOn(bb.storage.kv,'delete');vi.spyOn(bb.rpc,'register');
+ });
+ await ready;for(const dispose of cleanups)dispose();release();await starting;
+ console.log('STARTUP',JSON.stringify({writes:bb.storage.kv.set.mock.calls.map((c:any)=>c[0]),deletes:bb.storage.kv.delete.mock.calls.map((c:any)=>c[0]),rpcRegistrations:bb.rpc.register.mock.calls.length,timers:vi.getTimerCount()}));
+ expect(bb.storage.kv.set).not.toHaveBeenCalled();expect(bb.storage.kv.delete).not.toHaveBeenCalled();expect(bb.rpc.register).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+ }finally{for(const dispose of cleanups.splice(0))dispose();vi.useRealTimers();}
+});
+
+it('does not hydrate unrelated native checkpoint payloads and retires them to ancestry only', async () => {
+ const h = await harness(); const task = await h.setupTask(); await h.call('board');
+ const agent = h.storage.get('agent:general') as any;
+ h.storage.set('agent:general', {...agent,threadId:null});
+ h.storage.delete(`task:${task.taskId}`);
+ for (const row of h.threads.values()) row.archivedAt=1;
+ let get: any;
+ const warm = await harness(2,h.storage,h.threads,bb=>{get=vi.spyOn(bb.storage.kv,'get');});
+ expect(get.mock.calls.some(([key]:string[])=>key.startsWith('census-chunk:'))).toBe(false);
+ expect((await warm.call('board')).runningAgents).toBe(0);
+ expect(warm.threadApi.events.list).not.toHaveBeenCalled();
+ expect(get.mock.calls.some(([key]:string[])=>key.startsWith('census-chunk:'))).toBe(false);
+ expect([...h.storage.keys()].filter(key=>key.startsWith('census-chunk:'))).toHaveLength(0);
+ expect((h.storage.get(`census:${task.threadId}`) as any).chunks).toBe(0);
+});
+it.each(['settings', 'avatar-pool'])('stops startup when disposed during the first %s read', async stage => {
+ vi.useFakeTimers();
+ try {
+  let release!: () => void; let entered!: () => void; let bb: any;
+  const ready = new Promise<void>(resolve => entered = resolve);
+  const wait = new Promise<void>(resolve => release = resolve);
+  const starting = harness(2, new Map(), new Map(), value => {
+    bb = value;
+    if (stage === 'settings') bb.settings.define = () => ({get: async () => {entered(); await wait; return {maxWorkers:2};}});
+    else { const get = bb.storage.kv.get; bb.storage.kv.get = async (key: string) => {if(key==='avatar-pool'){entered(); await wait;} return get(key);}; }
+    vi.spyOn(bb.storage.kv, 'set'); vi.spyOn(bb.rpc, 'register');
+  });
+  await ready; for (const dispose of cleanups) dispose(); release(); await starting;
+  expect(bb.storage.kv.set).not.toHaveBeenCalled(); expect(bb.rpc.register).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
+ } finally { for (const dispose of cleanups.splice(0)) dispose(); vi.useRealTimers(); }
+});
+it('FINAL independent unavailable owner invalidation must not keep pump hot forever',async()=>{
+ vi.useFakeTimers();try{
+ const h=await harness();const task=await h.setupTask();
+ h.threadApi.events.list.mockImplementation(async({threadId}:any)=>{if(threadId===task.threadId)throw Object.assign(new Error('event_data_too_large'),{status:413});return [];});
+ for(let i=0;i<8;i++)await h.call('board');
+ await vi.advanceTimersByTimeAsync(2000);
+ await h.event('thread.idle',task.threadId);await h.call('board');
+ await vi.advanceTimersByTimeAsync(2000);h.bb.realtime.publish.mockClear();
+ await vi.advanceTimersByTimeAsync(4000);
+ expect(h.bb.realtime.publish.mock.calls.length).toBeLessThan(2);
+ }finally{vi.useRealTimers();}
 });
