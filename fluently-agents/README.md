@@ -32,9 +32,11 @@ The board hides BB's surrounding panels while open alone. Back to BB restores
 the ordinary view; saved panel widths, tabs and sidebar state stay unchanged.
 Split views retain BB's navigation.
 
-The sidebar always shows Running, Inbox, then chat, on the board and inside a
-task. Each list collapses independently. Running rows show the task, project,
-active agents and ETA; Inbox rows lead with the requested action.
+The sidebar shows one task panel above chat on the board and inside a task.
+Its Inbox / Running switch defaults to Inbox and only filters the list;
+it keeps the selected task, conversation and draft. A separate icon collapses
+the list. Running rows show the task, project, active agents and ETA;
+Inbox rows lead with the requested action.
 
 Board returns to the task cards without moving the navigation. A selected task
 adds the Task breadcrumb and shows its results to the right. Resize the sidebar
@@ -147,7 +149,7 @@ Model choice happens at launch; an existing conversation keeps its model.
 - Running includes queued work and shows the active-agent count and ETA.
 - Inbox shows the requested decision. Finishing an assistant turn does not
   mark a task done.
-- Running and Inbox remain above chat in both views. Select a row to switch
+- The selected list remains above chat in both views. Select a row to switch
   tasks; select Board to return to the cards.
 - Mark done archives settled work. Let active work finish and resolve queued
   messages before closing the task.

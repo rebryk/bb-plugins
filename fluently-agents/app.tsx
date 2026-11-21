@@ -36,7 +36,8 @@ function AgentsPage() {
   const root = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<'running' | 'review'>('review');
   const [taskTarget, setTaskTarget] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [sidebarWidth, setSidebarWidth] = useState(() => clampWidth(Number(readPreference(WIDTH_KEY, '440')), window.innerWidth));
@@ -209,10 +210,16 @@ function AgentsPage() {
     </main>
 
     <aside className="fa-communications" aria-label="Conversations">
-      {[{ label: 'Running', items: running }, { label: 'Inbox', items: needs }].map(group => <section key={group.label} className={`fa-inbox fa-panel${collapsed[group.label] ? ' fa-inbox-collapsed' : ''}`} aria-label={group.label}>
-        <button className="fa-inbox-header" aria-expanded={!collapsed[group.label]} onClick={() => setCollapsed(value => ({ ...value, [group.label]: !value[group.label] }))}><span>{group.label}</span><small>{group.items.length}</small><Icon name={collapsed[group.label] ? 'ChevronRight' : 'ChevronDown'} /></button>
-        <div className="fa-inbox-list" hidden={collapsed[group.label]}>{group.items.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title}`} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><strong>{item.state === 'needs-you' ? item.ask || 'Review task' : item.title}</strong><span className="fa-inbox-task-title">{item.state === 'needs-you' ? item.title : item.projectName}</span>{item.state !== 'needs-you' && <small className="fa-running-count">{item.runningAgents} agents</small>}<small>{item.state === 'needs-you' ? elapsed(item.needsSince ?? item.updatedAt, now).replace(' ago', '') : item.etaAt !== null ? `~${eta(item.etaAt, now)}` : item.state === 'queued' ? 'Queued' : ''}</small></button>)}{group.items.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
-      </section>)}
+      <section className={`fa-inbox fa-panel${collapsed ? ' fa-inbox-collapsed' : ''}`} aria-label="Tasks">
+        <div className="fa-inbox-header">
+          <div className="fa-task-status" role="group" aria-label="Task status">
+            <button aria-pressed={taskStatus === 'review'} onClick={() => setTaskStatus('review')}>Inbox <small>{needs.length}</small></button>
+            <button aria-pressed={taskStatus === 'running'} onClick={() => setTaskStatus('running')}>Running <small>{running.length}</small></button>
+          </div>
+          <button className="fa-icon-button" aria-label={collapsed ? 'Expand tasks' : 'Collapse tasks'} aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)}><Icon name={collapsed ? 'ChevronRight' : 'ChevronDown'} /></button>
+        </div>
+        <div className="fa-inbox-list" hidden={collapsed}>{(taskStatus === 'running' ? running : needs).map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title}`} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><strong>{item.state === 'needs-you' ? item.ask || 'Review task' : item.title}</strong><span className="fa-inbox-task-title">{item.state === 'needs-you' ? item.title : item.projectName}</span>{item.state !== 'needs-you' && <small className="fa-running-count">{item.runningAgents} agents</small>}<small>{item.state === 'needs-you' ? elapsed(item.needsSince ?? item.updatedAt, now).replace(' ago', '') : item.etaAt !== null ? `~${eta(item.etaAt, now)}` : item.state === 'queued' ? 'Queued' : ''}</small></button>)}{(taskStatus === 'running' ? running : needs).length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
+      </section>
       <section className="fa-chat" aria-label="Chat">
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}

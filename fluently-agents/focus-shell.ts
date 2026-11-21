@@ -13,6 +13,33 @@ const css = `
   margin: 0 !important; border: 0 !important; border-radius: 0 !important;
   box-shadow: none !important; translate: none !important;
 }
+/* Native framing is padding plus an inset background and a separate edge span.
+   Keep the title-bar height: native controls and drag regions still use it. */
+[${marker}="shell"][data-framed] {
+  padding: 0 !important;
+  --bb-window-frame-lip: 0px !important;
+  --bb-window-frame-leading-lip: 0px !important;
+  --bb-window-frame-top: 0px !important;
+}
+[${marker}="shell"][data-framed] > main[data-sidebar="inset"] {
+  padding: 0 !important; height: 100% !important;
+  mask-image: none !important; clip-path: none !important;
+}
+[${marker}="shell"][data-framed] > main[data-sidebar="inset"]::before,
+[${marker}="shell"][data-framed] > main[data-sidebar="inset"]::after {
+  content: none !important;
+}
+[${marker}="shell"][data-framed] > main[data-sidebar="inset"] > [data-sidebar="inset-edge"] {
+  display: none !important;
+}
+[${marker}="shell"][data-framed] > [data-testid="window-title-bar-drag-region"] {
+  height: 12px !important; z-index: 50;
+}
+/* Only the visible native title bar needs horizontal control clearance.
+   Hidden title bars leave Board aligned with the panels. */
+html:not([data-superhuman-no-title-bar]) [${marker}="shell"][data-framed] .fa-topbar {
+  left: max(12px, calc(var(--bb-window-title-bar-controls-end, 0px) + 12px));
+}
 [${marker}="main"] { flex: 1 1 0% !important; min-width: 0 !important; }
 `;
 

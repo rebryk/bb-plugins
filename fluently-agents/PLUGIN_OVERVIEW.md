@@ -1,11 +1,12 @@
 Talk to a standing agent, then review its tasks on one board.
 
-## Board and Inbox
+## Board and tasks
 
 Running cards show progress, active agents and an estimated finish time when
 available from Thread Sidebar. Needs you cards show the decision or review
-requested. Inbox keeps
-those tasks above a chat in one shared-width column. The board and task
+requested. One compact task panel switches between Inbox and Running
+above chat in both views. Inbox opens by default; switching lists preserves
+the selected task, conversation and draft. The board and task
 results use the remaining space beside the conversation.
 
 ## Persistent conversations

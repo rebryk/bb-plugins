@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.22
+
+- Keep Board aligned with the panels when the native title bar is hidden.
+- Combine task lists into one compact Inbox / Running switch, defaulting
+  to Inbox without changing the selected task, conversation, or draft.
+  Only the active option has a rounded highlight; there is no shared track.
+
+## 0.1.21
+
+- Remove native window-frame padding, inset decoration, and the edge overlay
+  while Agents is alone. Keep window controls and a top drag strip available,
+  and restore host framing when leaving Agents or opening another split.
+
 ## 0.1.20
 
 - Preserve a concurrent avatar or agent edit while remembering its thread.

@@ -48,3 +48,71 @@ it('supports the compact host without split or pane-content attributes', () => {
   expect(document.querySelector('[data-testid="app-layout-root"]')?.getAttribute('data-fa-focused-shell')).toBe('shell');
   expect(shelf.getAttribute('data-fa-focused-shell')).toBe('hidden');
 });
+
+it('restores native padding, edge, and drag geometry on split and exit', async () => {
+  fixture(); dispose?.();
+  const shell = document.querySelector<HTMLElement>('[data-testid="app-layout-root"]')!;
+  const inset = shell.querySelector<HTMLElement>('main[data-sidebar="inset"]')!;
+  shell.setAttribute('data-framed', '');
+  // Native framing uses padding and a separate overlay, not a main border.
+  const hostStyle = document.createElement('style');
+  hostStyle.textContent = `
+    [data-framed] { padding: 8px; --bb-window-frame-lip: 8px; }
+    main[data-sidebar="inset"] { padding: 0 1px 1px; }
+    [data-sidebar="inset-edge"] { display: block; border: 1px solid; }
+    [data-testid="window-title-bar-drag-region"] { height: 8px; }
+  `;
+  document.head.append(hostStyle);
+  const edge = document.createElement('span');
+  edge.setAttribute('data-sidebar', 'inset-edge'); inset.append(edge);
+  const drag = document.createElement('div');
+  drag.dataset.testid = 'window-title-bar-drag-region'; shell.prepend(drag);
+  const controls = document.createElement('div');
+  controls.dataset.testid = 'app-window-title-bar'; shell.prepend(controls);
+  const original = shell.getAttribute('style');
+  try {
+    expect(getComputedStyle(shell).padding).toBe('8px');
+    dispose = mountFocusedShell();
+    expect(getComputedStyle(shell).padding).toBe('0px');
+    expect(getComputedStyle(inset).padding).toBe('0px');
+    expect(getComputedStyle(edge).display).toBe('none');
+    expect(getComputedStyle(drag).height).toBe('12px');
+    expect(getComputedStyle(controls).display).not.toBe('none');
+    expect(shell.getAttribute('style')).toBe(original);
+    const other = document.createElement('div');
+    other.dataset.splitPaneId = 'two'; shell.append(other); await tick();
+    expect(getComputedStyle(shell).padding).toBe('8px');
+    expect(getComputedStyle(edge).display).toBe('block');
+    other.remove(); await tick();
+    expect(getComputedStyle(edge).display).toBe('none');
+    document.querySelector('.fa-app')!.remove(); await tick();
+    expect(getComputedStyle(shell).padding).toBe('8px');
+    expect(getComputedStyle(inset).padding).toBe('0px 1px 1px');
+    expect(getComputedStyle(edge).display).toBe('block');
+    expect(getComputedStyle(drag).height).toBe('8px');
+  } finally { hostStyle.remove(); }
+});
+
+it('keeps hidden-titlebar navigation aligned and reserves visible native controls', () => {
+  fixture();
+  const shell = document.querySelector('[data-testid="app-layout-root"]')!;
+  shell.setAttribute('data-framed', '');
+  const bar = document.createElement('nav'); bar.className = 'fa-topbar';
+  document.querySelector('.fa-app')!.append(bar);
+  const base = document.createElement('style');
+  base.textContent = '.fa-app .fa-topbar { left: 12px; }';
+  document.head.prepend(base);
+  try {
+    document.documentElement.setAttribute('data-superhuman-no-title-bar', '');
+    expect(getComputedStyle(bar).left).toBe('12px');
+    document.documentElement.removeAttribute('data-superhuman-no-title-bar');
+    // jsdom does not resolve max()/var(); verify the gate here and geometry in Yab.
+    const rule = Array.from(document.styleSheets).flatMap(sheet => Array.from(sheet.cssRules))
+      .find(rule => rule.cssText.includes('--bb-window-title-bar-controls-end')) as CSSStyleRule;
+    expect(bar.matches(rule.selectorText)).toBe(true);
+    document.documentElement.setAttribute('data-superhuman-no-title-bar', '');
+    expect(bar.matches(rule.selectorText)).toBe(false);
+  } finally {
+    base.remove(); document.documentElement.removeAttribute('data-superhuman-no-title-bar');
+  }
+});

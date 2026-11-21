@@ -44,7 +44,7 @@ function mount(overrides: {
 }
 
 async function selectReview(slot: ReturnType<typeof mount>) {
-  await slot.findByRole('region', { name: 'Inbox' });
+  await slot.findByRole('region', { name: 'Tasks' });
 }
 
 describe('Agents board interactions', () => {
@@ -147,7 +147,7 @@ describe('Agents board interactions', () => {
     const slot = mount({ board: () => current, completeTask: () => { current = { ...current, tasks: [nextTask] }; return null; } });
     await selectReview(slot);
     await slot.findByRole('button', { name: /Approve direction.*Review campaign/ });
-    fireEvent.click(within(slot.getByRole('region', { name: 'Inbox' })).getByRole('button', { name: /Review campaign/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Tasks' })).getByRole('button', { name: /Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('next-thread'));
     expect(slot.getByRole('button', { name: 'Back to board' })).not.toBeNull();
@@ -161,7 +161,8 @@ describe('Agents board interactions', () => {
     fireEvent.click(await slot.findByRole('button', { name: /Approve direction.*Review campaign/ }));
     fireEvent.click(slot.getByRole('button', { name: 'Mark task done' }));
     fireEvent.click(slot.getByRole('button', { name: 'Back to board' }));
-    fireEvent.click(within(slot.getByRole('region', { name: 'Running' })).getByRole('button', { name: /Prepare creatives/ }));
+    fireEvent.click(slot.getByRole('button', { name: /Running/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Tasks' })).getByRole('button', { name: /Prepare creatives/ }));
     await act(async () => { finish(); await completed; });
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('running-thread');
   });
@@ -259,12 +260,13 @@ describe('Agents board interactions', () => {
     expect(slot.getByRole('button', { name: 'Record voice message' })).not.toBeNull();
   });
 
-  it('keeps both lists and the selected task while switching conversation targets', async () => {
+  it('keeps the task panel and selected task while switching conversation targets', async () => {
     const slot = mount(); await slot.findByTestId('agents-chat');
     const lists = () => Array.from(slot.container.querySelectorAll('.fa-communications > section')).map(el => el.getAttribute('aria-label'));
-    expect(lists()).toEqual(['Running', 'Inbox', 'Chat']);
-    fireEvent.click(within(slot.getByRole('region', { name: 'Running' })).getByRole('button', { name: /Prepare creatives/ }));
-    expect(lists()).toEqual(['Running', 'Inbox', 'Chat']);
+    expect(lists()).toEqual(['Tasks', 'Chat']);
+    fireEvent.click(slot.getByRole('button', { name: /Running/ }));
+    fireEvent.click(within(slot.getByRole('region', { name: 'Tasks' })).getByRole('button', { name: /Prepare creatives/ }));
+    expect(lists()).toEqual(['Tasks', 'Chat']);
     fireEvent.click(slot.getByRole('button', { name: 'Chat with Ads' }));
     await waitFor(() => expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread'));
     expect(slot.getByText('Task')).not.toBeNull();
@@ -274,6 +276,27 @@ describe('Agents board interactions', () => {
     expect(slot.queryByText('Task')).toBeNull();
     expect(slot.container.querySelectorAll('.fa-board-card')).toHaveLength(2);
     expect(slot.getByTestId('agents-chat').getAttribute('data-thread-id')).toBe('ads-thread');
+  });
+  it('defaults to Inbox and switches lists without remounting chat or changing selection', async () => {
+    const slot = mount(); await slot.findByTestId('agents-chat');
+    const tasks = slot.getByRole('region', { name: 'Tasks' });
+    expect(slot.getByRole('button', { name: /Inbox 1/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(tasks).queryByRole('button', { name: /Prepare creatives/ })).toBeNull();
+    fireEvent.click(within(tasks).getByRole('button', { name: /Approve direction/ }));
+    const chat = slot.getByTestId('agents-chat');
+    const draft = document.createElement('textarea'); draft.value = 'Unsent draft'; chat.append(draft);
+    fireEvent.click(slot.getByRole('button', { name: /Running 1/ }));
+    expect(within(tasks).getByRole('button', { name: /Prepare creatives/ })).not.toBeNull();
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+    expect(chat.getAttribute('data-thread-id')).toBe('task-thread');
+    expect(draft.value).toBe('Unsent draft');
+    expect(slot.getByText('Task')).not.toBeNull();
+    fireEvent.click(slot.getByRole('button', { name: 'Collapse tasks' }));
+    fireEvent.click(slot.getByRole('button', { name: /Inbox 1/ }));
+    expect(slot.getByRole('button', { name: 'Expand tasks' }).getAttribute('aria-expanded')).toBe('false');
+    expect(slot.getByTestId('agents-chat')).toBe(chat);
+    fireEvent.click(slot.getByRole('button', { name: 'Expand tasks' }));
+    expect(within(tasks).getByRole('button', { name: /Approve direction/ }).className).toContain('fa-active');
   });
   it('persists a bounded keyboard-resizable sidebar', async () => {
     const slot = mount(); await slot.findByTestId('agents-chat');

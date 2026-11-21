@@ -45,8 +45,10 @@
 .fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; box-shadow: 0 2px 3px -3px rgba(0,0,0,.2); pointer-events: auto; }
 .fa-app .fa-inbox { max-height: 23%; min-height: 36px; overflow: hidden; flex: 0 1 auto; display: flex; flex-direction: column; }
 .fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 36px; }
-.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 15px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
-.fa-app .fa-inbox-header span { flex: 1; }
+.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 6px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
+.fa-app .fa-task-status { display: flex; align-items: center; gap: 2px; margin-right: auto; }
+.fa-app .fa-task-status button { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; color: var(--fa-muted); font: inherit; font-size: 12px; white-space: nowrap; }
+.fa-app .fa-task-status button[aria-pressed="true"] { background: var(--fa-hover); color: var(--fa-text); }
 .fa-app .fa-inbox-header small { color: var(--fa-faint); font-size: 11px; }
 .fa-app .fa-inbox-header svg { width: 12px; height: 12px; }
 .fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 6px 6px; border-radius: 0 0 18px 18px; }
@@ -103,7 +105,7 @@
 .fa-app .fa-menu button > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fa-app .fa-menu button > small { margin-left: auto; color: var(--fa-muted); }
 .fa-app .fa-menu button[aria-checked=true] { background: var(--fa-hover); }
-@media (hover: hover) { .fa-app .fa-task-crumb:hover, .fa-app .fa-inbox-header:hover { background: var(--fa-hover); } }
+@media (hover: hover) { .fa-app .fa-task-crumb:hover, .fa-app .fa-task-status button:hover { background: var(--fa-hover); } }
 @container (max-width: 650px) {
   .fa-app .fa-canvas { display: none; }
   .fa-app .fa-topbar { left: 8px; right: 8px; }
