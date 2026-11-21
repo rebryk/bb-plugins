@@ -75,3 +75,10 @@
 @media (max-width: 767px) and (pointer: coarse) {
   .fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .relative.h-5 { height: 24px; }
 }
+
+/* Keep owned editable text above the mobile browser's focus-zoom threshold.
+   Do not change native transcript/GenUI inputs or disable user pinch zoom. */
+@media (max-width: 767px), (pointer: coarse) {
+  .fa-app .fa-message-composer textarea,
+  .fa-app .fa-rename-dialog input { font-size: 16px; }
+}

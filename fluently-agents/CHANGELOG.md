@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.26
+
+- Use 16px composer and agent-name text on narrow or touch devices to avoid
+  mobile browser focus zoom. Keep compact controls and user pinch zoom.
+
 ## 0.1.25
 
 - Use the selected VoiceRing for recording and transcription in the mic button.
