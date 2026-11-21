@@ -18,6 +18,7 @@ bb plugin install storage-cleaner@sf-plugins
 bb plugin install resource-monitor@sf-plugins
 bb plugin install san-francisco@sf-plugins
 bb plugin install pool-usage@sf-plugins
+bb plugin install fluently-agents@sf-plugins
 bb plugin install slack@sf-plugins
 bb plugin install voice-input@sf-plugins
 ```
@@ -111,6 +112,13 @@ plan. Click it for the next resets.
 ## Other plugins
 
 The catalog also serves plugins outside the San Francisco family.
+
+### [Fluently Agents](./fluently-agents)
+
+A task board with persistent coordinator agents, native BB conversations and
+recursive workers. Board and Inbox share a compact chat column. Agents reuse
+BB memory and choose models from live catalogs, with optional quota estimates
+from Pool Usage.
 
 ### [Slack](./slack)
 
