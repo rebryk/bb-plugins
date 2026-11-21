@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.18
+
+- Match the approved v73 status-list layout on laptops and phones, with
+  Running/Review navigation and a task picker above full-height task chats.
+- Separate the persistent composer from BB's native transcript and preserve
+  its plugin embeds, queue, attachments and voice controls.
+
 ## 0.1.17
 
 - Create ordinary BB coordinator, task and worker threads, retaining durable

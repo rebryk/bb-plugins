@@ -1,19 +1,19 @@
 .fa-app {
-  --fa-canvas: var(--background);
-  --fa-raised: var(--popover);
-  --fa-control: var(--secondary);
-  --fa-text: var(--foreground);
-  --fa-muted: var(--muted-foreground);
-  --fa-faint: var(--muted-foreground);
-  --fa-line: var(--border);
-  --fa-blue: #5b8def;
+  --fa-canvas: light-dark(#f4f4f2, #141414);
+  --fa-raised: light-dark(#fff, #262626);
+  --fa-control: light-dark(#efefed, #333);
+  --fa-text: light-dark(#1a1a19, #ededeb);
+  --fa-muted: light-dark(#6b6b68, #a3a3a0);
+  --fa-faint: light-dark(#6b6b68, #a3a3a0);
+  --fa-line: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.08));
+  --fa-blue: light-dark(#3b7bf0, #5b8def);
   --fa-amber: light-dark(#a94d0b, #f08c4a);
-  --fa-card: var(--card);
-  --fa-hover: var(--accent);
+  --fa-card: var(--fa-raised);
+  --fa-hover: light-dark(rgba(0,0,0,.04), rgba(255,255,255,.05));
   --fa-warning-bg: color-mix(in srgb, var(--fa-amber) 12%, var(--fa-raised));
   position: relative; isolation: isolate; width: 100%; height: 100%; min-height: 0; flex: 1;
   overflow: hidden; background: var(--fa-canvas); color: var(--fa-text);
-  font: 13px/1.45 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font: 13px/1.5 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   container-type: inline-size;
 }
 .fa-app *, .fa-app *::before, .fa-app *::after { box-sizing: border-box; }
@@ -21,72 +21,57 @@
 .fa-app button:disabled:not(.fa-native-transcript *) { cursor: wait; opacity: .5; }
 .fa-app button:focus-visible, .fa-app a:focus-visible, .fa-app input:focus-visible, .fa-app [role=separator]:focus-visible { outline: 2px solid var(--fa-blue); outline-offset: 2px; }
 .fa-app svg:not(.fa-native-transcript *) { width: 16px; height: 16px; flex-shrink: 0; }
-.fa-app .fa-topbar { position: absolute; z-index: 30; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
+.fa-app .fa-topbar { position: absolute; z-index: 30; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
 .fa-app .fa-topbar > * { pointer-events: auto; }
 .fa-app .fa-pill { height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--fa-line); border-radius: 18px; background: var(--fa-raised); }
-.fa-app .fa-breadcrumb { box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06); padding: 3px; min-width: 0; max-width: calc(100% - 100px); }
+.fa-app .fa-breadcrumb { box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 3px; min-width: 0; max-width: calc(100% - 82px); }
 .fa-app .fa-icon-button { width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 50%; flex-shrink: 0; }
-.fa-app .fa-root-crumb { height: 28px; padding: 0 6px; border: 0; border-radius: 14px; background: none; text-align: left; flex-shrink: 0; }
-.fa-app .fa-crumb-divider { color: var(--fa-faint); padding: 0 3px; }
-.fa-app .fa-task-crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
-.fa-app .fa-agent-count { padding: 0 12px; gap: 7px; white-space: nowrap; }
+.fa-app .fa-root-crumb { height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 14px; background: none; text-align: left; flex-shrink: 0; }
+.fa-app .fa-crumb-divider { color: var(--fa-faint); padding: 0 2px; }
+.fa-app .fa-task-crumb { display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px; border: 0; border-radius: 14px; background: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+.fa-app .fa-agent-count { padding: 0 12px; gap: 6px; white-space: nowrap; font-size: 12px; }
 .fa-app .fa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fa-blue); flex-shrink: 0; }
 .fa-app .fa-amber { background: var(--fa-amber); }
-.fa-app .fa-canvas { container: fa-content / inline-size; position: absolute; inset: 56px 0 12px calc(min(var(--fa-column-width), calc(100% - 320px)) + 24px); overflow: auto; transition: left 220ms ease, height 220ms ease; }
-.fa-app .fa-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: min(644px, 100%); margin: 20px auto; padding: 0 24px 24px; }
-.fa-app .fa-board-column h2 { margin: 0 0 14px; display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500; }
-.fa-app .fa-board-column h2 > span { margin-left: auto; color: var(--fa-faint); font-size: 12px; }
-.fa-app .fa-card-list { display: flex; flex-direction: column; gap: 10px; }
-.fa-app .fa-task-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 20px 17px 3px; gap: 4px; position: relative; height: 74px; padding: 12px; width: 100%; border: 1px solid var(--fa-line); border-radius: 14px; background: var(--fa-card); text-align: left; }
-.fa-app .fa-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
-.fa-app .fa-card-heading strong { min-width: 0; flex: 1; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.fa-app .fa-project-tag { display: inline-block; padding: 2px 6px; border-radius: 5px; font-size: 10px; line-height: 16px; color: var(--fa-muted); background: var(--fa-control); max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fa-app .fa-card-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 17px; color: var(--fa-muted); font-size: 11px; }
-.fa-app .fa-card-status > span { display: flex; align-items: center; gap: 6px; }
-.fa-app .fa-card-status .fa-ask { color: var(--fa-amber); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.fa-app .fa-canvas { position: absolute; inset: 56px 12px 12px 476px; overflow: auto; }
 .fa-app .fa-ask .fa-dot { margin-right: 7px; vertical-align: 1px; }
-.fa-app .fa-progress { height: 3px; display: block; border-radius: 3px; overflow: hidden; background: rgba(91,141,239,.13); }
-.fa-app .fa-progress > span { height: 100%; display: block; background: var(--fa-blue); border-radius: inherit; }
-.fa-app .fa-column-empty { color: var(--fa-faint); font-size: 12px; padding: 8px 0; }
 .fa-app .fa-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; color: var(--fa-faint); text-align: center; pointer-events: none; }
 .fa-app .fa-task-canvas { min-height: 100%; padding: 24px; }
-.fa-app .fa-artifacts { width: min(620px, 100%); margin: 24px auto; display: grid; gap: 12px; }
+.fa-app .fa-artifacts { width: min(520px, 100%); margin: 24px auto; display: grid; gap: 12px; }
 .fa-app .fa-artifact { display: flex; align-items: center; gap: 12px; padding: 20px; background: var(--fa-card); border: 1px solid var(--fa-line); border-radius: 18px; color: inherit; text-decoration: none; }
 .fa-app .fa-artifact strong { flex: 1; font-weight: 500; overflow-wrap: anywhere; }
 .fa-app .fa-artifact svg { color: var(--fa-muted); }
 .fa-app .fa-reopen { position: relative; display: block; margin: 24px auto; border: 1px solid var(--fa-line); background: var(--fa-raised); padding: 8px 16px; border-radius: 18px; }
-.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 12px; width: min(var(--fa-column-width), calc(100% - 320px)); display: flex; flex-direction: column; gap: 12px; pointer-events: none; visibility: visible; transition: transform 220ms ease, opacity 220ms ease; }
-.fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; box-shadow: 0 3px 5px -3px rgba(0,0,0,.24); pointer-events: auto; }
-.fa-app .fa-inbox { max-height: 40%; min-height: 70px; flex: 0 1 auto; display: flex; flex-direction: column; }
-.fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 38px; }
-.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 20px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
+.fa-app .fa-communications { position: absolute; z-index: 20; left: 12px; top: 56px; bottom: 12px; width: 440px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.fa-app .fa-panel { position: relative; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; box-shadow: 0 2px 3px -3px rgba(0,0,0,.2); pointer-events: auto; }
+.fa-app .fa-inbox { max-height: 30%; min-height: 36px; overflow: hidden; flex: 0 1 auto; display: flex; flex-direction: column; }
+.fa-app .fa-inbox-collapsed { min-height: 0; flex: 0 0 36px; }
+.fa-app .fa-inbox-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 36px; padding: 0 15px; border: 0; border-radius: 18px; background: transparent; color: var(--fa-text); text-align: left; font-size: 13px; }
 .fa-app .fa-inbox-header span { flex: 1; }
-.fa-app .fa-inbox-header small { color: var(--fa-faint); font-size: 10px; }
+.fa-app .fa-inbox-header small { color: var(--fa-faint); font-size: 11px; }
 .fa-app .fa-inbox-header svg { width: 12px; height: 12px; }
-.fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 7px 10px; border-radius: 0 0 18px 18px; }
-.fa-app .fa-inbox-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 4px 12px; text-align: left; border: 0; background: none; border-radius: 13px; }
-.fa-app .fa-inbox-item strong { display: block; flex: 0 1 auto; max-width: 55%; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fa-app .fa-inbox-task-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fa-muted); font-size: 11px; }
+.fa-app .fa-inbox-list { min-height: 0; overflow: auto; padding: 0 6px 6px; border-radius: 0 0 18px 18px; }
+.fa-app .fa-inbox-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 9px; text-align: left; border: 0; background: none; border-radius: 14px; }
+.fa-app .fa-inbox-item strong { display: block; flex: 1; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-app .fa-inbox-task-title { max-width: 35%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fa-muted); font-size: 11px; }
 .fa-app .fa-inbox-item small { flex-shrink: 0; white-space: nowrap; font-size: 10px; color: var(--fa-faint); }
 .fa-app .fa-inbox-item.fa-active { background: var(--fa-hover); }
 .fa-app .fa-inbox-empty { margin: 5px 12px 7px; color: var(--fa-faint); font-size: 12px; }
-.fa-app .fa-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 6px 8px; }
-.fa-app .fa-native-chat { min-height: 0; height: 100%; flex: 1; border-radius: 20px; overflow: hidden; }
+.fa-app .fa-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; pointer-events: auto; }
+.fa-app .fa-native-chat { min-height: 0; height: 100%; flex: 1; overflow: hidden; }
 .fa-app .fa-chat-empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--fa-muted); padding: 24px; }
 .fa-app .fa-chat-empty button { background: var(--fa-control); border: 0; padding: 10px; border-radius: 14px; }
-.fa-app .fa-resize { position: absolute; z-index: 2; width: 8px; top: 28px; right: -4px; bottom: 28px; cursor: col-resize; touch-action: none; border-radius: 4px; }
 .fa-app .fa-worker-actions { padding: 0 6px 8px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; max-height: 30%; overflow-y: auto; }
 .fa-app .fa-worker-actions button { display: flex; align-items: center; gap: 8px; text-align: left; background: var(--fa-control); border: 0; border-radius: 14px; padding: 8px 10px; font-size: 11px; }
 .fa-app .fa-worker-actions button svg:last-child { margin-left: auto; }
 .fa-app .fa-voice-hint { display: flex; gap: 8px; font-size: 11px; color: var(--fa-muted); padding: 8px 12px; }
 .fa-app .fa-voice-hint button { align-self: start; background: none; border: 0; padding: 0; }
-.fa-app .fa-avatars { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; gap: 3px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.fa-app .fa-avatars { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; gap: 3px; padding: 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .fa-app .fa-avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--fa-control); color: var(--fa-text); border: 2px solid transparent; opacity: .55; overflow: hidden; font-size: 9px; }
 .fa-app .fa-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.fa-app .fa-avatar.fa-selected { opacity: 1; border-color: var(--fa-muted); }
+.fa-app .fa-avatar.fa-selected { opacity: 1; border-color: var(--fa-blue); }
 .fa-app .fa-avatar:focus-visible { outline-offset: -2px; }
-.fa-app .fa-menu { position: absolute; z-index: 50; width: 192px; padding: 5px; background: var(--fa-raised); border: 1px solid var(--fa-line); border-radius: 17px; box-shadow: 0 3px 5px -3px rgba(0,0,0,.24); }
-.fa-app .fa-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 10px; background: transparent; border: 0; border-radius: 12px; font-size: 12px; }
+.fa-app .fa-menu { position: absolute; z-index: 50; width: 192px; padding: 5px; background: var(--fa-raised); border: 1px solid var(--fa-line); border-radius: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.09); }
+.fa-app .fa-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 10px; background: transparent; border: 0; border-radius: 14px; font-size: 13px; }
 .fa-app .fa-menu-label { padding: 8px 10px 4px; font-size: 10px; color: var(--fa-faint); }
 .fa-app .fa-snooze-menu { right: 12px; top: 56px; }
 .fa-app .fa-file-input { display: none; }
@@ -102,19 +87,7 @@
 @media (hover: hover) {
   .fa-app .fa-root-crumb:hover { background: var(--fa-hover); }
   .fa-app .fa-icon-button:hover, .fa-app .fa-menu button:hover, .fa-app .fa-inbox-item:hover { background: var(--fa-hover); }
-  .fa-app .fa-task-card:hover { border-color: var(--fa-muted); background: var(--fa-hover); }
   .fa-app .fa-avatar:hover { opacity: 1; }
-  .fa-app .fa-resize:hover { background: var(--fa-line); }
-}
-@container (max-width: 600px) {
-  .fa-app .fa-canvas { inset: 56px 0 auto; height: calc((100% - 80px) * .38); }
-  .fa-app .fa-communications { top: calc(68px + (100% - 80px) * .38); bottom: 12px; width: calc(100% - 24px); gap: 8px; }
-  .fa-app .fa-inbox { max-height: 32%; min-height: 62px; }
-  .fa-app .fa-inbox-collapsed { min-height: 0; }
-  .fa-app[data-sidebar-open=false] .fa-canvas { height: auto; inset: 56px 0 12px; }
-  .fa-app .fa-resize { display: none; }
-  .fa-app .fa-project-tag { max-width: 100px; }
-  .fa-app .fa-agent-count { font-size: 11px; padding: 0 9px; }
 }
 .fa-app .fa-worker-dialog { width: min(600px, 100%); height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 8px 8px; }
 .fa-app .fa-worker-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; gap: 12px; }
@@ -122,11 +95,32 @@
 .fa-app .fa-worker-dialog > header small { font-size: 11px; color: var(--fa-muted); }
 .fa-app .fa-worker-dialog > p { font-size: 11px; color: var(--fa-muted); padding: 8px; margin: 0; }
 
-@container fa-content (max-width: 560px) {
-  .fa-app .fa-board { padding: 0 14px 16px; gap: 14px; margin-top: 18px; grid-template-columns: minmax(0, 1fr); }
-  .fa-app .fa-board-column + .fa-board-column { margin-top: 10px; }
+
+
+.fa-app .fa-task-crumb > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fa-app .fa-root-crumb svg, .fa-app .fa-task-crumb svg { width: 12px; height: 12px; }
+.fa-app .fa-navigation-menu { top: 56px; left: 12px; width: min(440px, calc(100% - 24px)); max-height: calc(100% - 80px); overflow: auto; }
+.fa-app .fa-menu button > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fa-app .fa-menu button > small { margin-left: auto; color: var(--fa-muted); }
+.fa-app .fa-menu button[aria-checked=true] { background: var(--fa-hover); }
+@media (hover: hover) { .fa-app .fa-task-crumb:hover, .fa-app .fa-inbox-header:hover { background: var(--fa-hover); } }
+@container (max-width: 650px) {
+  .fa-app .fa-canvas { display: none; }
+  .fa-app .fa-topbar { left: 8px; right: 8px; }
+  .fa-app .fa-communications { left: 8px; right: 8px; top: 56px; bottom: 8px; width: auto; }
+  .fa-app .fa-inbox { max-height: 27%; }
+  .fa-app .fa-inbox-item { height: 32px; }
+  .fa-app .fa-inbox-task-title { max-width: 29%; }
+  .fa-app .fa-running-count { display: none; }
+  .fa-app .fa-breadcrumb { max-width: calc(100% - 76px); }
+  .fa-app .fa-pill { padding: 1px; }
+  .fa-app .fa-topbar .fa-icon-button { width: 32px; height: 32px; }
+  .fa-app .fa-root-crumb, .fa-app .fa-task-crumb { height: 32px; }
+  .fa-app .fa-root-crumb { padding: 0 6px; }
+  .fa-app .fa-task-crumb { max-width: 150px; font-size: 12px; }
+  .fa-app .fa-crumb-divider { padding: 0; }
+  .fa-app .fa-agent-count { font-size: 11px; padding: 0 9px; }
+  .fa-app .fa-avatar { width: 32px; height: 32px; }
 }
 
-.fa-app[data-sidebar-open=false] .fa-communications { transform: translateX(-110%); opacity: 0; visibility: hidden; pointer-events: none; transition: transform 220ms ease, opacity 220ms ease, visibility 0s linear 220ms; }
-.fa-app[data-sidebar-open=false] .fa-canvas { left: 0; }
-@media (prefers-reduced-motion: reduce) { .fa-app[data-sidebar-open] .fa-communications, .fa-app .fa-canvas { transition: none; } }
+.fa-app .fa-status-menu { top: 56px; left: 46px; width: 160px; }

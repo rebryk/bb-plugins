@@ -7,7 +7,7 @@ type Attachment = Awaited<ReturnType<Sdk['projects']['attachments']['upload']>>;
 type Thread = Awaited<ReturnType<Sdk['threads']['get']>>;
 type Interactions = Awaited<ReturnType<Sdk['threads']['interactions']['list']>>;
 type Queue = Awaited<ReturnType<Sdk['threads']['queuedMessages']['list']>>;
-export interface ChatProps { threadId: string; focusRequest?: number; voiceRequest?: number; onVoiceRequestHandled?(nonce: number): void; onVoiceState?(value: { state: VoiceState; level: number }): void; composerAgents?: ReactNode; onVoiceContextMenu?(event: MouseEvent<HTMLButtonElement>): void; className?: string; }
+export interface ChatProps { threadId: string; placeholder?: string; focusRequest?: number; voiceRequest?: number; onVoiceRequestHandled?(nonce: number): void; onVoiceState?(value: { state: VoiceState; level: number }): void; composerAgents?: ReactNode; onVoiceContextMenu?(event: MouseEvent<HTMLButtonElement>): void; className?: string; }
 function RetryIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 3v7h7" /></svg>; }
 type Draft = { text: string; attachments: Attachment[] };
 export function removeSubmittedDraft(current: Draft, submitted: Draft): Draft {
@@ -56,7 +56,7 @@ function draftFor(id: string): { text: string; attachments: Attachment[] } {
   try { const item = JSON.parse(localStorage.getItem(`fluently-agents.draft.${id}`) || '{}'); return { text: typeof item.text === 'string' ? item.text : '', attachments: Array.isArray(item.attachments) ? item.attachments.filter((file: Attachment) => file && typeof file.path === 'string' && (file.type === 'localFile' || file.type === 'localImage')) : [] }; } catch { return { text: '', attachments: [] }; }
 }
 export function Chat(props: ChatProps) { return <ChatSession key={props.threadId} {...props} />; }
-function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoiceRequestHandled, composerAgents, onVoiceContextMenu, className = '' }: ChatProps) {
+function ChatSession({ threadId, placeholder = 'Message…', focusRequest, voiceRequest, onVoiceState, onVoiceRequestHandled, composerAgents, onVoiceContextMenu, className = '' }: ChatProps) {
   const sdk = useSdk();
   const [draft, setDraft] = useState(() => draftFor(threadId));
   const [thread, setThread] = useState<Thread | null>(null);
@@ -127,7 +127,7 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
   }, [sdk, threadId, refresh, report]);
   useEffect(() => {
     const textarea = input.current; if (!textarea) return;
-    textarea.style.height = '28px'; textarea.style.height = `${Math.min(92, Math.max(28, textarea.scrollHeight))}px`;
+    textarea.style.height = '42px'; textarea.style.height = `${Math.min(120, Math.max(42, textarea.scrollHeight))}px`;
   }, [draft.text]);
   const mutate = async (operation: () => Promise<unknown>) => { if (sending.current || activeRequests.has(threadId)) return; sending.current = true; activeRequests.add(threadId); notifyRequest(threadId); setBusy(true); setError(null); try { await operation(); await refresh(); } catch (cause) { report(cause); } finally { sending.current = false; activeRequests.delete(threadId); notifyRequest(threadId); if (alive.current) setBusy(false); } };
   const voiceBusy = ['starting', 'recording', 'transcribing'].includes(voice.state);
@@ -201,7 +201,7 @@ function ChatSession({ threadId, focusRequest, voiceRequest, onVoiceState, onVoi
     {uploading && <div className="fa-upload-status" role="status">Attaching files…</div>}
     {failedFiles.map((item, index) => <div className="fa-upload-error" role="alert" key={index}><span>{item.file.name}: {item.error}</span><button type="button" aria-label="Retry upload" title="Retry upload" onClick={() => uploadFiles([item.file])}><RetryIcon /></button><button type="button" aria-label={`Dismiss ${item.file.name}`} title={`Dismiss ${item.file.name}`} onClick={() => { const remaining = (failedUploads.get(threadId) ?? []).filter(entry => entry !== item); if (remaining.length) failedUploads.set(threadId, remaining); else failedUploads.delete(threadId); notifyRequest(threadId); }}><Icon name="X" /></button></div>)}
     {!!queue?.length && <div className="fa-message-queue" role="region" aria-label="Queued messages">{queue.map(item => <div className="fa-queued-message" key={item.id}><small>Queued</small><span>{item.content.filter(part => part.visibility !== 'agent-only').filter(part => part.type === 'text').map(part => part.text).join('\n') || 'Attachments'}</span><button className="fa-queue-send" aria-label="Send queued message now" title="Send now" disabled={busy || !loaded || !!interactions.length} onClick={() => void mutate(() => sdk.threads.queuedMessages.send({ threadId, queuedMessageId: item.id, mode: 'steer' }))}><Icon name="ArrowUp" /></button><button aria-label="Remove queued message" title="Remove" disabled={busy} onClick={() => void mutate(() => sdk.threads.queuedMessages.delete({ threadId, queuedMessageId: item.id }))}><Icon name="X" /></button></div>)}</div>}
-    <form className="fa-message-composer" onSubmit={event => { event.preventDefault(); send(); }}><textarea ref={input} value={draft.text} placeholder="Message…" aria-label="Message" rows={1} onChange={event => setDraft(old => ({ ...old, text: event.target.value }))} onKeyDown={event => {
+    <form className="fa-message-composer" onSubmit={event => { event.preventDefault(); send(); }}><textarea ref={input} value={draft.text} placeholder={placeholder} aria-label="Message" rows={1} onChange={event => setDraft(old => ({ ...old, text: event.target.value }))} onKeyDown={event => {
       if (event.defaultPrevented || event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229 || event.shiftKey) return;
       // BB's modifier is Command on Apple platforms, Control elsewhere.
       const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);

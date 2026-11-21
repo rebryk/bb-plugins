@@ -20,15 +20,15 @@ The board hides BB's surrounding panels while open alone. Back to BB restores
 the ordinary view; saved panel widths, tabs and sidebar state stay unchanged.
 Split views retain BB's navigation.
 
-Chat opens on the left. The board and task results use the remaining space
-on the right. Resize the shared column to adjust both. On narrow screens,
-content sits above the conversation instead.
+Running and Review in the top navigation select a compact task list above the
+conversation. Collapse the list with its header. Running rows show the task,
+project, active agents and ETA; Review rows lead with the requested action.
 
-The sidebar button in the navigation pill smoothly hides or restores Inbox,
-chat and the agent controls together. Inbox stays at the top of the sidebar;
-click its header to collapse or expand the task list. Each row shows the
-requested action, task name and waiting time. Select a row to switch tasks
-directly; click Board to return to the board.
+Open a task to give its transcript the full column height. The task picker in
+the navigation switches between tasks; the back arrow returns to the selected
+status list. The conversation and separate composer stay visible. On laptops,
+results use the space to the right; phones show the conversation alone, with
+results available through the native transcript's links and embeds.
 
 ## Existing BB threads
 
@@ -128,12 +128,11 @@ Model choice happens at launch; an existing conversation keeps its model.
 
 ## Board controls
 
-- Running includes queued work. A card has a title, BB project tag, progress,
-  active-agent count and the ETA resolved by Thread Sidebar.
-- Needs you shows the requested decision or review. Finishing an assistant
-  turn does not mark a task done.
-- Inbox lists tasks needing attention above the conversation. Resize either
-  panel to change their shared width; this browser remembers it.
+- Running includes queued work and shows the active-agent count and ETA.
+- Review shows the requested decision. Finishing an assistant turn does not
+  mark a task done.
+- The task list appears above the coordinator conversation and hides inside
+  tasks. Use the top picker to switch tasks.
 - Mark done archives settled work. Let active work finish and resolve queued
   messages before closing the task.
 - Snooze hides a card for three hours, until tomorrow at 09:00, or indefinitely.

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { definePluginApp, experimental_Icon as Icon, ThreadChat, UrlLink, useBbNavigate, useRealtime, useRpc } from '@get-bb/plugin-sdk/app';
 import { CHANGED, type Agent, type Task, type rpcContract } from './shared';
 import './styles.css';
 import { Chat } from './chat';
 import { mountFocusedShell } from './focus-shell';
 
-const WIDTH_KEY = 'fluently-agents.communication-width';
 const AGENT_KEY = 'fluently-agents.selected-agent';
 function readPreference(key: string, fallback: string) {
   try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
@@ -26,23 +25,8 @@ function Avatar({ agent }: { agent: Agent }) {
   const image = /^(https?:\/\/|data:image\/(png|jpeg|webp|gif);base64,)/i.test(agent.avatar);
   return image ? <img src={agent.avatar} alt="" /> : <span>{agent.avatar || agent.name.slice(0, 2).toUpperCase()}</span>;
 }
-function TaskCard({ task, now, open }: { task: Task; now: number; open(): void }) {
-  const needs = task.state === 'needs-you';
-  return <button className="fa-task-card" onClick={open}>
-    <span className="fa-card-heading"><strong title={task.title}>{task.title}</strong><span className="fa-project-tag">{task.projectName}</span></span>
-    <span className="fa-card-status">
-      {needs ? <span className="fa-ask"><i className="fa-dot fa-amber" />{task.ask || 'Review the task'}</span> : <>
-        <span><i className="fa-dot" />{task.state === 'queued' ? 'Queued' : `${task.runningAgents} ${task.runningAgents === 1 ? 'agent' : 'agents'}`}</span>
-        {task.etaAt !== null && <span>{eta(task.etaAt, now)}</span>}
-      </>}
-    </span>
-    {!needs && <span className="fa-progress" role="progressbar" aria-label="Task progress" aria-valuemin={0} aria-valuemax={task.total || 1} aria-valuenow={Math.min(task.completed, task.total)}>
-      <span style={{ width: task.total > 0 ? `${Math.min(100, task.completed / task.total * 100)}%` : '0%' }} />
-    </span>}
-  </button>;
-}
 
-type Menu = { kind: 'agent'; agent: Agent; left: number; bottom: number } | { kind: 'mode'; left: number; bottom: number } | { kind: 'snooze' };
+type Menu = { kind: 'agent'; agent: Agent; left: number; bottom: number } | { kind: 'mode'; left: number; bottom: number } | { kind: 'snooze' | 'status' | 'tasks' };
 type Board = { agents: Agent[]; tasks: Task[]; runningAgents: number };
 function AgentsPage() {
   const navigate = useBbNavigate();
@@ -51,7 +35,7 @@ function AgentsPage() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inboxOpen, setInboxOpen] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [status, setStatus] = useState<'running' | 'review'>('running');
   const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState(() => readPreference(AGENT_KEY, ''));
   const [agentThreads, setAgentThreads] = useState<Record<string, string>>({});
@@ -59,7 +43,6 @@ function AgentsPage() {
   const pendingOpens = useRef(new Map<string, Promise<{ threadId: string }>>());
   const [workerThread, setWorkerThread] = useState<string | null>(null);
   const [focus, setFocus] = useState(0);
-  const [width, setWidth] = useState(() => Math.max(280, Math.min(560, Number(readPreference(WIDTH_KEY, '360')) || 360)));
   const [menu, setMenu] = useState<Menu | null>(null);
   const [renaming, setRenaming] = useState<Agent | null>(null);
   const [name, setName] = useState('');
@@ -73,8 +56,8 @@ function AgentsPage() {
   const uploadAgent = useRef<Agent | null>(null);
   const openingSequence = useRef(0);
   const fetchSequence = useRef(0);
-  const navigation = useRef({ taskId, inboxOpen, sidebarOpen });
-  navigation.current = { taskId, inboxOpen, sidebarOpen };
+  const navigation = useRef({ taskId, status });
+  navigation.current = { taskId, status };
   const report = useCallback((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)), []);
   const refresh = useCallback(() => {
     const sequence = ++fetchSequence.current;
@@ -121,12 +104,10 @@ function AgentsPage() {
     if (!taskId && agent && !threadId && !attemptedAgents.current.has(agent.id)) void openAgent(agent);
   }, [taskId, agent, threadId, openAgent]);
   const focusChat = useCallback(() => {
-    setSidebarOpen(true);
     if (task || threadId) setFocus(value => value + 1);
     else if (agent) void openAgent(agent, true);
   }, [task, threadId, agent, openAgent]);
   const activateVoice = useCallback(async () => {
-    setSidebarOpen(true);
     const target = threadId ?? (agent ? await openAgent(agent) : undefined);
     if (target) setVoiceRequest(previous => ({ threadId: target, nonce: previous.nonce + 1 }));
   }, [threadId, agent, openAgent]);
@@ -146,7 +127,7 @@ function AgentsPage() {
   useEffect(() => {
     if (!menu) return;
     const dismiss = (event: globalThis.PointerEvent) => {
-      if (event.target instanceof Element && !event.target.closest('.fa-menu')) setMenu(null);
+      if (event.target instanceof Element && !event.target.closest('.fa-menu, [aria-haspopup=menu]')) setMenu(null);
     };
     window.addEventListener('pointerdown', dismiss);
     return () => window.removeEventListener('pointerdown', dismiss);
@@ -160,17 +141,17 @@ function AgentsPage() {
     setMenu(kind === 'agent' && next ? { kind, agent: next, ...position } : { kind: 'mode', ...position });
   };
   const openTask = (next: Task) => {
-    setSidebarOpen(true);
+    setStatus(next.state === 'needs-you' ? 'review' : 'running');
     openingSequence.current++; setOpening(false); setTaskId(next.id); setWorkerThread(null); setMenu(null);
   };
   const returnHome = () => { setTaskId(null); setWorkerThread(null); setMenu(null); };
   const act = async (operation: () => Promise<unknown>, closeTask = false) => {
-    const origin = { taskId, inboxOpen, sidebarOpen };
+    const origin = { taskId, status };
     setBusy(true); setMenu(null);
     try {
       await operation();
-      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.inboxOpen === origin.inboxOpen && navigation.current.sidebarOpen === origin.sidebarOpen) {
-        const next = origin.inboxOpen && origin.sidebarOpen ? needs.find(item => item.id !== origin.taskId) : null;
+      if (closeTask && navigation.current.taskId === origin.taskId && navigation.current.status === origin.status) {
+        const next = (origin.status === 'review' ? needs : running).find(item => item.id !== origin.taskId);
         if (next) openTask(next); else returnHome();
       }
       refresh();
@@ -182,32 +163,15 @@ function AgentsPage() {
     await rpc.call('saveAgent', { id: next.id, name: next.name, avatar: next.avatar, instructions: next.instructions, projectId: next.projectId, execution: next.execution, ...fields });
     setRenaming(null);
   });
-  const resize = (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
-    const startX = event.clientX, startWidth = width;
-    const target = event.currentTarget;
-    const move = (next: globalThis.PointerEvent) => {
-      const maximum = Math.min(560, (root.current?.clientWidth ?? 584) - 24);
-      const value = Math.max(280, Math.min(maximum, startWidth + next.clientX - startX));
-      setWidth(value); writePreference(WIDTH_KEY, String(value));
-    };
-    const stop = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', stop); target.removeEventListener('pointercancel', stop); };
-    target.addEventListener('pointermove', move); target.addEventListener('pointerup', stop); target.addEventListener('pointercancel', stop);
-  };
-  const resizeHandle = <div role="separator" aria-label="Communication panel width" aria-orientation="vertical" aria-valuemin={280} aria-valuemax={560} aria-valuenow={Math.round(width)} tabIndex={0} className="fa-resize" onPointerDown={resize} onKeyDown={event => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault(); const next = Math.max(280, Math.min(560, width + (event.key === 'ArrowRight' ? 20 : -20))); setWidth(next); writePreference(WIDTH_KEY, String(next));
-  }} />;
+  const agentSelector = task ? <div className="fa-avatars"><span className="fa-avatar fa-selected" title="Task worker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8M12 2v2M6 8h12a2 2 0 0 1 2 2v9H4v-9a2 2 0 0 1 2-2M8 12h.01M16 12h.01M9 16h6M2 12v4M22 12v4" /></svg></span></div> : board && board.agents.length > 0 && <div className="fa-avatars" aria-label="Agents">{board.agents.map(item => <button type="button" className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>;
 
-  const agentSelector = !task && board && board.agents.length > 0 && <div className="fa-avatars" aria-label="Agents">{board.agents.map(item => <button type="button" className={`fa-avatar${agent?.id === item.id ? ' fa-selected' : ''}`} key={item.id} title={item.name} aria-label={`Chat with ${item.name}`} aria-pressed={agent?.id === item.id} onContextMenu={event => showMenu(event, 'agent', item)} onClick={() => void openAgent(item, true)}><Avatar agent={item} /></button>)}</div>;
-
-  return <div className="fa-app" data-sidebar-open={sidebarOpen} ref={root} style={{ '--fa-column-width': `${width}px` } as CSSProperties}>
+  return <div className="fa-app" ref={root}>
     <header className="fa-topbar">
       <nav className="fa-pill fa-breadcrumb" aria-label="Agents navigation">
-        <button className="fa-icon-button" title="Back to BB" aria-label="Back to BB" onClick={() => navigate.toCompose()}><Icon name="ArrowLeft" /></button>
-        <button className="fa-icon-button" title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'} aria-label="Toggle sidebar" aria-expanded={sidebarOpen} onClick={event => { event.currentTarget.focus(); setSidebarOpen(value => !value); setMenu(null); }}><Icon name="PanelLeft" /></button>
-        <span className="fa-crumb-divider">/</span><button className="fa-root-crumb" onClick={returnHome}>Board</button>
-        {task && <><span className="fa-crumb-divider">/</span><span className="fa-task-crumb">{task.title}</span></>}
+        <button className="fa-icon-button" title={task ? `Back to ${status}` : 'Back to BB'} aria-label={task ? `Back to ${status}` : 'Back to BB'} onClick={() => task ? returnHome() : navigate.toCompose()}><Icon name="ArrowLeft" /></button>
+        <button className="fa-root-crumb" aria-haspopup="menu" aria-expanded={menu?.kind === 'status'} onClick={() => setMenu(value => value?.kind === 'status' ? null : { kind: 'status' })}>{status === 'running' ? 'Running' : 'Review'}<Icon name="ChevronDown" /></button>
+        {task && <><span className="fa-crumb-divider">/</span><button className="fa-task-crumb" aria-label="Switch task" title={task.title} aria-haspopup="menu" aria-expanded={menu?.kind === 'tasks'} onClick={() => setMenu(value => value?.kind === 'tasks' ? null : { kind: 'tasks' })}><span>{task.title}</span><Icon name="ChevronDown" /></button></>}
+
       </nav>
       <div className="fa-top-actions">
         {task ? <div className="fa-pill">
@@ -222,32 +186,25 @@ function AgentsPage() {
       {!board ? <div className="fa-empty" role="status">Loading agents…</div> : task ? <div className="fa-task-canvas">
         {task.artifacts.length > 0 ? <div className="fa-artifacts">{task.artifacts.map((artifact, index) => <UrlLink className="fa-artifact" key={`${artifact.url}-${index}`} href={artifact.url}><Icon name="FileText" /><strong>{artifact.title}</strong><Icon name="ArrowUpRight" /></UrlLink>)}</div> : <div className="fa-empty">Results will appear here.</div>}
         {(task.state === 'snoozed' || task.state === 'done') && <button className="fa-reopen" disabled={busy} onClick={() => void act(() => rpc.call('reopenTask', { taskId: task.id }))}>Reopen task</button>}
-      </div> : <div className="fa-board">
-        {([{ label: 'Running', tasks: running, warning: false }, { label: 'Needs you', tasks: needs, warning: true }]).map(column => <section className="fa-board-column" key={column.label}>
-          <h2><i className={`fa-dot${column.warning ? ' fa-amber' : ''}`} />{column.label}<span>{column.tasks.length}</span></h2>
-          <div className="fa-card-list">{column.tasks.map(item => <TaskCard key={item.id} task={item} now={now} open={() => openTask(item)} />)}</div>
-          {column.tasks.length === 0 && <p className="fa-column-empty">{column.warning ? 'Nothing needs your attention.' : 'Message an agent to get started.'}</p>}
-        </section>)}
-      </div>}
+      </div> : null}
+
     </main>
 
-    <aside className="fa-communications" aria-label="Conversations" aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
-      <section className={`fa-inbox fa-panel${inboxOpen ? '' : ' fa-inbox-collapsed'}`} aria-label="Inbox">
-        <button className="fa-inbox-header" aria-expanded={inboxOpen} onClick={() => setInboxOpen(value => !value)}><span>Inbox</span><small>{needs.length}</small><Icon name={inboxOpen ? 'ChevronDown' : 'ChevronRight'} /></button>
-        <div className="fa-inbox-list" hidden={!inboxOpen}>{needs.map(item => <button key={item.id} className={`fa-inbox-item${item.id === taskId ? ' fa-active' : ''}`} title={`${item.projectName} / ${item.title} · ${item.ask || 'Review task'}`} onClick={() => openTask(item)}><i className="fa-dot fa-amber" /><strong>{item.ask || 'Review task'}</strong><span className="fa-inbox-task-title">{item.title}</span><small title="Waiting for you">{elapsed(item.needsSince ?? item.updatedAt, now)}</small></button>)}{needs.length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
-        {resizeHandle}
-      </section>
-      <section className="fa-chat fa-panel" aria-label="Chat">
+    <aside className="fa-communications" aria-label="Conversations">
+      {!task && <section className={`fa-inbox fa-panel${inboxOpen ? '' : ' fa-inbox-collapsed'}`} aria-label="Task list">
+        <button className="fa-inbox-header" aria-expanded={inboxOpen} onClick={() => setInboxOpen(value => !value)}><span>{status === 'running' ? 'Running' : 'Review'}</span><small>{(status === 'running' ? running : needs).length}</small><Icon name={inboxOpen ? 'ChevronDown' : 'ChevronRight'} /></button>
+        <div className="fa-inbox-list" hidden={!inboxOpen}>{(status === 'running' ? running : needs).map(item => <button key={item.id} className="fa-inbox-item" title={`${item.projectName} / ${item.title}`} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><strong>{item.state === 'needs-you' ? item.ask || 'Review task' : item.title}</strong><span className="fa-inbox-task-title">{item.state === 'needs-you' ? item.title : item.projectName}</span>{item.state !== 'needs-you' && <small className="fa-running-count">{item.runningAgents} agents</small>}<small>{item.state === 'needs-you' ? elapsed(item.needsSince ?? item.updatedAt, now).replace(' ago', '') : item.etaAt !== null ? `~${eta(item.etaAt, now)}` : item.state === 'queued' ? 'Queued' : ''}</small></button>)}{(status === 'running' ? running : needs).length === 0 && <p className="fa-inbox-empty">All caught up.</p>}</div>
+      </section>}
+      <section className="fa-chat" aria-label="Chat">
         {task && task.pendingWorkers.length > 0 && <div className="fa-worker-actions">
           {task.pendingWorkers.map(worker => <button key={worker.threadId} onClick={() => { setWorkerThread(worker.threadId); setFocus(value => value + 1); }}><i className="fa-dot fa-amber" />{worker.title}<Icon name="ArrowRight" /></button>)}
         </div>}
-        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…{agentSelector}</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} composerAgents={agentSelector} onVoiceContextMenu={event => showMenu(event, 'mode')} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}{agentSelector}</div>}
-        {resizeHandle}
+        {opening ? <div className="fa-chat-empty" role="status">Opening conversation…{agentSelector}</div> : threadId ? <Chat key={threadId} threadId={threadId} focusRequest={focus} voiceRequest={voiceRequest.threadId === threadId ? voiceRequest.nonce : 0} composerAgents={agentSelector} placeholder={task ? 'Message worker…' : `Message ${agent?.name ?? 'agent'}…`} onVoiceContextMenu={event => showMenu(event, 'mode')} onVoiceRequestHandled={onVoiceRequestHandled} className="fa-native-chat" /> : <div className="fa-chat-empty">{task ? 'The task conversation is being created.' : agent ? <button onClick={() => void openAgent(agent, true)}>Open {agent.name} conversation</button> : 'Create an agent in the plugin settings.'}{agentSelector}</div>}
       </section>
     </aside>
 
-    {menu && <div className={`fa-menu${menu.kind === 'snooze' ? ' fa-snooze-menu' : ''}`} role="menu" style={menu.kind === 'snooze' ? undefined : { left: menu.left, bottom: menu.bottom }}>
-      {menu.kind === 'snooze' && task ? <><div className="fa-menu-label">Snooze until</div>{[
+    {menu && <div className={`fa-menu${menu.kind === 'snooze' ? ' fa-snooze-menu' : menu.kind === 'status' ? ' fa-status-menu' : menu.kind === 'tasks' ? ' fa-navigation-menu' : ''}`} role="menu" style={'left' in menu ? { left: menu.left, bottom: menu.bottom } : undefined}>
+      {menu.kind === 'status' ? <>{(['running', 'review'] as const).map(value => <button key={value} role="menuitemradio" aria-checked={status === value} onClick={() => { setStatus(value); returnHome(); }}><i className={`fa-dot${value === 'review' ? ' fa-amber' : ''}`} />{value === 'running' ? 'Running' : 'Review'}<small>{(value === 'running' ? running : needs).length}</small></button>)}</> : menu.kind === 'tasks' ? <>{[{ label: 'Running', items: running }, { label: 'Review', items: needs }].map(group => <div key={group.label}><div className="fa-menu-label">{group.label}</div>{group.items.map(item => <button key={item.id} role="menuitemradio" aria-checked={item.id === taskId} onClick={() => openTask(item)}><i className={`fa-dot${item.state === 'needs-you' ? ' fa-amber' : ''}`} /><span>{item.title}</span>{item.id === taskId && <Icon name="Check" />}</button>)}</div>)}</> : menu.kind === 'snooze' && task ? <><div className="fa-menu-label">Snooze until</div>{[
         { label: 'Later today', until: now + 3 * 60 * 60 * 1000 },
         { label: 'Tomorrow', until: new Date(new Date(now).getFullYear(), new Date(now).getMonth(), new Date(now).getDate() + 1, 9).getTime() },
         { label: 'Forever', until: null },

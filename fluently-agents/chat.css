@@ -1,23 +1,23 @@
-.fa-app .fa-custom-chat { --fa-chat-inset: 12px; position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.fa-app .fa-custom-chat { --fa-chat-inset: 14px; gap: 8px; position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 /* BB owns transcript behavior and plugin renderers. Keep host DOM overrides
    scoped to its message shells; never restyle nested plugin content. */
-.fa-app .fa-chat-transcript { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: 12px var(--fa-chat-inset) 18px; scrollbar-width: thin; }
+.fa-app .fa-chat-transcript { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: 14px var(--fa-chat-inset); border: 1px solid var(--fa-line); border-radius: 19px; background: var(--fa-raised); scrollbar-width: thin; }
 .fa-app .fa-native-transcript { min-width: 0; }
 .fa-app .fa-native-transcript > div { background: transparent; padding: 0; }
 .fa-app .fa-native-transcript [data-message-column][class~="group/message"] { padding-inline: 0; font-size: 13px; line-height: 1.6; }
-.fa-app .fa-native-transcript [data-message-column] > .ml-auto { max-width: 88%; }
-.fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .bg-surface-recessed { padding: 9px 13px; border: 0; border-radius: 18px 18px 5px 18px; background: var(--fa-control); font-size: 13px; line-height: 1.6; }
+.fa-app .fa-native-transcript [data-message-column] > .ml-auto { max-width: 90%; }
+.fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .bg-surface-recessed { padding: 8px 12px; border: 0; border-radius: 17px 17px 5px 17px; background: var(--fa-control); font-size: 13px; line-height: 1.6; }
 .fa-app .fa-native-transcript [data-message-column][class~="group/message"] > [data-sidebar-swipe-selectable] > [data-markdown-preview],
 .fa-app .fa-native-transcript [data-message-column] > .ml-auto > .items-end > .bg-surface-recessed > [data-image-gallery-clipped] > [data-markdown-preview] { font-size: 13px; line-height: 1.6; }
 .fa-app .fa-native-transcript [data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id] > .rounded-md > [class~="group/timeline-row"] > button[aria-expanded] { padding: 0; font-size: 11px; line-height: 18px; }
 .fa-app .fa-native-transcript [data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id] > .rounded-md > [class~="group/timeline-row"] > button[aria-expanded] .text-sm { font-size: inherit; line-height: inherit; }
-.fa-app .fa-message-composer { display: flex; flex-direction: column; align-items: stretch; gap: 4px; flex-shrink: 0; margin: 0 6px 3px; padding: 6px; border: 1px solid var(--fa-line); background: transparent; border-radius: 21px; }
-.fa-app .fa-message-composer textarea { display: block; flex: none; min-width: 0; resize: none; height: 28px; min-height: 28px; max-height: 92px; width: 100%; padding: 4px 6px; font: inherit; line-height: 20px; border: 0; outline: none; color: inherit; background: transparent; }
+.fa-app .fa-message-composer { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex-shrink: 0; margin: 0; padding: 10px; border: 1px solid var(--fa-line); background: var(--fa-raised); border-radius: 19px; }
+.fa-app .fa-message-composer textarea { display: block; flex: none; min-width: 0; resize: none; height: 42px; min-height: 42px; max-height: 120px; width: 100%; padding: 0 2px; font: inherit; line-height: 21px; border: 0; outline: none; color: inherit; background: transparent; }
 .fa-app .fa-message-composer textarea::placeholder { color: var(--fa-faint); }
 .fa-app .fa-compose-actions { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
-.fa-app .fa-compose-left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.fa-app .fa-compose-right { display: flex; align-items: center; gap: 2px; flex: none; }
-.fa-app .fa-compose-actions .fa-composer-tool { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; min-width: 28px; height: 28px; padding: 4px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
+.fa-app .fa-compose-left { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.fa-app .fa-compose-right { display: flex; align-items: center; gap: 4px; flex: none; }
+.fa-app .fa-compose-actions .fa-composer-tool { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; min-width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: none; color: var(--fa-muted); font-size: 10px; }
 .fa-app .fa-compose-actions .fa-send-message { background: var(--fa-control); color: var(--fa-text); }
 .fa-app .fa-chat-error { display: flex; gap: 8px; align-items: center; padding: 10px; color: var(--fa-amber); font-size: 11px; }
 .fa-app .fa-chat-error button, .fa-app .fa-interaction button { border: 0; background: var(--fa-control); color: inherit; border-radius: 10px; padding: 6px 9px; font-size: 11px; }
@@ -25,8 +25,8 @@
 .fa-app .fa-draft-files > span { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--fa-control); border-radius: 8px; }
 .fa-app .fa-draft-files button, .fa-app .fa-queued-message button { padding: 0; border: 0; background: none; }
 .fa-app .fa-interaction { margin: 10px 0; padding: 10px; border: 1px solid color-mix(in srgb, var(--fa-amber) 40%, var(--fa-line)); border-radius: 14px; font-size: 12px; }
-.fa-app .fa-message-queue { flex: 0 1 auto; min-height: 0; max-height: min(144px, 25%); overflow-y: auto; scrollbar-width: thin; margin: 0 6px 6px; }
-.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: var(--fa-control); border-radius: 12px; padding: 6px 8px; font-size: 11px; }
+.fa-app .fa-message-queue { flex: 0 1 auto; min-height: 0; max-height: min(144px, 25%); overflow-y: auto; scrollbar-width: thin; margin: 0; }
+.fa-app .fa-queued-message { display: flex; align-items: center; gap: 8px; background: var(--fa-control); border-radius: 14px; padding: 7px 10px; font-size: 11px; }
 .fa-app .fa-queued-message + .fa-queued-message { margin-top: 4px; }
 .fa-app .fa-queued-message > span { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fa-app .fa-queued-message > small { color: var(--fa-muted); }
@@ -39,11 +39,11 @@
 .fa-app .fa-advanced-overlay p { color: var(--fa-muted); font-size: 11px; }
 @media (hover: hover) { .fa-app .fa-compose-actions .fa-composer-tool:hover { background: var(--fa-hover); } }
 
-@media (max-width: 700px) { .fa-app .fa-message-composer textarea { font-size: 16px; } }
+@container (max-width: 650px) { .fa-app .fa-chat-transcript { padding: 12px; } }
 
 .fa-app .fa-draft-files { flex-wrap: nowrap; overflow-x: auto; padding: 6px var(--fa-chat-inset); flex-shrink: 0; scrollbar-width: thin; }
 .fa-app .fa-draft-files > span { flex: none; align-self: center; }
-.fa-app .fa-image-attachment { position: relative; width: 88px; height: 72px; flex: none; }
+.fa-app .fa-image-attachment { position: relative; width: 80px; height: 64px; flex: none; }
 .fa-app .fa-image-attachment .fa-attachment-preview, .fa-app .fa-image-fallback { display: block; width: 100%; height: 100%; overflow: hidden; padding: 0; border: 1px solid var(--fa-line); border-radius: 14px; background: var(--fa-control); }
 .fa-app .fa-image-attachment .fa-remove-attachment { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--fa-line); border-radius: 50%; background: var(--fa-raised); color: var(--fa-text); padding: 3px; }
 .fa-app .fa-remove-attachment svg { width: 12px; height: 12px; }
